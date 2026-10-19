@@ -8,7 +8,7 @@
  *   (e.g., 'https://xiptv-play-backend.onrender.com'), or set the VITE_API_BASE_URL environment variable.
  */
 
-export const DEFAULT_API_BASE_URL = 'https://YOUR-REAL-RENDER-URL';
+export const DEFAULT_API_BASE_URL = 'https://GERCEK-RENDER-BACKEND-URL';
 
 /**
  * Returns the current active API base URL.
