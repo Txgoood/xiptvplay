@@ -1,4 +1,5 @@
 import { MediaItem, XtreamUserInfo, XtreamServerInfo } from '../types';
+import { buildProxyUrl, safeFetchJson } from '../config/api';
 
 export interface XtreamVerifyResult {
   success: boolean;
@@ -71,7 +72,7 @@ export class XtreamClientService {
     password: string
   ): Promise<XtreamVerifyResult> {
     try {
-      const resp = await fetch('/api/iptv/xtream/verify', {
+      const result = await safeFetchJson<any>('/api/iptv/xtream/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,22 +84,19 @@ export class XtreamClientService {
         }),
       });
 
-      const text = await resp.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(text);
-      } catch {
+      if (!result.success) {
         return {
           success: false,
-          error: `Sunucu geçerli bir JSON yanıtı vermedi (HTTP ${resp.status}). Sunucu adresini ve port numarasını kontrol edin.`,
+          error: result.error || 'Kimlik doğrulama isteği başarısız oldu.',
         };
       }
 
-      if (!data.success) {
+      const data = result.data;
+      if (!data || !data.success) {
         return {
           success: false,
-          error: data.error || `Kimlik doğrulama başarısız oldu (HTTP ${resp.status})`,
-          pingMs: data.pingMs,
+          error: data?.error || 'Kimlik doğrulama başarısız oldu.',
+          pingMs: data?.pingMs,
         };
       }
 
@@ -131,7 +129,7 @@ export class XtreamClientService {
     playlistId: string
   ): Promise<XtreamCatalogResult> {
     try {
-      const resp = await fetch('/api/iptv/xtream/catalog', {
+      const result = await safeFetchJson<any>('/api/iptv/xtream/catalog', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -143,15 +141,12 @@ export class XtreamClientService {
         }),
       });
 
-      const text = await resp.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error(`Katalog verisi okunamadı (HTTP ${resp.status}). Sunucu adresi veya portu kontrol edin.`);
+      if (!result.success) {
+        throw new Error(result.error || 'Katalog verisi alınamadı.');
       }
 
-      if (data.success === false) {
+      const data = result.data;
+      if (data?.success === false) {
         throw new Error(data.error || 'Katalog verisi alınamadı.');
       }
 
@@ -193,7 +188,7 @@ export class XtreamClientService {
           const directStreamUrl = `${workingServer}/live/${encodeURIComponent(username)}/${encodeURIComponent(
             password
           )}/${stream.stream_id}.ts`;
-          const proxiedUrl = `/api/iptv/proxy?url=${encodeURIComponent(directStreamUrl)}`;
+          const proxiedUrl = buildProxyUrl(directStreamUrl);
 
           items.push({
             id: `${playlistId}-live-${stream.stream_id || idx}`,
@@ -204,7 +199,7 @@ export class XtreamClientService {
             resolution: 'FHD',
             poster:
               stream.stream_icon && stream.stream_icon.startsWith('http')
-                ? `/api/iptv/proxy?url=${encodeURIComponent(stream.stream_icon)}`
+                ? buildProxyUrl(stream.stream_icon)
                 : 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80',
             streamUrl: proxiedUrl,
             channelNumber: idx + 1,
@@ -220,7 +215,7 @@ export class XtreamClientService {
           const directStreamUrl = `${workingServer}/movie/${encodeURIComponent(username)}/${encodeURIComponent(
             password
           )}/${vod.stream_id}.${ext}`;
-          const proxiedUrl = `/api/iptv/proxy?url=${encodeURIComponent(directStreamUrl)}`;
+          const proxiedUrl = buildProxyUrl(directStreamUrl);
 
           items.push({
             id: `${playlistId}-vod-${vod.stream_id || idx}`,
@@ -231,7 +226,7 @@ export class XtreamClientService {
             resolution: '4K UHD',
             poster:
               vod.stream_icon && vod.stream_icon.startsWith('http')
-                ? `/api/iptv/proxy?url=${encodeURIComponent(vod.stream_icon)}`
+                ? buildProxyUrl(vod.stream_icon)
                 : 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&auto=format&fit=crop&q=80',
             streamUrl: proxiedUrl,
             year: vod.year ? parseInt(vod.year, 10) : undefined,
@@ -249,7 +244,7 @@ export class XtreamClientService {
           const directStreamUrl = `${workingServer}/series/${encodeURIComponent(username)}/${encodeURIComponent(
             password
           )}/${ser.series_id}.mp4`;
-          const proxiedUrl = `/api/iptv/proxy?url=${encodeURIComponent(directStreamUrl)}`;
+          const proxiedUrl = buildProxyUrl(directStreamUrl);
 
           items.push({
             id: `${playlistId}-series-${ser.series_id || idx}`,
@@ -260,7 +255,7 @@ export class XtreamClientService {
             resolution: 'FHD',
             poster:
               ser.cover && ser.cover.startsWith('http')
-                ? `/api/iptv/proxy?url=${encodeURIComponent(ser.cover)}`
+                ? buildProxyUrl(ser.cover)
                 : 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&auto=format&fit=crop&q=80',
             streamUrl: proxiedUrl,
             year: ser.year ? parseInt(ser.year, 10) : undefined,
@@ -280,10 +275,7 @@ export class XtreamClientService {
       };
     } catch (err: any) {
       console.error('[XtreamClient] Fetch catalog failed:', err);
-      return {
-        items: [],
-        counts: { live: 0, movie: 0, series: 0 },
-      };
+      throw err;
     }
   }
 
@@ -297,7 +289,7 @@ export class XtreamClientService {
     seriesId: string | number
   ): Promise<any> {
     try {
-      const resp = await fetch('/api/iptv/xtream/series_info', {
+      const result = await safeFetchJson<any>('/api/iptv/xtream/series_info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -307,12 +299,12 @@ export class XtreamClientService {
           seriesId,
         }),
       });
-      const text = await resp.text();
-      try {
-        return JSON.parse(text);
-      } catch {
-        return { success: false, error: 'Dizi bilgisi ayrıştırılamadı (Geçersiz yanıt).' };
+
+      if (!result.success) {
+        return { success: false, error: result.error || 'Dizi bilgisi alınamadı.' };
       }
+
+      return result.data;
     } catch (err: any) {
       return { success: false, error: err.message };
     }

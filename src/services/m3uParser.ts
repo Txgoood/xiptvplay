@@ -1,4 +1,5 @@
 import { MediaItem } from '../types';
+import { buildProxyUrl, safeFetchJson } from '../config/api';
 
 export interface M3UFetchResult {
   success: boolean;
@@ -22,7 +23,7 @@ export class M3UParserService {
    */
   static async fetchM3U(url: string): Promise<M3UFetchResult> {
     try {
-      const resp = await fetch('/api/iptv/m3u/fetch', {
+      const result = await safeFetchJson<any>('/api/iptv/m3u/fetch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -30,21 +31,18 @@ export class M3UParserService {
         body: JSON.stringify({ url: url.trim() }),
       });
 
-      const text = await resp.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(text);
-      } catch {
+      if (!result.success) {
         return {
           success: false,
-          error: `M3U sunucusu geçerli bir yanıt dönmedi (HTTP ${resp.status}). Adresi kontrol edin.`,
+          error: result.error || 'M3U sunucusu yanıt vermedi.',
         };
       }
 
-      if (!data.success) {
+      const data = result.data;
+      if (!data || !data.success) {
         return {
           success: false,
-          error: data.error || `M3U sunucusu yanıt vermedi (HTTP ${resp.status})`,
+          error: data?.error || 'M3U içeriği alınamadı.',
         };
       }
 
@@ -96,7 +94,7 @@ export class M3UParserService {
         if (logoMatch && logoMatch[1].trim()) {
           const rawLogo = logoMatch[1].trim();
           currentItem.poster = rawLogo.startsWith('http')
-            ? `/api/iptv/proxy?url=${encodeURIComponent(rawLogo)}`
+            ? buildProxyUrl(rawLogo)
             : rawLogo;
         } else {
           currentItem.poster =
@@ -140,9 +138,9 @@ export class M3UParserService {
         let streamUrl = line;
 
         // If not already proxied, wrap through backend proxy to bypass Mixed Content & CORS
-        if (!streamUrl.startsWith('/api/iptv/proxy')) {
+        if (!streamUrl.includes('/api/iptv/proxy?url=')) {
           if (streamUrl.startsWith('http://') || streamUrl.startsWith('https://')) {
-            streamUrl = `/api/iptv/proxy?url=${encodeURIComponent(streamUrl)}`;
+            streamUrl = buildProxyUrl(streamUrl);
           }
         }
 

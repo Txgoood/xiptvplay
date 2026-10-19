@@ -3,6 +3,7 @@ import { Playlist, MediaItem } from '../../types';
 import { XtreamClientService } from '../../services/xtreamClient';
 import { M3UParserService } from '../../services/m3uParser';
 import { StorageService } from '../../services/storage';
+import { safeFetchJson, buildProxyUrl } from '../../config/api';
 import {
   X,
   Radio,
@@ -80,18 +81,24 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
     setPingResult('Bağlanıyor...');
 
     try {
-      const resp = await fetch('/api/iptv/ping', {
+      const result = await safeFetchJson<any>('/api/iptv/ping', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: target }),
       });
-      const data = await resp.json();
 
-      if (data.reachable && data.pingMs) {
+      if (!result.success) {
+        setPingResult('Erişilemedi');
+        setErrorMessage(result.error || 'Sunucuya ulaşılamadı. Port ve adresi kontrol edin.');
+        return;
+      }
+
+      const data = result.data;
+      if (data && data.reachable && data.pingMs) {
         setPingResult(`Ping: ${data.pingMs}ms (${data.activeProtocol?.toUpperCase() || 'OK'})`);
       } else {
         setPingResult('Erişilemedi');
-        setErrorMessage(data.error || 'Sunucuya ulaşılamadı. Port ve adresi kontrol edin.');
+        setErrorMessage(data?.error || 'Sunucuya ulaşılamadı. Port ve adresi kontrol edin.');
       }
     } catch (pingErr: any) {
       setPingResult('Hata');
@@ -183,7 +190,7 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
         type: 'live',
         resolution: 'FHD',
         poster: 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80',
-        streamUrl: `/api/iptv/proxy?url=${encodeURIComponent(`${cleanServer}/live/${encodeURIComponent(cleanUser)}/${encodeURIComponent(cleanPass)}/1.ts`)}`,
+        streamUrl: buildProxyUrl(`${cleanServer}/live/${encodeURIComponent(cleanUser)}/${encodeURIComponent(cleanPass)}/1.ts`),
         channelNumber: 1,
       },
       {
@@ -194,7 +201,7 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
         type: 'live',
         resolution: 'HD',
         poster: 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80',
-        streamUrl: `/api/iptv/proxy?url=${encodeURIComponent(`${cleanServer}/live/${encodeURIComponent(cleanUser)}/${encodeURIComponent(cleanPass)}/2.ts`)}`,
+        streamUrl: buildProxyUrl(`${cleanServer}/live/${encodeURIComponent(cleanUser)}/${encodeURIComponent(cleanPass)}/2.ts`),
         channelNumber: 2,
       },
     ];

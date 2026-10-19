@@ -185,9 +185,9 @@ async function startServer() {
     next();
   });
 
-  // Health check endpoint
+  // Health check endpoint for monitoring & Android connectivity verification
   app.get('/api/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ ok: true });
   });
 
   // Real Latency Ping endpoint with protocol fallback
