@@ -1,0 +1,6 @@
+{
+  "name": "xiptvplay",
+  "description": "High-performance IPTV streaming client and offline multi-thread downloader with Xtream Codes & M3U support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

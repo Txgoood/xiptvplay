@@ -1,11 +1,29 @@
-<div align="center">
+# XIPTV Play
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+IPTV (Xtream Codes / M3U) Oynatıcısı.
 
-  <h1>Built with AI Studio</h2>
+## Kurulum ve Çalıştırma
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+### 1) PC (Web Geliştirme)
+Bilgisayarda Node.js kurulu iken:
+```bash
+npm install
+npm run dev
+```
+Tarayıcıda [http://localhost:3000](http://localhost:3000) adresinden erişebilirsiniz. (Proxy kullanıcının kendi IP'siyle çıkar.)
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+### 2) APK (Android)
+```bash
+npm install
+npx cap add android
+npm run cap:sync
+```
+*   `android/app/src/main/AndroidManifest.xml` içerisindeki `<application>` etiketine `android:usesCleartextTraffic="true"` ekleyin.
+*   `npx cap open android` ile Android Studio'da açıp Build > Build APK seçeneği ile kurulum dosyasını oluşturun.
 
-</div>
+## Android indirme notları
+- İndirme süresi artık tek bir anlık hız ölçümüne göre değil, yumuşatılmış hız ortalamasına göre hesaplanır; kaynak sunucu toplam boyutu bildirmiyorsa ETA kesin olmayabilir.
+- Tamamlanan indirme kartındaki **Dosyayı Aç / Paylaş** düğmesi Android paylaşım penceresini açar. Android'in uygulama özelindeki `Directory.Data` klasörü dosya yöneticisinde doğrudan açılabilir bir genel klasör değildir; bu nedenle paylaşım penceresinden VLC gibi bir oynatıcı seçilebilir.
+- MKV kapsayıcısı veya içindeki kodekler Android WebView tarafından desteklenmeyebilir. Böyle dosyalar için harici oynatıcı kullanın.
+- `@capacitor/share` eklentisi eklendi. Bağımlılıkları yükledikten sonra `npx cap sync android` çalıştırıp APK'yi yeniden oluşturun.
+- Bir indirme akışının hızını yalnızca arayüzden artırmak mümkün değildir; hız sunucu, ağ ve yayın sağlayıcısının sınırlarına bağlıdır. Bu sürüm sahte bir “hızlandır” kontrolü göstermez.
