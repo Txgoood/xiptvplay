@@ -4,18 +4,18 @@
  * IMPORTANT:
  * - In Android APK (Capacitor), relative URLs like '/api/...' fail because they resolve to
  *   'capacitor://localhost/api/...' or 'http://localhost/api/...', returning index.html instead of backend data.
- * - Replace 'https://YOUR-REAL-RENDER-URL' below with your deployed Render backend service URL
- *   (e.g., 'https://xiptv-play-backend.onrender.com'), or set the VITE_API_BASE_URL environment variable.
+ * - Replace 'https://xiptvplay.onrender.com' below with your deployed Render backend service URL
+ *   (e.g., 'https://xiptvplay.onrender.com'), or set the VITE_API_BASE_URL environment variable.
  */
 
-export const DEFAULT_API_BASE_URL = 'https://GERCEK-RENDER-BACKEND-URL';
+export const DEFAULT_API_BASE_URL = 'https://xiptvplay.onrender.com';
 
 /**
  * Returns the current active API base URL.
  * Prioritizes:
  * 1. VITE_API_BASE_URL environment variable (if defined)
  * 2. Window origin in web browser (when running fullstack web)
- * 3. DEFAULT_API_BASE_URL ('https://YOUR-REAL-RENDER-URL') for native Android Capacitor APK
+ * 3. DEFAULT_API_BASE_URL ('https://xiptvplay.onrender.com') for native Android Capacitor APK
  */
 export function getApiBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
@@ -48,7 +48,7 @@ export function getApiBaseUrl(): string {
 
 /**
  * Builds a full absolute URL for a backend API route.
- * Example: buildApiUrl('/api/iptv/xtream/verify') -> 'https://YOUR-REAL-RENDER-URL/api/iptv/xtream/verify'
+ * Example: buildApiUrl('/api/iptv/xtream/verify') -> 'https://xiptvplay.onrender.com/api/iptv/xtream/verify'
  */
 export function buildApiUrl(path: string): string {
   const base = getApiBaseUrl();
@@ -60,7 +60,7 @@ export function buildApiUrl(path: string): string {
  * Builds a backend proxy URL for IPTV stream chunks, video playlists, and channel posters.
  * Preserves the original external IPTV URL without modifying the provider's host.
  * Example: buildProxyUrl('http://iptv.server:8080/live/u/p/1.ts')
- * -> 'https://YOUR-REAL-RENDER-URL/api/iptv/proxy?url=http%3A%2F%2Fiptv.server%3A8080%2Flive%2Fu%2Fp%2F1.ts'
+ * -> 'https://xiptvplay.onrender.com/api/iptv/proxy?url=http%3A%2F%2Fiptv.server%3A8080%2Flive%2Fu%2Fp%2F1.ts'
  */
 export function buildProxyUrl(targetMediaUrl: string): string {
   if (!targetMediaUrl) return '';
