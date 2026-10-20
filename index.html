@@ -1,10 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>xiptvplay</title>
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="description" content="High-performance IPTV streaming client and offline multi-thread downloader with Xtream Codes & M3U support." />
+    <meta http-equiv="Content-Security-Policy" content="default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; script-src * data: blob: 'unsafe-inline' 'unsafe-eval'; style-src * data: blob: 'unsafe-inline'; img-src * data: blob:; font-src * data: blob:; media-src * data: blob:; connect-src * data: blob: ws: wss:; worker-src * blob: data:; frame-src * data: blob:;">
     <meta property="og:title" content="xiptvplay" />
     <meta property="og:description" content="High-performance IPTV streaming client and offline multi-thread downloader with Xtream Codes & M3U support." />
     <meta property="og:type" content="website" />
@@ -16,7 +17,6 @@
   </head>
   <body class="bg-[#131315] text-[#e5e1e4] antialiased selection:bg-[#00f0ff] selection:text-[#00363a]">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="./src/main.tsx"></script>
   </body>
 </html>
-
