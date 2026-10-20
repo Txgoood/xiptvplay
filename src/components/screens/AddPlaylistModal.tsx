@@ -3,7 +3,6 @@ import { Playlist, MediaItem } from '../../types';
 import { XtreamClientService } from '../../services/xtreamClient';
 import { M3UParserService } from '../../services/m3uParser';
 import { StorageService } from '../../services/storage';
-import { safeFetchJson, buildProxyUrl } from '../../config/api';
 import {
   X,
   Radio,
@@ -62,9 +61,6 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [autoDetectedInfo, setAutoDetectedInfo] = useState<string | null>(null);
-  const [canAddAnyway, setCanAddAnyway] = useState(false);
-
   if (!isOpen) return null;
 
   // Real ping test
@@ -78,34 +74,26 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
       );
       return;
     }
-
     setErrorMessage(null);
     setIsTestingPing(true);
     setPingResult('Bağlanıyor...');
 
     try {
-      const result = await safeFetchJson<any>('/api/iptv/ping', {
+      const resp = await fetch('/api/iptv/ping', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: target }),
       });
-
-      if (!result.success) {
-        setPingResult('Erişilemedi');
-        setErrorMessage(result.error || 'Sunucuya ulaşılamadı. Port ve adresi kontrol edin.');
-        return;
-      }
-
-      const data = result.data;
-      if (data && data.reachable && data.pingMs) {
+      const data = await resp.json();
+      if (data.reachable && data.pingMs) {
         setPingResult(`Ping: ${data.pingMs}ms (${data.activeProtocol?.toUpperCase() || 'OK'})`);
       } else {
         setPingResult('Erişilemedi');
-        setErrorMessage(data?.error || 'Sunucuya ulaşılamadı. Port ve adresi kontrol edin.');
+        setErrorMessage(data.error || 'Sunucuya ulaşılamadı. Port ve adresi kontrol edin.');
       }
     } catch (pingErr: any) {
       setPingResult('Hata');
-      setErrorMessage(`Ağ kontrolü başarısız: ${pingErr.message}`);
+      setErrorMessage(`Ağ kontrol hatası: ${pingErr.message}`);
     } finally {
       setIsTestingPing(false);
     }
@@ -122,12 +110,10 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setM3uFileName(file.name);
     if (!name) {
       setName(file.name.replace(/\.[^/.]+$/, ''));
     }
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
@@ -142,246 +128,142 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
     reader.readAsText(file);
   };
 
-
-  // Auto-detect and parse Xtream credentials if user pastes a full M3U / player_api URL
-  const handleServerUrlChange = (val: string) => {
-    let cleanVal = val.trim();
-    setErrorMessage(null);
-    setCanAddAnyway(false);
-
-    if (cleanVal.includes('username=') && cleanVal.includes('password=')) {
-      try {
-        const urlObj = new URL(cleanVal.startsWith('http') ? cleanVal : `http://${cleanVal}`);
-        const userParam = urlObj.searchParams.get('username') || '';
-        const passParam = urlObj.searchParams.get('password') || '';
-        const hostPort = `${urlObj.protocol}//${urlObj.host}`;
-
-        setServerUrl(hostPort);
-        if (userParam) setUsername(userParam);
-        if (passParam) setPassword(passParam);
-        if (!name) setName('IPTV Yayını');
-        setAutoDetectedInfo(`Bağlantıdan ayrıştırıldı: ${hostPort} (Kullanıcı: ${userParam})`);
-        return;
-      } catch {
-        // fallback to normal set
-      }
-    }
-
-    setServerUrl(val);
-  };
-
-  // Add Anyway (Bypass strict Xtream verification)
-  const handleAddAnyway = () => {
-    const playlistId = `pl-${Date.now()}`;
-    const cleanServer = serverUrl.trim().replace(/\/+$/, '');
-    const cleanUser = username.trim();
-    const cleanPass = password.trim();
-
-    if (!cleanServer || !cleanUser) {
-      setErrorMessage('Lütfen en azından sunucu adresi ve kullanıcı adını girin.');
-      return;
-    }
-
-    const placeholderItems: MediaItem[] = [
-      {
-        id: `${playlistId}-live-1`,
-        playlistId,
-        title: `${cleanUser} - Canlı Akış 1`,
-        category: 'Canlı TV',
-        type: 'live',
-        resolution: 'FHD',
-        poster: 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80',
-        streamUrl: buildProxyUrl(`${cleanServer}/live/${encodeURIComponent(cleanUser)}/${encodeURIComponent(cleanPass)}/1.ts`),
-        channelNumber: 1,
-      },
-      {
-        id: `${playlistId}-live-2`,
-        playlistId,
-        title: `${cleanUser} - Canlı Akış 2`,
-        category: 'Canlı TV',
-        type: 'live',
-        resolution: 'HD',
-        poster: 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80',
-        streamUrl: buildProxyUrl(`${cleanServer}/live/${encodeURIComponent(cleanUser)}/${encodeURIComponent(cleanPass)}/2.ts`),
-        channelNumber: 2,
-      },
-    ];
-
-    const newPlaylist: Playlist = {
-      id: playlistId,
-      name: name.trim() || `Xtream: ${cleanUser}`,
-      type: 'xtream',
-      serverUrl: cleanServer,
-      username: cleanUser,
-      password: cleanPass,
-      status: 'active',
-      statusLabel: 'Kayıt Edildi (Doğrulama Atlandı)',
-      badge: 'MANUEL',
-      expiryDays: 30,
-      expiryDateStr: 'Manuel Eklendi',
-      liveCount: placeholderItems.length,
-      movieCount: 0,
-      seriesCount: 0,
-      isCached: false,
-      lastSync: 'Şimdi',
-      pingMs: 28,
-      isDemo: false,
-    };
-
-    StorageService.upsertPlaylist(newPlaylist);
-    StorageService.savePlaylistItems(playlistId, placeholderItems);
-
-    onAddPlaylist(newPlaylist, placeholderItems);
-    onClose();
-  };
-
-  // Convert Xtream credentials to M3U and test
-  const handleConvertToM3u = async () => {
-    const cleanServer = serverUrl.trim().replace(/\/+$/, '');
-    const cleanUser = username.trim();
-    const cleanPass = password.trim();
-
-    if (!cleanServer || !cleanUser || !cleanPass) {
-      setErrorMessage('M3U çekmek için sunucu adresi, kullanıcı adı ve şifre gereklidir.');
-      return;
-    }
-
-    const generatedM3uUrl = `${cleanServer}/get.php?username=${encodeURIComponent(cleanUser)}&password=${encodeURIComponent(cleanPass)}&type=m3u_plus`;
-    setActiveTab('m3u');
-    setM3uUrl(generatedM3uUrl);
-    setErrorMessage(null);
-    setCanAddAnyway(false);
-  };
-
-  // Verify and Add handler with robust try/catch
+  // Verify and Add handler
   const handleVerifyAndAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    setCanAddAnyway(false);
     setIsVerifying(true);
 
     const playlistId = `pl-${Date.now()}`;
 
-    try {
-      if (activeTab === 'xtream') {
-        const cleanServer = serverUrl.trim();
-        const cleanUser = username.trim();
-        const cleanPass = password.trim();
+    if (activeTab === 'xtream') {
+      const cleanServer = serverUrl.trim();
+      const cleanUser = username.trim();
+      const cleanPass = password.trim();
 
-        if (!cleanServer || !cleanUser || !cleanPass) {
-          setErrorMessage('Lütfen sunucu adresi, kullanıcı adı ve şifre alanlarını eksiksiz doldurun.');
-          setIsVerifying(false);
-          return;
-        }
-
-        // 1. Verify connection against real Xtream API
-        const verifyRes = await XtreamClientService.verifyConnection(cleanServer, cleanUser, cleanPass);
-
-        if (!verifyRes.success) {
-          setErrorMessage(verifyRes.error || 'Xtream sunucusu doğrulaması başarısız oldu.');
-          setCanAddAnyway(true);
-          setIsVerifying(false);
-          return;
-        }
-
-        // 2. Fetch real catalog streams from Xtream
-        const effectiveHost = verifyRes.effectiveServerUrl || cleanServer;
-        const catalogRes = await XtreamClientService.fetchCatalog(effectiveHost, cleanUser, cleanPass, playlistId);
-
-        const newPlaylist: Playlist = {
-          id: playlistId,
-          name: name.trim() || `Xtream: ${cleanUser}`,
-          type: 'xtream',
-          serverUrl: verifyRes.effectiveServerUrl || cleanServer,
-          username: cleanUser,
-          password: cleanPass,
-          status: 'active',
-          statusLabel: 'Bağlı (Aktif)',
-          badge: verifyRes.userInfo?.is_trial === '1' ? 'DENEME' : 'PRO',
-          expiryDays: verifyRes.expiryDays || 30,
-          expiryDateStr: verifyRes.expiryDateStr || 'Bilinmiyor',
-          liveCount: catalogRes.counts.live,
-          movieCount: catalogRes.counts.movie,
-          seriesCount: catalogRes.counts.series,
-          isCached: true,
-          lastSync: 'Şimdi',
-          pingMs: verifyRes.pingMs || 32,
-          isDemo: false,
-          maxConnections: parseInt(verifyRes.userInfo?.max_connections || '1', 10),
-          activeConnections: parseInt(verifyRes.userInfo?.active_cons || '0', 10),
-        };
-
-        StorageService.upsertPlaylist(newPlaylist);
-        StorageService.savePlaylistItems(playlistId, catalogRes.items);
-
+      if (!cleanServer || !cleanUser || !cleanPass) {
+        setErrorMessage('Lütfen sunucu adresi, kullanıcı adı ve şifre alanlarını eksiksiz doldurun.');
         setIsVerifying(false);
-        onAddPlaylist(newPlaylist, catalogRes.items);
-        onClose();
-      } else {
-        // M3U Playlist Handling
-        let rawContent = m3uFileContent;
-        let workingM3uUrl = m3uUrl.trim();
-
-        if (!rawContent && workingM3uUrl) {
-          const fetchResult = await M3UParserService.fetchM3U(workingM3uUrl);
-          if (!fetchResult.success || !fetchResult.content) {
-            setErrorMessage(fetchResult.error || 'M3U URL adresinden veri alınamadı.');
-            setCanAddAnyway(true);
-            setIsVerifying(false);
-            return;
-          }
-          rawContent = fetchResult.content;
-          if (fetchResult.effectiveUrl) {
-            workingM3uUrl = fetchResult.effectiveUrl;
-          }
-        }
-
-        if (!rawContent) {
-          setErrorMessage('Lütfen geçerli bir M3U URL adresi girin veya dosya seçin.');
-          setIsVerifying(false);
-          return;
-        }
-
-        const parseResult = M3UParserService.parse(rawContent, playlistId);
-
-        if (parseResult.items.length === 0) {
-          setErrorMessage('M3U dosyasında hiçbir geçerli kanal veya yayın akışı bulunamadı.');
-          setCanAddAnyway(true);
-          setIsVerifying(false);
-          return;
-        }
-
-        const newPlaylist: Playlist = {
-          id: playlistId,
-          name: name.trim() || (m3uFileName ? m3uFileName : 'Özel M3U Yayını'),
-          type: 'm3u',
-          m3uUrl: workingM3uUrl,
-          serverUrl: workingM3uUrl || `Yerel: ${m3uFileName}`,
-          status: 'active',
-          statusLabel: 'Çevrimdışı Önbelleklendi',
-          badge: 'M3U',
-          expiryDays: 365,
-          expiryDateStr: 'Süresiz',
-          liveCount: parseResult.counts.live,
-          movieCount: parseResult.counts.movie,
-          seriesCount: parseResult.counts.series,
-          isCached: true,
-          lastSync: 'Şimdi',
-          pingMs: 22,
-          isDemo: false,
-        };
-
-        StorageService.upsertPlaylist(newPlaylist);
-        StorageService.savePlaylistItems(playlistId, parseResult.items);
-
-        setIsVerifying(false);
-        onAddPlaylist(newPlaylist, parseResult.items);
-        onClose();
+        return;
       }
-    } catch (err: any) {
-      setErrorMessage(`İşlem sırasında hata oluştu: ${err.message || 'Bilinmeyen bağlantı hatası'}`);
-      setCanAddAnyway(true);
+
+      // 1. Verify connection against real Xtream API
+      const verifyRes = await XtreamClientService.verifyConnection(cleanServer, cleanUser, cleanPass);
+      if (!verifyRes.success) {
+        setErrorMessage(verifyRes.error || 'Xtream sunucusu doğrulaması başarısız oldu.');
+        setIsVerifying(false);
+        return;
+      }
+
+      // 2. Fetch real catalog streams from Xtream
+      const catalogRes = await XtreamClientService.fetchCatalog(cleanServer, cleanUser, cleanPass, playlistId);
+
+      const newPlaylist: Playlist = {
+        id: playlistId,
+        name: name.trim() || `Xtream: ${cleanUser}`,
+        type: 'xtream',
+        serverUrl: verifyRes.effectiveServerUrl || cleanServer,
+        username: cleanUser,
+        password: cleanPass,
+        status: 'active',
+        statusLabel: 'Bağlı (Aktif)',
+        badge: verifyRes.userInfo?.is_trial === '1' ? 'DENEME' : 'PRO',
+        expiryDays: verifyRes.expiryDays || 30,
+        expiryDateStr: verifyRes.expiryDateStr || 'Bilinmiyor',
+        liveCount: catalogRes.counts.live,
+        movieCount: catalogRes.counts.movie,
+        seriesCount: catalogRes.counts.series,
+        isCached: true,
+        lastSync: 'Şimdi',
+        pingMs: verifyRes.pingMs || 32,
+        isDemo: false,
+        maxConnections: parseInt(verifyRes.userInfo?.max_connections || '1', 10),
+        activeConnections: parseInt(verifyRes.userInfo?.active_cons || '0', 10),
+      };
+
+      StorageService.upsertPlaylist(newPlaylist);
+      StorageService.savePlaylistItems(playlistId, catalogRes.items);
       setIsVerifying(false);
+      onAddPlaylist(newPlaylist, catalogRes.items);
+      onClose();
+    } else {
+      // M3U Playlist Handling
+      let rawContent = m3uFileContent;
+      let workingM3uUrl = m3uUrl.trim();
+
+      if (!rawContent && workingM3uUrl) {
+        const fetchResult = await M3UParserService.fetchM3U(workingM3uUrl);
+        if (!fetchResult.success || !fetchResult.content) {
+          setErrorMessage(fetchResult.error || 'M3U URL adresinden veri alınamadı.');
+          setIsVerifying(false);
+          return;
+        }
+        rawContent = fetchResult.content;
+        if (fetchResult.effectiveUrl) {
+          workingM3uUrl = fetchResult.effectiveUrl;
+        }
+      }
+
+      if (!rawContent) {
+        setErrorMessage('Lütfen geçerli bir M3U URL adresi girin veya dosya seçin.');
+        setIsVerifying(false);
+        return;
+      }
+
+      const parseResult = M3UParserService.parse(rawContent, playlistId);
+      if (parseResult.items.length === 0) {
+        setErrorMessage('M3U dosyasında hiçbir geçerli kanal veya yayın akışı bulunamadı.');
+        setIsVerifying(false);
+        return;
+      }
+
+      // Extract credentials from M3U URL or stream items if present (e.g. get.php?username=...&password=...)
+      let m3uExtractedServer = parseResult.detectedXtreamConfig?.serverUrl;
+      let m3uExtractedUser = parseResult.detectedXtreamConfig?.username;
+      let m3uExtractedPass = parseResult.detectedXtreamConfig?.password;
+
+      if ((!m3uExtractedUser || !m3uExtractedPass) && workingM3uUrl) {
+        try {
+          const parsedM3uUrl = new URL(workingM3uUrl);
+          const u = parsedM3uUrl.searchParams.get('username');
+          const p = parsedM3uUrl.searchParams.get('password');
+          if (u && p) {
+            m3uExtractedServer = parsedM3uUrl.origin;
+            m3uExtractedUser = u;
+            m3uExtractedPass = p;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const newPlaylist: Playlist = {
+        id: playlistId,
+        name: name.trim() || (m3uFileName ? m3uFileName : 'Özel M3U Yayını'),
+        type: 'm3u',
+        m3uUrl: m3uUrl.trim(),
+        serverUrl: m3uExtractedServer || m3uUrl.trim() || `Yerel: ${m3uFileName}`,
+        username: m3uExtractedUser,
+        password: m3uExtractedPass,
+        status: 'active',
+        statusLabel: 'Çevrimdışı Önbelleklendi',
+        badge: m3uExtractedUser ? 'M3U+XTREAM' : 'M3U',
+        expiryDays: 365,
+        expiryDateStr: 'Süresiz',
+        liveCount: parseResult.counts.live,
+        movieCount: parseResult.counts.movie,
+        seriesCount: parseResult.counts.series,
+        isCached: true,
+        lastSync: 'Şimdi',
+        pingMs: 22,
+        isDemo: false,
+      };
+
+      StorageService.upsertPlaylist(newPlaylist);
+      StorageService.savePlaylistItems(playlistId, parseResult.items);
+      setIsVerifying(false);
+      onAddPlaylist(newPlaylist, parseResult.items);
+      onClose();
     }
   };
 
@@ -430,7 +312,6 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
         <div className="relative overflow-hidden rounded-2xl bg-[#1c1b1d] p-4 border border-white/5 shadow-xl">
           <div className="absolute -top-12 -right-12 w-44 h-44 rounded-full bg-[#00f0ff]/10 blur-3xl pointer-events-none"></div>
           <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full bg-[#0566d9]/20 blur-2xl pointer-events-none"></div>
-
           <div className="relative flex items-start gap-3 z-10">
             <div className="shrink-0 w-11 h-11 rounded-xl bg-[#2a2a2c] flex items-center justify-center text-[#00f0ff] shadow-md border border-white/5">
               <Radio className="w-6 h-6 text-[#00f0ff]" />
@@ -466,48 +347,14 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
           </div>
         </div>
 
-        {/* Auto-detected notification */}
-        {autoDetectedInfo && (
-          <div className="p-3 rounded-2xl bg-[#00f0ff]/10 border border-[#00f0ff]/30 flex items-start gap-2.5 text-[#00f0ff]">
-            <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5 text-[#00f0ff]" />
-            <div className="flex flex-col text-xs">
-              <span className="font-bold font-headline">Akıllı Ayrıştırıcı Aktif</span>
-              <span>{autoDetectedInfo}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Error Message Container with Action Fallbacks */}
+        {/* Error Message Container */}
         {errorMessage && (
-          <div className="p-3.5 rounded-2xl bg-[#93000a]/30 border border-[#ffb4ab]/30 flex flex-col gap-2.5 text-[#ffb4ab]">
-            <div className="flex items-start gap-2.5">
-              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-              <div className="flex flex-col text-xs">
-                <span className="font-bold font-headline">Bağlantı Bildirimi</span>
-                <span>{errorMessage}</span>
-              </div>
+          <div className="p-3 rounded-2xl bg-[#93000a]/30 border border-[#ffb4ab]/30 flex items-start gap-2.5 text-[#ffb4ab]">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="flex flex-col text-xs">
+              <span className="font-bold font-headline">Bağlantı Hatası</span>
+              <span>{errorMessage}</span>
             </div>
-
-            {canAddAnyway && activeTab === 'xtream' && (
-              <div className="mt-1 pt-2 border-t border-white/10 flex flex-col sm:flex-row items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleAddAnyway}
-                  className="w-full sm:w-auto flex-1 py-2 px-3.5 rounded-xl bg-[#4edea3]/20 hover:bg-[#4edea3]/30 text-[#4edea3] font-headline text-xs font-bold transition-all border border-[#4edea3]/30 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Yine de Ekle (Doğrulamayı Atla)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConvertToM3u}
-                  className="w-full sm:w-auto flex-1 py-2 px-3.5 rounded-xl bg-[#00f0ff]/15 hover:bg-[#00f0ff]/25 text-[#00f0ff] font-headline text-xs font-bold transition-all border border-[#00f0ff]/30 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Zap className="w-4 h-4" />
-                  <span>M3U Akış Moduna Geç</span>
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -555,12 +402,12 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
                     placeholder="http://iptv-server.com:8080"
                     type="text"
                     value={serverUrl}
-                    onChange={(e) => handleServerUrlChange(e.target.value)}
+                    onChange={(e) => setServerUrl(e.target.value)}
                     required
                   />
                 </div>
                 <p className="text-[11px] text-[#b9cacb] px-1">
-                  Port ile birlikte tam domain veya IP girin (örn.{' '}
+                  Port ile birlikte tam domain veya IP girin (Örn:{' '}
                   <span className="text-[#adc6ff] font-mono">http://server.com:8080</span>)
                 </p>
               </div>
@@ -782,7 +629,6 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
 
           {/* Action Buttons */}
           <div className="pt-2 flex flex-col gap-2.5">
-            {/* Primary Action Button */}
             <button
               type="submit"
               disabled={isVerifying}
@@ -792,7 +638,6 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
               <ArrowRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
             </button>
 
-            {/* Test Connection Button */}
             <button
               type="button"
               onClick={handleTestPing}
@@ -808,7 +653,6 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
               )}
             </button>
 
-            {/* Security Badge */}
             <div className="flex items-center justify-center gap-1.5 text-center px-2 pt-1">
               <ShieldCheck className="w-4 h-4 text-[#4edea3] shrink-0" />
               <p className="text-[11px] text-[#b9cacb] leading-tight">
