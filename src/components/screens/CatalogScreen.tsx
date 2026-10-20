@@ -1,6 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { MediaItem, Playlist } from '../../types';
-import { ArrowLeft, Search, X, Tv, Heart, Play, Download, Film, Clapperboard, Filter } from 'lucide-react';
+import {
+  ArrowLeft,
+  Search,
+  X,
+  Tv,
+  Heart,
+  Play,
+  Download,
+  Layers,
+  Film,
+  Sparkles,
+  ChevronDown,
+} from 'lucide-react';
 
 interface CatalogScreenProps {
   catalog: MediaItem[];
@@ -9,9 +21,11 @@ interface CatalogScreenProps {
   onPlayMedia: (item: MediaItem) => void;
   onDownloadMedia: (item: MediaItem) => void;
   onToggleFavorite: (id: string) => void;
+  onOpenSeriesDetail: (item: MediaItem) => void;
+  isCatalogLoading?: boolean;
 }
 
-type TabType = 'all' | 'live' | 'movie' | 'series';
+const PAGE_CHUNK = 60;
 
 export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   catalog,
@@ -20,287 +34,462 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   onPlayMedia,
   onDownloadMedia,
   onToggleFavorite,
+  onOpenSeriesDetail,
+  isCatalogLoading,
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'live' | 'movie' | 'series'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_CHUNK);
 
-  // Extract distinct categories based on current tab
-  const categories = useMemo(() => {
-    const list = activeTab === 'all' ? catalog : catalog.filter((item) => item.type === activeTab);
-    const set = new Set<string>();
-    list.forEach((item) => {
-      if (item.category) set.add(item.category);
-    });
-    return Array.from(set).sort();
+  // 2- İçerik Sayılarının Örtüşmesi (Rozetlerin Gerçek Sunucu Toplamını Göstermesi)
+  const serverLiveTotal =
+    activePlaylist?.liveCount !== undefined
+      ? activePlaylist.liveCount
+      : catalog.filter((i) => i.type === 'live').length;
+
+  const serverMovieTotal =
+    activePlaylist?.movieCount !== undefined
+      ? activePlaylist.movieCount
+      : catalog.filter((i) => i.type === 'movie').length;
+
+  const serverSeriesTotal =
+    activePlaylist?.seriesCount !== undefined
+      ? activePlaylist.seriesCount
+      : catalog.filter((i) => i.type === 'series').length;
+
+  const serverGrandTotal =
+    activePlaylist?.liveCount !== undefined &&
+    activePlaylist?.movieCount !== undefined &&
+    activePlaylist?.seriesCount !== undefined
+      ? activePlaylist.liveCount + activePlaylist.movieCount + activePlaylist.seriesCount
+      : catalog.length;
+
+  // 1- Dinamik Kategori / Alt Klasör Filtrelemesi:
+  // Seçili sekmeye (live, movie, series) ait içerikler
+  const itemsForActiveTab = useMemo(() => {
+    if (activeTab === 'all') return catalog;
+    return catalog.filter((item) => item.type === activeTab);
   }, [catalog, activeTab]);
 
-  // Filtered items
+  // Seçili sekmeye ait dinamik kategoriler ve içerik adetleri
+  const categoriesForTab = useMemo(() => {
+    const countsMap = new Map<string, number>();
+
+    itemsForActiveTab.forEach((item) => {
+      const cat = (item.category || 'Genel').trim();
+      countsMap.set(cat, (countsMap.get(cat) || 0) + 1);
+    });
+
+    // En çok içeriğe sahip kategorileri öne sırala
+    const sorted = Array.from(countsMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+
+    return [
+      { name: 'Tümü', count: itemsForActiveTab.length },
+      ...sorted,
+    ];
+  }, [itemsForActiveTab]);
+
+  // Sekme değiştirildiğinde kategoriyi otomatik 'Tümü' yap ve sayfa limitini sıfırla
+  const handleTabChange = (tab: 'all' | 'live' | 'movie' | 'series') => {
+    setActiveTab(tab);
+    setSelectedCategory('Tümü');
+    setVisibleCount(PAGE_CHUNK);
+  };
+
+  // Kategori tıklandığında sayfa limitini sıfırla
+  const handleCategorySelect = (categoryName: string) => {
+    setSelectedCategory(categoryName);
+    setVisibleCount(PAGE_CHUNK);
+  };
+
+  // Arama veya kategori filtresi
   const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return catalog.filter((item) => {
       if (activeTab !== 'all' && item.type !== activeTab) return false;
-      if (selectedCategory !== 'all' && item.category !== selectedCategory) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesTitle = item.title.toLowerCase().includes(q);
-        const matchesCat = item.category?.toLowerCase().includes(q);
-        return matchesTitle || matchesCat;
+      if (
+        selectedCategory !== 'Tümü' &&
+        (item.category || 'Genel').trim() !== selectedCategory
+      ) {
+        return false;
+      }
+      if (q) {
+        const titleMatch = item.title.toLowerCase().includes(q);
+        const catMatch = item.category && item.category.toLowerCase().includes(q);
+        return titleMatch || catMatch;
       }
       return true;
     });
   }, [catalog, activeTab, selectedCategory, searchQuery]);
 
+  // Performanslı DOM gösterimi için sayfalanmış içerik
+  const visibleItems = useMemo(() => {
+    return filteredItems.slice(0, visibleCount);
+  }, [filteredItems, visibleCount]);
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => Math.min(filteredItems.length, prev + PAGE_CHUNK));
+  };
+
+  const handleLoadAll = () => {
+    setVisibleCount(filteredItems.length);
+  };
+
   return (
-    <div className="flex-1 w-full max-w-7xl mx-auto px-4 py-4 flex flex-col gap-4 pb-24">
-      {/* Top Bar with Playlist Information */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#18181b]/90 border border-white/5 rounded-2xl p-4 backdrop-blur-md">
-        <div className="flex items-center gap-3">
+    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-2 pb-28 gap-3.5 select-none">
+      {/* Active Playlist Header Strip */}
+      <div className="flex items-center justify-between p-3 rounded-2xl bg-[#1c1b1d] border border-white/5 shadow-md">
+        <div className="flex items-center gap-2.5 min-w-0">
           <button
             onClick={onBackToPlaylists}
-            className="w-9 h-9 rounded-xl bg-[#201f21] hover:bg-[#2a2a2c] flex items-center justify-center text-[#e5e1e4] hover:text-[#00f0ff] transition-colors border border-white/5 cursor-pointer shrink-0"
+            className="w-8 h-8 rounded-full bg-[#201f21] hover:bg-[#2a2a2c] flex items-center justify-center text-[#00f0ff] shrink-0 border border-white/5 cursor-pointer"
             title="Playlistlere Dön"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4 text-[#00f0ff]" />
           </button>
           <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="font-headline font-bold text-base sm:text-lg text-white truncate">
-                {activePlaylist?.name || 'Katalog İçeriği'}
-              </h1>
-              {activePlaylist?.badge && (
-                <span className="px-2 py-0.5 rounded-full bg-[#00f0ff]/10 text-[#00f0ff] text-[10px] font-bold border border-[#00f0ff]/20">
-                  {activePlaylist.badge}
-                </span>
-              )}
-            </div>
-            <span className="text-xs text-[#849495] truncate">
-              {activePlaylist?.serverUrl || 'Önbellek Veritabanı'} • Toplam {catalog.length} içerik
+            <span className="font-headline text-xs font-bold text-white truncate">
+              {activePlaylist ? activePlaylist.name : 'Tüm Kanallar'}
+            </span>
+            <span className="text-[10px] text-[#b9cacb] truncate font-mono">
+              {activePlaylist
+                ? `${serverGrandTotal.toLocaleString('tr-TR')} İçerik • ${filteredItems.length.toLocaleString('tr-TR')} Eşleşen`
+                : `${catalog.length.toLocaleString('tr-TR')} Kanal`}
             </span>
           </div>
         </div>
-
-        {/* Search input in Top Bar */}
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#849495]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Kanal veya film ara..."
-            className="w-full bg-[#201f21] rounded-xl pl-9 pr-8 py-2 text-xs text-[#e5e1e4] placeholder:text-[#849495] border border-white/5 focus:outline-none focus:border-[#00f0ff]/40"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#849495] hover:text-white"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+        {activePlaylist?.badge && (
+          <span className="px-2 py-0.5 rounded-full bg-[#00f0ff]/15 text-[#00f0ff] font-headline text-[10px] font-bold shrink-0">
+            {activePlaylist.badge}
+          </span>
+        )}
       </div>
 
-      {/* Tabs Row */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-        {[
-          { id: 'all' as TabType, label: 'Tümü', icon: Tv, count: catalog.length },
-          {
-            id: 'live' as TabType,
-            label: 'Canlı TV',
-            icon: Tv,
-            count: catalog.filter((i) => i.type === 'live').length,
-          },
-          {
-            id: 'movie' as TabType,
-            label: 'Filmler',
-            icon: Film,
-            count: catalog.filter((i) => i.type === 'movie').length,
-          },
-          {
-            id: 'series' as TabType,
-            label: 'Diziler',
-            icon: Clapperboard,
-            count: catalog.filter((i) => i.type === 'series').length,
-          },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
+      {/* Search Input Bar */}
+      <div className="relative flex items-center rounded-2xl bg-[#1c1b1d] border border-white/5 focus-within:border-[#00f0ff]/40 shadow-md">
+        <div className="absolute left-3.5 flex items-center pointer-events-none text-[#b9cacb]">
+          <Search className="w-4 h-4 text-[#b9cacb]" />
+        </div>
+        <input
+          className="w-full bg-transparent pl-11 pr-10 py-3 text-[14px] text-[#e5e1e4] placeholder:text-[#849495] focus:outline-none"
+          placeholder="Gerçek Kanal, Film veya Dizi Ara..."
+          type="text"
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setVisibleCount(PAGE_CHUNK);
+          }}
+        />
+        {searchQuery && (
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setVisibleCount(PAGE_CHUNK);
+            }}
+            className="absolute right-3 p-1 rounded-full text-[#b9cacb] hover:text-[#e5e1e4] cursor-pointer"
+          >
+            <X className="w-4 h-4 text-[#b9cacb]" />
+          </button>
+        )}
+      </div>
+
+      {/* Media Type Tabs with Real Server Totals */}
+      <div className="flex items-center gap-1.5 p-1 rounded-full bg-[#1c1b1d] border border-white/5">
+        <button
+          onClick={() => handleTabChange('all')}
+          className={`flex-1 py-1.5 px-2 rounded-full font-headline text-xs font-bold transition-all cursor-pointer truncate ${
+            activeTab === 'all'
+              ? 'bg-[#00f0ff] text-[#00363a] shadow-[0_0_10px_rgba(0,240,255,0.35)]'
+              : 'text-[#b9cacb] hover:text-[#e5e1e4]'
+          }`}
+        >
+          Tümü ({serverGrandTotal.toLocaleString('tr-TR')})
+        </button>
+        <button
+          onClick={() => handleTabChange('live')}
+          className={`flex-1 py-1.5 px-2 rounded-full font-headline text-xs font-bold transition-all cursor-pointer truncate ${
+            activeTab === 'live'
+              ? 'bg-[#00f0ff] text-[#00363a] shadow-[0_0_10px_rgba(0,240,255,0.35)]'
+              : 'text-[#b9cacb] hover:text-[#e5e1e4]'
+          }`}
+        >
+          Canlı ({serverLiveTotal.toLocaleString('tr-TR')})
+        </button>
+        <button
+          onClick={() => handleTabChange('movie')}
+          className={`flex-1 py-1.5 px-2 rounded-full font-headline text-xs font-bold transition-all cursor-pointer truncate ${
+            activeTab === 'movie'
+              ? 'bg-[#00f0ff] text-[#00363a] shadow-[0_0_10px_rgba(0,240,255,0.35)]'
+              : 'text-[#b9cacb] hover:text-[#e5e1e4]'
+          }`}
+        >
+          Film ({serverMovieTotal.toLocaleString('tr-TR')})
+        </button>
+        <button
+          onClick={() => handleTabChange('series')}
+          className={`flex-1 py-1.5 px-2 rounded-full font-headline text-xs font-bold transition-all cursor-pointer truncate ${
+            activeTab === 'series'
+              ? 'bg-[#00f0ff] text-[#00363a] shadow-[0_0_10px_rgba(0,240,255,0.35)]'
+              : 'text-[#b9cacb] hover:text-[#e5e1e4]'
+          }`}
+        >
+          Dizi ({serverSeriesTotal.toLocaleString('tr-TR')})
+        </button>
+      </div>
+
+      {/* 1- Dinamik Kategori Çipleri (O an seçili sekmeye ait alt klasörler) */}
+      {categoriesForTab.length > 1 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+          {categoriesForTab.map((cat) => (
             <button
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id);
-                setSelectedCategory('all');
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-[#00f0ff] text-[#00363a] font-bold shadow-[0_0_12px_rgba(0,240,255,0.3)]'
-                  : 'bg-[#18181b] text-[#b9cacb] hover:text-white hover:bg-[#201f21] border border-white/5'
+              key={cat.name}
+              onClick={() => handleCategorySelect(cat.name)}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-headline font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedCategory === cat.name
+                  ? 'bg-[#0566d9] text-white shadow-[0_0_8px_rgba(5,102,217,0.4)]'
+                  : 'bg-[#201f21] text-[#b9cacb] hover:text-[#e5e1e4] border border-white/5'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
+              <span className="truncate max-w-[180px]">{cat.name}</span>
               <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  isActive ? 'bg-[#00363a]/20 text-[#00363a]' : 'bg-[#2a2a2c] text-[#849495]'
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  selectedCategory === cat.name
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[#2a2a2c] text-[#849495]'
                 }`}
               >
-                {tab.count}
+                {cat.count.toLocaleString('tr-TR')}
               </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Categories Filter Selector */}
-      {categories.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-          <div className="flex items-center gap-1.5 text-xs text-[#849495] shrink-0 pl-1">
-            <Filter className="w-3.5 h-3.5 text-[#00f0ff]" />
-            <span>Kategori:</span>
-          </div>
-          <button
-            onClick={() => setSelectedCategory('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-              selectedCategory === 'all'
-                ? 'bg-[#2a2a2c] text-white border border-[#00f0ff]/40'
-                : 'bg-[#18181b] text-[#849495] hover:text-white border border-white/5'
-            }`}
-          >
-            Tüm Kategoriler
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-                selectedCategory === cat
-                  ? 'bg-[#2a2a2c] text-[#00f0ff] border border-[#00f0ff]/40 font-semibold'
-                  : 'bg-[#18181b] text-[#849495] hover:text-white border border-white/5'
-              }`}
-            >
-              {cat}
             </button>
           ))}
         </div>
       )}
 
-      {/* Media Catalog Grid */}
-      {filteredItems.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-20 text-center gap-3">
-          <div className="w-16 h-16 rounded-2xl bg-[#1c1b1d] border border-white/10 flex items-center justify-center text-[#849495]">
-            <Search className="w-8 h-8" />
+      {/* Empty State */}
+      {isCatalogLoading ? (
+        <div className="flex flex-col items-center justify-center p-8 bg-[#1c1b1d] rounded-2xl border border-white/5 text-center my-4 gap-3">
+          <div className="text-xs text-[#b9cacb]">Katalog yükleniyor…</div>
+        </div>
+      ) : catalog.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-8 bg-[#1c1b1d] rounded-2xl border border-white/5 text-center my-4 gap-3">
+          <div className="w-14 h-14 rounded-full bg-[#2a2a2c] flex items-center justify-center text-[#849495]">
+            <Tv className="w-7 h-7 text-[#849495]" />
           </div>
-          <h3 className="font-headline font-bold text-base text-white">İçerik Bulunamadı</h3>
-          <p className="text-xs text-[#849495] max-w-sm">
-            Seçilen filtreler veya arama sorgusuna uygun yayın kaydı yok. Arama kelimesini değiştirmeyi veya filtreleri sıfırlamayı deneyin.
+          <h3 className="font-headline text-base font-bold text-[#e5e1e4]">
+            Kanal Listesi Bulunamadı
+          </h3>
+          <p className="text-xs text-[#b9cacb] max-w-xs leading-relaxed">
+            Seçili playlist için sunucudan henüz kanal çekilmemiş veya bağlantı kurulamamış olabilir.
           </p>
-          {(searchQuery || selectedCategory !== 'all') && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedCategory('all');
-              }}
-              className="mt-2 px-4 py-2 rounded-xl bg-[#201f21] hover:bg-[#2a2a2c] text-xs font-semibold text-[#00f0ff] border border-[#00f0ff]/20 cursor-pointer"
-            >
-              Filtreleri Temizle
-            </button>
-          )}
+          <button
+            onClick={onBackToPlaylists}
+            className="px-4 py-2 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold shadow-[0_0_10px_rgba(0,240,255,0.4)] cursor-pointer active:scale-95"
+          >
+            Playlistlere Geri Dön
+          </button>
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-8 bg-[#1c1b1d] rounded-2xl border border-white/5 text-center my-4 gap-2">
+          <Sparkles className="w-8 h-8 text-[#849495]" />
+          <span className="text-xs text-[#b9cacb]">
+            "{searchQuery || selectedCategory}" kriterine uygun içerik bulunamadı
+          </span>
+          <button
+            onClick={() => {
+              setSelectedCategory('Tümü');
+              setSearchQuery('');
+            }}
+            className="mt-2 text-xs text-[#00f0ff] hover:underline cursor-pointer"
+          >
+            Filtreleri Temizle
+          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-          {filteredItems.map((item) => (
-            <div
-              key={item.id}
-              className="group relative bg-[#18181b] rounded-2xl border border-white/5 hover:border-[#00f0ff]/30 overflow-hidden flex flex-col transition-all duration-200 hover:shadow-[0_8px_20px_rgba(0,0,0,0.6)]"
-            >
-              {/* Thumbnail Container */}
-              <div className="relative aspect-[16/10] sm:aspect-square bg-[#0e0e10] overflow-hidden">
-                <img
-                  src={item.poster}
-                  alt={item.title}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80';
-                  }}
-                />
+        <>
+          {/* Catalog Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {visibleItems.map((item) => {
+              const isLive = item.type === 'live';
+              const isSeries = item.type === 'series';
 
-                {/* Badges Overlay */}
-                <div className="absolute top-2 left-2 flex items-center gap-1">
-                  <span className="px-1.5 py-0.5 rounded bg-[#0e0e10]/90 text-[#00f0ff] font-headline text-[9px] font-bold tracking-normal shadow">
-                    {item.resolution}
-                  </span>
-                  {item.rating && (
-                    <span className="px-1.5 py-0.5 rounded bg-[#0e0e10]/90 text-[#ffb703] font-headline text-[9px] font-bold shadow">
-                      ★ {item.rating}
-                    </span>
-                  )}
-                </div>
-
-                {/* Favorite Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(item.id);
-                  }}
-                  className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer backdrop-blur-md ${
-                    item.isFavorite
-                      ? 'bg-[#ff5470] text-white shadow-md'
-                      : 'bg-black/50 text-white/70 hover:text-white hover:bg-black/80'
-                  }`}
-                  title={item.isFavorite ? 'Favorilerden Çıkar' : 'Favorilere Ekle'}
-                >
-                  <Heart className={`w-3.5 h-3.5 ${item.isFavorite ? 'fill-current' : ''}`} />
-                </button>
-
-                {/* Quick Play Hover Overlay */}
+              return (
                 <div
-                  onClick={() => onPlayMedia(item)}
-                  className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-[2px]"
+                  key={item.id}
+                  className="group relative flex flex-col rounded-2xl bg-[#1c1b1d] border border-white/5 p-3 shadow-md gap-2.5 transition-all hover:border-[#00f0ff]/30 overflow-hidden"
                 >
-                  <div className="w-11 h-11 rounded-full bg-[#00f0ff] text-[#00363a] flex items-center justify-center shadow-[0_0_16px_rgba(0,240,255,0.6)] transform scale-90 group-hover:scale-100 transition-transform">
-                    <Play className="w-5 h-5 fill-current ml-0.5" />
+                  {/* Poster / Thumbnail with click interaction */}
+                  <div
+                    onClick={() => {
+                      if (isSeries) {
+                        onOpenSeriesDetail(item);
+                      } else {
+                        onPlayMedia(item);
+                      }
+                    }}
+                    className="relative aspect-video rounded-xl bg-[#2a2a2c] overflow-hidden cursor-pointer"
+                  >
+                    <img
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      alt={item.title}
+                      src={item.poster}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e10] via-transparent to-transparent"></div>
+
+                    {/* Badges */}
+                    <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded bg-[#0e0e10]/90 text-[#00f0ff] font-headline text-[9px] font-bold tracking-normal shadow">
+                        {item.resolution}
+                      </span>
+                      {isLive && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-[#65f2b5]/20 text-[#4edea3] font-headline text-[9px] font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#4edea3] animate-pulse"></span>
+                          CANLI
+                        </span>
+                      )}
+                      {isSeries && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-[#0566d9]/30 text-[#adc6ff] font-headline text-[9px] font-bold flex items-center gap-1">
+                          <Layers className="w-3 h-3 text-[#00f0ff]" />
+                          DİZİ
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Favorite Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleFavorite(item.id);
+                      }}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 flex items-center justify-center text-[#ffb4ab] transition-colors cursor-pointer"
+                      title={item.isFavorite ? 'Favorilerden Çıkar' : 'Favorilere Ekle'}
+                    >
+                      <Heart
+                        className={`w-4 h-4 ${
+                          item.isFavorite ? 'fill-[#ffb4ab] text-[#ffb4ab]' : 'text-[#ffb4ab]'
+                        }`}
+                      />
+                    </button>
+
+                    {/* Rating / Duration / Channel Number */}
+                    <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[11px] text-[#e5e1e4]">
+                      {item.channelNumber && (
+                        <span className="font-mono text-[#00f0ff] font-bold">#{item.channelNumber}</span>
+                      )}
+                      {item.duration && <span>{item.duration}</span>}
+                      {item.rating && (
+                        <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold flex items-center gap-0.5">
+                          ★ {item.rating}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Title & EPG Info */}
+                  <div className="flex flex-col min-w-0">
+                    <h4
+                      onClick={() => {
+                        if (isSeries) {
+                          onOpenSeriesDetail(item);
+                        } else {
+                          onPlayMedia(item);
+                        }
+                      }}
+                      className="font-headline text-[14px] font-bold text-[#e5e1e4] truncate cursor-pointer hover:text-[#00f0ff] transition-colors"
+                      title={item.title}
+                    >
+                      {item.title}
+                    </h4>
+                    {isLive && item.epgCurrent ? (
+                      <div className="flex flex-col gap-1 mt-1">
+                        <span className="text-[11px] text-[#4edea3] font-medium truncate">
+                          {item.epgCurrent}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-[#b9cacb] mt-0.5 truncate">
+                        {item.category} •{' '}
+                        {item.type === 'movie'
+                          ? 'Film'
+                          : item.type === 'series'
+                          ? 'Dizi (Çok Sezonlu)'
+                          : 'Yayın'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                    {isSeries ? (
+                      <button
+                        onClick={() => onOpenSeriesDetail(item)}
+                        className="flex-1 h-9 rounded-full bg-gradient-to-r from-[#0566d9] to-[#00f0ff] text-[#002022] font-headline text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.35)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <Layers className="w-3.5 h-3.5" />
+                        <span>Sezonlar &amp; Bölümler</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onPlayMedia(item)}
+                        className="flex-1 h-9 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.35)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>{isLive ? 'İzle' : 'Oynat'}</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        if (isSeries) {
+                          onOpenSeriesDetail(item);
+                        } else {
+                          onDownloadMedia(item);
+                        }
+                      }}
+                      className="h-9 px-3 rounded-full bg-[#201f21] hover:bg-[#2a2a2c] text-[#e5e1e4] font-headline text-xs font-semibold flex items-center justify-center gap-1.5 border border-white/5 cursor-pointer active:scale-95"
+                      title={isSeries ? 'Bölüm Listesi ve İndirme' : 'İndir (Offline)'}
+                    >
+                      <Download className="w-3.5 h-3.5 text-[#00f0ff]" />
+                      <span className="hidden sm:inline">{isSeries ? 'Bölümler' : 'İndir'}</span>
+                    </button>
                   </div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
 
-              {/* Info Container */}
-              <div className="p-3 flex flex-col justify-between flex-1 gap-2">
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[10px] text-[#00f0ff] font-mono truncate">
-                    {item.category || 'Genel'}
-                  </span>
-                  <h4
-                    className="font-headline font-bold text-xs text-[#e5e1e4] group-hover:text-white line-clamp-2 title-ellipsis leading-tight"
-                    title={item.title}
-                  >
-                    {item.title}
-                  </h4>
-                </div>
-
-                {/* Bottom Action Buttons */}
-                <div className="flex items-center gap-1.5 pt-1 border-t border-white/5">
+          {/* Pagination & Load More Footer */}
+          {filteredItems.length > visibleCount && (
+            <div className="flex flex-col items-center justify-center pt-4 pb-2 gap-2.5">
+              <span className="text-xs text-[#b9cacb] font-mono">
+                Gösterilen: {visibleItems.length.toLocaleString('tr-TR')} / {filteredItems.length.toLocaleString('tr-TR')} içerik
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleLoadMore}
+                  className="px-5 py-2.5 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold shadow-[0_0_10px_rgba(0,240,255,0.4)] hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                  <span>Daha Fazla Göster (+{PAGE_CHUNK})</span>
+                </button>
+                {filteredItems.length > visibleCount + PAGE_CHUNK && (
                   <button
-                    onClick={() => onPlayMedia(item)}
-                    className="flex-1 py-1.5 rounded-lg bg-[#201f21] hover:bg-[#00f0ff] text-[#e5e1e4] hover:text-[#00363a] font-headline text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
+                    onClick={handleLoadAll}
+                    className="px-4 py-2.5 rounded-full bg-[#201f21] hover:bg-[#2a2a2c] text-[#e5e1e4] font-headline text-xs font-medium border border-white/5 cursor-pointer transition-colors"
                   >
-                    <Play className="w-3 h-3 fill-current" />
-                    <span>İzle</span>
+                    Tümünü Listele
                   </button>
-
-                  <button
-                    onClick={() => onDownloadMedia(item)}
-                    className="p-1.5 rounded-lg bg-[#201f21] hover:bg-[#2a2a2c] text-[#849495] hover:text-[#00f0ff] transition-all cursor-pointer"
-                    title="İndirme Kuyruğuna Ekle"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                )}
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );
