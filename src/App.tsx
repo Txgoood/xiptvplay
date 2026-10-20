@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ScreenType, AppMode, Playlist, DownloadItem, MediaItem } from './types';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { ScreenType, AppMode, Playlist, DownloadItem, MediaItem, SeriesEpisode } from './types';
 import { INITIAL_STATS } from './data/mockData';
 import { StorageService } from './services/storage';
 import { XtreamClientService } from './services/xtreamClient';
@@ -13,29 +13,34 @@ import { DownloadsScreen } from './components/screens/DownloadsScreen';
 import { CatalogScreen } from './components/screens/CatalogScreen';
 import { FavoritesScreen } from './components/screens/FavoritesScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
+import { SeriesDetailModal } from './components/screens/SeriesDetailModal';
 import { VideoPlayerModal } from './components/player/VideoPlayerModal';
 import { PrdHub } from './components/prd/PrdHub';
 import { Info, Cast as CastIcon, Tv as TvIcon, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 export default function App() {
   const [appMode, setAppMode] = useState<AppMode>('app');
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('playlists');
   const [userEmail, setUserEmail] = useState<string | null>('bahritugtekin@gmail.com');
 
-  // Persistent Application Data States (Restored from StorageService)
+  // Persistent Application Data States (Clean Empty Initial States)
   const [stats, setStats] = useState(INITIAL_STATS);
   const [playlists, setPlaylists] = useState<Playlist[]>(() => StorageService.getPlaylists());
   const [downloads, setDownloads] = useState<DownloadItem[]>(() => StorageService.getDownloads());
-  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => StorageService.getFavorites());
+  const [favoriteItems, setFavoriteItems] = useState<MediaItem[]>(() => StorageService.getFavoriteItems());
 
   // Active Selected Playlist and Its Loaded Items
   const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
   const [catalogItems, setCatalogItems] = useState<MediaItem[]>([]);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(false);
+  const autoRefreshAttemptedRef = useRef<Set<string>>(new Set());
 
   // Modals & Player State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addModalType, setAddModalType] = useState<'xtream' | 'm3u'>('xtream');
   const [activePlayerMedia, setActivePlayerMedia] = useState<MediaItem | DownloadItem | null>(null);
+  const [selectedSeriesItem, setSelectedSeriesItem] = useState<MediaItem | null>(null);
 
   // Cast, Search & Profile Modals
   const [isCastOpen, setIsCastOpen] = useState(false);
@@ -46,7 +51,6 @@ export default function App() {
 
   // Toast System
   const [toast, setToast] = useState<string | null>(null);
-
   const showToast = (message: string) => {
     setToast(message);
     setTimeout(() => setToast(null), 3200);
@@ -68,21 +72,55 @@ export default function App() {
 
   // Sync favorites to persistent storage
   useEffect(() => {
-    StorageService.saveFavorites(favoriteIds);
-  }, [favoriteIds]);
+    StorageService.saveFavoriteItems(favoriteItems);
+  }, [favoriteItems]);
 
-  // When active playlist changes, load its real items from storage
+  // Aktif playlist id'sini kalıcı sakla (açılışta geri yüklemek için)
+  useEffect(() => {
+    StorageService.setActivePlaylistId(activePlaylist ? activePlaylist.id : null);
+  }, [activePlaylist]);
+
+  // Açılışta kayıtlı (yoksa ilk) playlist'i otomatik seç
+  useEffect(() => {
+    const savedId = StorageService.getActivePlaylistId();
+    const target = playlists.find((p) => p.id === savedId) || playlists[0];
+    if (target) {
+      setActivePlaylist(target);
+    }
+  }, []);
+
+  // When active playlist changes, load its items from storage
   useEffect(() => {
     if (activePlaylist) {
+      setIsCatalogLoading(true);
+      // 1. Fast load (localStorage)
       const items = StorageService.getPlaylistItems(activePlaylist.id);
       setCatalogItems(items);
-    } else if (playlists.length > 0) {
-      const items = StorageService.getPlaylistItems(playlists[0].id);
-      setCatalogItems(items);
+
+      // 2. Slow load (IndexedDB)
+      StorageService.loadPlaylistItemsPersistent(activePlaylist.id).then(persistentItems => {
+        if (persistentItems && persistentItems.length > items.length) {
+          setCatalogItems(persistentItems);
+        }
+        setIsCatalogLoading(false);
+        
+        // Auto-refresh logic:
+        // check total > 0 and no movie/series in catalog
+        const totalItems = (activePlaylist.liveCount || 0) + (activePlaylist.movieCount || 0) + (activePlaylist.seriesCount || 0);
+        const hasMovieOrSeries = persistentItems ? persistentItems.some(i => i.type === 'movie' || i.type === 'series') : false;
+        
+        if (totalItems > 0 && !hasMovieOrSeries && !autoRefreshAttemptedRef.current.has(activePlaylist.id)) {
+            autoRefreshAttemptedRef.current.add(activePlaylist.id);
+            handleRefreshPlaylist(activePlaylist.id);
+        }
+      });
     } else {
       setCatalogItems([]);
+      setIsCatalogLoading(false);
     }
-  }, [activePlaylist, playlists]);
+  }, [activePlaylist]);
+
+
 
   // Add Playlist Handler
   const handleOpenAddModal = (type: 'xtream' | 'm3u' = 'xtream') => {
@@ -94,7 +132,19 @@ export default function App() {
     setPlaylists((prev) => [newPl, ...prev]);
     setActivePlaylist(newPl);
     setCatalogItems(items);
-    showToast(`"${newPl.name}" başarıyla doğrulandı ve kaydedildi (${items.length} içerik)!`);
+    setAppMode('app');
+    setCurrentScreen('catalog');
+
+    // 3. M3U listesi başarıyla yüklendiğinde katalog ekranında hemen listele ve ilk kanalı VideoPlayerModal'da otomatik oynat
+    if (items.length > 0) {
+      const firstPlayable = items.find((i) => i.type === 'live') || items[0];
+      setActivePlayerMedia(firstPlayable);
+      showToast(
+        `"${newPl.name}" başarıyla yüklendi (${items.length} kanal). "${firstPlayable.title}" otomatik başlatılıyor...`
+      );
+    } else {
+      showToast(`"${newPl.name}" başarıyla doğrulandı ve kaydedildi!`);
+    }
   };
 
   // Permanent Delete Handler
@@ -106,6 +156,15 @@ export default function App() {
       setCatalogItems([]);
     }
     showToast('Playlist kalıcı olarak silindi.');
+  };
+
+  const handleUpdatePlaylist = (updated: Playlist) => {
+    StorageService.upsertPlaylist(updated);
+    setPlaylists((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    if (activePlaylist?.id === updated.id) {
+      setActivePlaylist(updated);
+    }
+    showToast(`"${updated.name}" başarıyla güncellendi ve kaydedildi.`);
   };
 
   // Real Refresh / Sync Handler
@@ -138,22 +197,19 @@ export default function App() {
         return;
       }
 
-      const effectiveUrl = verifyRes.effectiveServerUrl || target.serverUrl;
       const catalogRes = await XtreamClientService.fetchCatalog(
-        effectiveUrl,
+        target.serverUrl,
         target.username,
         target.password,
         target.id
       );
 
       StorageService.savePlaylistItems(target.id, catalogRes.items);
-
       setPlaylists((prev) =>
         prev.map((p) =>
           p.id === id
             ? {
                 ...p,
-                serverUrl: effectiveUrl,
                 status: 'active',
                 statusLabel: 'Bağlı (Aktif)',
                 liveCount: catalogRes.counts.live,
@@ -180,10 +236,8 @@ export default function App() {
           showToast(`M3U senkronizasyonu başarısız: ${fetchRes.error || 'İçerik alınamadı'}`);
           return;
         }
-
         const parsed = M3UParserService.parse(fetchRes.content, target.id);
         StorageService.savePlaylistItems(target.id, parsed.items);
-
         setPlaylists((prev) =>
           prev.map((p) =>
             p.id === id
@@ -198,7 +252,6 @@ export default function App() {
               : p
           )
         );
-
         if (activePlaylist?.id === id) {
           setCatalogItems(parsed.items);
         }
@@ -211,16 +264,17 @@ export default function App() {
     }
   };
 
-  // Explicit Demo Data Loader
-  const handleLoadDemoData = () => {
-    const demos = StorageService.loadDemoPlaylists();
-    setPlaylists(demos);
-    if (demos[0]) {
-      setActivePlaylist(demos[0]);
-      setCatalogItems(StorageService.getPlaylistItems(demos[0].id));
+  // Katalog ekranına güvenli geçiş: playlist yoksa ekle, hiç playlist yoksa listeye yönlendir
+  const handleNavigateToCatalog = () => {
+    if (activePlaylist) {
+      setCurrentScreen('catalog');
+    } else if (playlists.length > 0) {
+      setActivePlaylist(playlists[0]);
+      setCurrentScreen('catalog');
+    } else {
+      setCurrentScreen('playlists');
+      showToast('Önce bir playlist ekleyin.');
     }
-    setDownloads(StorageService.getDownloads());
-    showToast('Test amaçlı demo oynatma listeleri yüklendi.');
   };
 
   // Open Playlist in Catalog
@@ -233,9 +287,11 @@ export default function App() {
 
   // Favorites Toggle
   const handleToggleFavorite = (mediaId: string) => {
-    setFavoriteIds((prev) => {
-      const exists = prev.includes(mediaId);
-      const next = exists ? prev.filter((id) => id !== mediaId) : [...prev, mediaId];
+    setFavoriteItems((prev) => {
+      const exists = prev.find(item => item.id === mediaId);
+      const next = exists 
+        ? prev.filter((item) => item.id !== mediaId) 
+        : [...prev, catalogItems.find(item => item.id === mediaId) || { id: mediaId, title: 'Bilinmiyor', category: 'Genel', type: 'movie', resolution: 'HD', poster: '', streamUrl: '' } as MediaItem];
       showToast(exists ? 'Favorilerden çıkarıldı' : 'Favorilere eklendi');
       return next;
     });
@@ -251,26 +307,154 @@ export default function App() {
     }
 
     const newDownload: DownloadItem = {
-      id: `dl-${Date.now()}`,
+      id: `dl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       mediaId: item.id,
       title: item.title,
       subtitle: `${item.category} • ${item.resolution} • ${item.fileSizeGb || 1.8} GB`,
       type: item.type === 'movie' ? 'movie' : 'series',
       resolutionBadge: item.resolution,
       totalSizeGb: item.fileSizeGb || 1.8,
-      downloadedGb: 0.05,
-      speedMbps: 9.4,
-      eta: '2d 15s',
-      progressPercent: 3,
+      downloadedGb: 0,
+      speedMbps: 0,
+      eta: '0s',
+      progressPercent: 0,
       status: 'downloading',
       statusLabel: 'İniyor',
       poster: item.poster,
       streamUrl: item.streamUrl,
+      rawStreamUrl: item.rawStreamUrl || item.streamUrl,
     };
 
     setDownloads([newDownload, ...downloads]);
-    showToast(`"${item.title}" indirme kuyruğuna eklendi.`);
+    showToast(`"${item.title}" indirme başlatılıyor...`);
+    
+    import('./services/downloadManager').then(dm => {
+        dm.startDownload(
+            newDownload,
+            (progress, downloadedGb, speedMbps, eta) => {
+                setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, progressPercent: progress, downloadedGb, speedMbps, eta } : d));
+            },
+            (localUrl, relativePath, fileUri) => {
+                setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, status: 'completed', statusLabel: 'Tamamlandı', localUrl, offlinePath: relativePath, fileUri, progressPercent: 100, eta: 'Tamamlandı' } : d));
+                showToast(`"${item.title}" indirildi.`);
+            },
+            (error) => {
+                setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, status: 'error', statusLabel: 'Hata', errorMessage: error } : d));
+                showToast(`İndirme hatası: ${error}`);
+            }
+        );
+    });
+    
     setCurrentScreen('downloads');
+  };
+
+  // Series Episode Play Handler
+  const handlePlayEpisode = (episode: SeriesEpisode, seriesItem: MediaItem) => {
+    const seasonStr = String(episode.seasonNum).padStart(2, '0');
+    const epStr = String(episode.episodeNum).padStart(2, '0');
+
+    // 1- Dizi Bölümü URL Oluşturma Mantığı:
+    // ${serverUrl}/series/${username}/${password}/${episode.id}.${episode.container_extension || 'mp4'}
+    let finalStreamUrl = episode.streamUrl;
+    let directUrl = episode.rawStreamUrl;
+    if (
+      activePlaylist &&
+      activePlaylist.type === 'xtream' &&
+      activePlaylist.serverUrl &&
+      activePlaylist.username &&
+      activePlaylist.password
+    ) {
+      const serverUrl = XtreamClientService.normalizeServerUrl(activePlaylist.serverUrl);
+      const ext = episode.containerExtension || 'mp4';
+      directUrl = `${serverUrl}/series/${activePlaylist.username}/${activePlaylist.password}/${episode.id}.${ext}`;
+      // 2- Proxy ve Güvenli Oynatıcı:
+      finalStreamUrl = XtreamClientService.getSafeStreamUrl(directUrl);
+    } else if (finalStreamUrl && !finalStreamUrl.startsWith('/api/')) {
+      directUrl = finalStreamUrl;
+      finalStreamUrl = XtreamClientService.getSafeStreamUrl(finalStreamUrl);
+    }
+
+    const episodeMedia: MediaItem = {
+      id: `ep-${seriesItem.id}-${episode.id}`,
+      playlistId: seriesItem.playlistId,
+      title: `${seriesItem.title} - S${seasonStr}E${epStr}: ${episode.title}`,
+      category: seriesItem.category || 'Dizi',
+      type: 'series',
+      resolution: seriesItem.resolution || 'FHD 60P',
+      duration: episode.duration,
+      rating: episode.rating,
+      poster: episode.image || seriesItem.poster,
+      streamUrl: finalStreamUrl,
+      rawStreamUrl: directUrl || episode.rawStreamUrl,
+      audioTracks: ['Türkçe Dublaj', 'English (Dolby)'],
+      subtitles: ['Türkçe', 'English', 'Off'],
+      containerExtension: episode.containerExtension || 'mp4',
+      streamId: episode.id,
+    };
+    setActivePlayerMedia(episodeMedia);
+  };
+
+  // Series Episode Download Handler
+  const handleDownloadEpisode = (episode: SeriesEpisode, seriesItem: MediaItem) => {
+    const seasonStr = String(episode.seasonNum).padStart(2, '0');
+    const epStr = String(episode.episodeNum).padStart(2, '0');
+
+    let finalStreamUrl = episode.streamUrl;
+    let directUrl = episode.rawStreamUrl;
+    if (
+      activePlaylist &&
+      activePlaylist.type === 'xtream' &&
+      activePlaylist.serverUrl &&
+      activePlaylist.username &&
+      activePlaylist.password
+    ) {
+      const serverUrl = XtreamClientService.normalizeServerUrl(activePlaylist.serverUrl);
+      const ext = episode.containerExtension || 'mp4';
+      directUrl = `${serverUrl}/series/${activePlaylist.username}/${activePlaylist.password}/${episode.id}.${ext}`;
+      finalStreamUrl = XtreamClientService.getSafeStreamUrl(directUrl);
+    } else if (finalStreamUrl && !finalStreamUrl.startsWith('/api/')) {
+      finalStreamUrl = XtreamClientService.getSafeStreamUrl(finalStreamUrl);
+    }
+
+    const episodeMedia: MediaItem = {
+      id: `ep-${seriesItem.id}-${episode.id}`,
+      playlistId: seriesItem.playlistId,
+      title: `${seriesItem.title} - S${seasonStr}E${epStr}: ${episode.title}`,
+      category: seriesItem.category || 'Dizi',
+      type: 'series',
+      resolution: seriesItem.resolution || 'FHD 60P',
+      duration: episode.duration,
+      rating: episode.rating,
+      poster: episode.image || seriesItem.poster,
+      streamUrl: finalStreamUrl,
+      rawStreamUrl: directUrl || episode.rawStreamUrl,
+      fileSizeGb: 1.2,
+      audioTracks: ['Türkçe Dublaj', 'English (Dolby)'],
+      subtitles: ['Türkçe', 'English', 'Off'],
+      containerExtension: episode.containerExtension || 'mp4',
+      streamId: episode.id,
+    };
+    handleDownloadMedia(episodeMedia);
+  };
+
+  // Dosya yolu paylaşım menüsünü açmadan gösterilir. Android'in uygulama özelindeki
+  // data klasörünü dosya yöneticisinde açmak için ayrı bir yerel Android intent gerekir.
+  const handleOpenDownloadedFile = async (item: DownloadItem) => {
+    try {
+      let fileUri = item.fileUri;
+      if (!fileUri && item.offlinePath) {
+        const result = await Filesystem.getUri({ path: item.offlinePath, directory: Directory.Data });
+        fileUri = result.uri;
+      }
+      const path = item.offlinePath || fileUri;
+      if (!path) {
+        showToast('Dosya yolu bulunamadı. İndirme kaydı eksik olabilir.');
+        return;
+      }
+      showToast(`Dosya konumu: ${path}`);
+    } catch (err: any) {
+      showToast(`Dosya konumu alınamadı: ${err?.message || 'Bilinmeyen hata'}`);
+    }
   };
 
   // Downloads Batch Actions
@@ -341,7 +525,7 @@ export default function App() {
     setStats((prev) => ({
       ...prev,
       releasableMb: 0,
-      cacheSizeGb: 1.15,
+      cacheSizeGb: 0,
     }));
   };
 
@@ -349,14 +533,26 @@ export default function App() {
     StorageService.clearAll();
     setPlaylists([]);
     setDownloads([]);
-    setFavoriteIds([]);
+    setFavoriteItems([]);
     setActivePlaylist(null);
     setCatalogItems([]);
+    setSelectedSeriesItem(null);
+    setStats((prev) => ({
+      ...prev,
+      activePlaylistsCount: 0,
+      cacheSizeGb: 0,
+      releasableMb: 0,
+      iptvArchiveGb: 0,
+      usedPercent: 0,
+      downloadSpeedMbps: 0,
+    }));
     showToast('Tüm veriler ve kayıtlı playlistler silindi.');
   };
 
-  // Favorites array mapped with isFavorite property
-  const allFavoritesList = catalogItems.filter((c) => favoriteIds.includes(c.id));
+  // 1- Rozet Sayısı Hesaplaması: Sadece mevcut katalogda gerçekten eşleşen favorileri say
+  const allFavoritesList = useMemo(() => {
+    return favoriteItems;
+  }, [favoriteItems]);
   const activeDownloadsCount = downloads.filter(
     (d) => d.status === 'downloading' || d.status === 'queued'
   ).length;
@@ -413,7 +609,7 @@ export default function App() {
                 onSelectPlaylist={handleSelectPlaylist}
                 onRefreshPlaylist={handleRefreshPlaylist}
                 onDeletePlaylist={handleDeletePlaylist}
-                onLoadDemoData={handleLoadDemoData}
+                onUpdatePlaylist={handleUpdatePlaylist}
               />
             )}
 
@@ -421,13 +617,15 @@ export default function App() {
               <CatalogScreen
                 catalog={catalogItems.map((c) => ({
                   ...c,
-                  isFavorite: favoriteIds.includes(c.id),
+                  isFavorite: favoriteItems.some(f => f.id === c.id),
                 }))}
                 activePlaylist={activePlaylist}
                 onBackToPlaylists={() => setCurrentScreen('playlists')}
                 onPlayMedia={(item) => setActivePlayerMedia(item)}
                 onDownloadMedia={handleDownloadMedia}
                 onToggleFavorite={handleToggleFavorite}
+                onOpenSeriesDetail={(item) => setSelectedSeriesItem(item)}
+                isCatalogLoading={isCatalogLoading}
               />
             )}
 
@@ -436,6 +634,7 @@ export default function App() {
                 downloads={downloads}
                 stats={stats}
                 onPlayMedia={(download) => setActivePlayerMedia(download)}
+                onOpenDownloadedFile={handleOpenDownloadedFile}
                 onPauseAll={handlePauseAll}
                 onResumeAll={handleResumeAll}
                 onClearCompleted={handleClearCompleted}
@@ -448,7 +647,13 @@ export default function App() {
             {currentScreen === 'favorites' && (
               <FavoritesScreen
                 favorites={allFavoritesList}
-                onPlayMedia={(item) => setActivePlayerMedia(item)}
+                onPlayMedia={(item) => {
+                  if (item.type === 'series') {
+                    setSelectedSeriesItem(item);
+                  } else {
+                    setActivePlayerMedia(item);
+                  }
+                }}
                 onRemoveFavorite={handleToggleFavorite}
                 onOpenCatalog={() => setCurrentScreen('catalog')}
               />
@@ -469,9 +674,12 @@ export default function App() {
       {appMode === 'app' && currentScreen !== 'onboarding' && (
         <BottomNav
           currentScreen={currentScreen}
-          onSelectScreen={setCurrentScreen}
+          onSelectScreen={(s) => {
+            if (s === 'catalog') handleNavigateToCatalog();
+            else setCurrentScreen(s);
+          }}
           activeDownloadsCount={activeDownloadsCount}
-          favoritesCount={favoriteIds.length}
+          favoritesCount={allFavoritesList.length}
         />
       )}
 
@@ -481,6 +689,16 @@ export default function App() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddPlaylist={handleAddPlaylist}
+      />
+
+      {/* Series Detail & Episodes Selection Modal */}
+      <SeriesDetailModal
+        seriesItem={selectedSeriesItem}
+        activePlaylist={activePlaylist}
+        isOpen={!!selectedSeriesItem}
+        onClose={() => setSelectedSeriesItem(null)}
+        onPlayEpisode={handlePlayEpisode}
+        onDownloadEpisode={handleDownloadEpisode}
       />
 
       {/* Real Video Player Modal */}
@@ -551,44 +769,53 @@ export default function App() {
                 <CloseIcon className="w-4 h-4" />
               </button>
             </div>
-
             <div className="flex flex-col gap-1 max-h-60 overflow-y-auto no-scrollbar">
-              {catalogItems
-                .filter(
-                  (c) =>
-                    !globalSearchTerm ||
-                    c.title.toLowerCase().includes(globalSearchTerm.toLowerCase()) ||
-                    c.category.toLowerCase().includes(globalSearchTerm.toLowerCase())
-                )
-                .map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setIsSearchOpen(false);
-                      setActivePlayerMedia(item);
-                    }}
-                    className="flex items-center justify-between p-2 rounded-xl hover:bg-[#201f21] text-left transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <img
-                        src={item.poster}
-                        alt=""
-                        className="w-9 h-9 rounded-lg object-cover shrink-0"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80';
-                        }}
-                      />
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-headline text-xs font-semibold text-white truncate">
-                          {item.title}
-                        </span>
-                        <span className="text-[10px] text-[#b9cacb]">{item.category}</span>
+              {catalogItems.length === 0 ? (
+                <div className="p-4 text-center text-xs text-[#849495]">
+                  Arama yapmak için önce bir playlist ekleyin.
+                </div>
+              ) : (
+                catalogItems
+                  .filter(
+                    (c) =>
+                      !globalSearchTerm ||
+                      c.title.toLowerCase().includes(globalSearchTerm.toLowerCase()) ||
+                      c.category.toLowerCase().includes(globalSearchTerm.toLowerCase())
+                  )
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setIsSearchOpen(false);
+                        if (item.type === 'series') {
+                          setSelectedSeriesItem(item);
+                        } else {
+                          setActivePlayerMedia(item);
+                        }
+                      }}
+                      className="flex items-center justify-between p-2 rounded-xl hover:bg-[#201f21] text-left transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={item.poster}
+                          alt=""
+                          className="w-9 h-9 rounded-lg object-cover shrink-0"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80';
+                          }}
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-headline text-xs font-semibold text-white truncate">
+                            {item.title}
+                          </span>
+                          <span className="text-[10px] text-[#b9cacb]">{item.category}</span>
+                        </div>
                       </div>
-                    </div>
-                    <PlayCircle className="w-5 h-5 text-[#00f0ff] shrink-0" />
-                  </button>
-                ))}
+                      <PlayCircle className="w-5 h-5 text-[#00f0ff] shrink-0" />
+                    </button>
+                  ))
+              )}
             </div>
           </div>
         </div>
@@ -605,10 +832,9 @@ export default function App() {
               <span className="font-headline text-base font-bold text-white">Bahri Tuğtekin</span>
               <span className="text-xs text-[#00f0ff] font-mono">{userEmail}</span>
               <span className="text-[11px] text-[#4edea3] mt-1 font-semibold">
-                ● Kalıcı Depolama Etkin
+                ✓ Kalıcı Depolama Etkin
               </span>
             </div>
-
             <div className="w-full grid grid-cols-2 gap-2 text-xs">
               <div className="p-2.5 rounded-xl bg-[#201f21] border border-white/5">
                 <span className="text-[10px] text-[#849495] block">Bağlı Playlist</span>
@@ -623,7 +849,6 @@ export default function App() {
                 </span>
               </div>
             </div>
-
             <div className="flex flex-col gap-2 w-full pt-1">
               <button
                 onClick={() => {
