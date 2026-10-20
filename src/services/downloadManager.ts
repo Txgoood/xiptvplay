@@ -96,12 +96,12 @@ export async function startDownload(
       // ENOENT önlemek için hedef klasörü indirmeden önce oluştur.
       await Filesystem.mkdir({
         path: 'downloads',
-        directory: Directory.Data,
+        directory: Directory.Documents,
         recursive: true,
       }).catch(async (mkdirError: any) => {
         // Bazı sürümlerde klasör zaten varsa mkdir hata verebilir; varlığını kontrol et.
         try {
-          await Filesystem.stat({ path: 'downloads', directory: Directory.Data });
+          await Filesystem.stat({ path: 'downloads', directory: Directory.Documents });
         } catch {
           throw mkdirError;
         }
@@ -112,7 +112,7 @@ export async function startDownload(
       const result = await Filesystem.downloadFile({
         url: rawUrl,
         path: fullPath,
-        directory: Directory.Data,
+        directory: Directory.Documents,
         recursive: true,
         progress: true,
       });
@@ -120,7 +120,7 @@ export async function startDownload(
       if (progressListener) { try { await progressListener.remove(); } catch {} }
 
       const savedPath = result.path || fullPath;
-      const uri = await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
+      const uri = await Filesystem.getUri({ path: savedPath, directory: Directory.Documents });
       const localUrl = Capacitor.convertFileSrc(uri.uri);
       onDone(localUrl, savedPath, uri.uri);
     } catch (err: any) {
