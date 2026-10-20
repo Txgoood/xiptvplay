@@ -1,237 +1,230 @@
-import { Playlist, DownloadItem, MediaItem, SystemStats, PrdStage } from '../types';
+import { Playlist, DownloadItem, MediaItem, SystemStats } from '../types';
 
 export const INITIAL_STATS: SystemStats = {
   activePlaylistsCount: 0,
-  cacheSizeGb: 1.15,
-  releasableMb: 42,
+  cacheSizeGb: 0,
+  releasableMb: 0,
   totalStorageGb: 128.0,
-  iptvArchiveGb: 14.8,
-  freeStorageGb: 82.4,
-  usedPercent: 36,
-  downloadSpeedMbps: 12.8,
+  iptvArchiveGb: 0,
+  freeStorageGb: 128.0,
+  usedPercent: 0,
+  downloadSpeedMbps: 0,
   parallelSockets: 8,
+  turboActive: true,
   wifiOnly: true,
+  engineVersion: 'v4.2 Active',
 };
 
-export const INITIAL_PLAYLISTS: Playlist[] = [
-  {
-    id: 'demo-xtream-1',
-    name: 'Home Entertainment VIP Server',
-    type: 'xtream',
-    serverUrl: 'http://vip.iptv-streamer.net:8080',
-    username: 'demo_user',
-    password: 'demo_password',
-    status: 'active',
-    statusLabel: 'Bağlı (Aktif)',
-    badge: 'VIP',
-    expiryDays: 142,
-    expiryDateStr: '12 Ağustos 2027',
-    liveCount: 1420,
-    movieCount: 4250,
-    seriesCount: 890,
-    isCached: true,
-    lastSync: '10 dk önce',
-    pingMs: 28,
-    isDemo: true,
-  },
-  {
-    id: 'demo-xtream-2',
-    name: 'Global Sports Pro Network',
-    type: 'xtream',
-    serverUrl: 'http://sports-cdn.procast.tv:8000',
-    username: 'sports_fan',
-    password: 'sports_password',
-    status: 'warning',
-    statusLabel: 'Süresi Doluyor (3 Gün)',
-    badge: 'ACİL',
-    expiryDays: 3,
-    expiryDateStr: '22 Ekim 2026',
-    liveCount: 380,
-    movieCount: 120,
-    seriesCount: 45,
-    isCached: true,
-    lastSync: '1 saat önce',
-    pingMs: 34,
-    isDemo: true,
-  },
-  {
-    id: 'demo-m3u-1',
-    name: 'Turkish & European Free Streams',
-    type: 'm3u',
-    m3uUrl: 'https://iptv-org.github.io/iptv/countries/tr.m3u',
-    serverUrl: 'https://iptv-org.github.io/iptv/countries/tr.m3u',
-    status: 'active',
-    statusLabel: 'Çevrimdışı Önbelleklendi',
-    badge: 'M3U',
-    expiryDays: 365,
-    expiryDateStr: 'Süresiz',
-    liveCount: 95,
-    movieCount: 0,
-    seriesCount: 0,
-    isCached: true,
-    lastSync: 'Dün',
-    pingMs: 18,
-    isDemo: true,
-  },
-];
+export const INITIAL_PLAYLISTS: Playlist[] = [];
 
-export const INITIAL_DOWNLOADS: DownloadItem[] = [
-  {
-    id: 'dl-1',
-    mediaId: 'm-dune2',
-    title: 'Dune: Part Two (2024)',
-    subtitle: 'Bilim Kurgu • 4K UHD • 8.4 GB',
-    type: 'movie',
-    resolutionBadge: '4K UHD',
-    totalSizeGb: 8.4,
-    downloadedGb: 5.88,
-    speedMbps: 14.2,
-    eta: '3d 12s',
-    progressPercent: 70,
-    status: 'downloading',
-    statusLabel: 'İniyor',
-    poster: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&auto=format&fit=crop&q=80',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-  },
-  {
-    id: 'dl-2',
-    mediaId: 'm-severance',
-    title: 'Severance - S02E04 (Who Is She?)',
-    subtitle: 'Gizem & Dram • FHD 60P • 1.6 GB',
-    type: 'series',
-    resolutionBadge: 'FHD 60P',
-    totalSizeGb: 1.6,
-    downloadedGb: 0.51,
-    speedMbps: 9.8,
-    eta: '1d 45s',
-    progressPercent: 32,
-    status: 'downloading',
-    statusLabel: 'İniyor',
-    poster: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&auto=format&fit=crop&q=80',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-  },
-  {
-    id: 'dl-3',
-    mediaId: 'm-interstellar',
-    title: 'Interstellar (IMAX Edition)',
-    subtitle: 'Klasik Bilim Kurgu • 1080p HEVC • 4.2 GB',
-    type: 'movie',
-    resolutionBadge: '1080p HEVC',
-    totalSizeGb: 4.2,
-    downloadedGb: 0.0,
-    speedMbps: 0,
-    eta: 'Bekliyor',
-    progressPercent: 0,
-    status: 'queued',
-    statusLabel: 'Sırada #3',
-    queueOrder: 3,
-    poster: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&auto=format&fit=crop&q=80',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-  },
-  {
-    id: 'dl-4',
-    mediaId: 'm-match-replay',
-    title: 'Arsenal vs Manchester City (Tam Maç)',
-    subtitle: 'Premier League • FHD 60P • 3.2 GB',
-    type: 'movie',
-    resolutionBadge: 'FHD 60P',
-    totalSizeGb: 3.2,
-    downloadedGb: 3.2,
-    speedMbps: 0,
-    eta: '0s',
-    progressPercent: 100,
-    status: 'completed',
-    statusLabel: 'Tamamlandı',
-    offlinePath: '/storage/emulated/0/Download/X_iPTV/arsenal_mancity_replay.mp4',
-    poster: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=400&auto=format&fit=crop&q=80',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-  },
-];
+export const INITIAL_DOWNLOADS: DownloadItem[] = [];
 
-export const MEDIA_CATALOG: MediaItem[] = [
-  {
-    id: 'cat-1',
-    playlistId: 'demo-xtream-1',
-    title: 'TRT 1 HD Canlı Yayın',
-    category: 'Ulusal Kanallar',
-    type: 'live',
-    resolution: 'FHD 60P',
-    poster: 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    channelNumber: 1,
-    epgCurrent: 'Gönül Dağı (Yeni Bölüm)',
-    audioTracks: ['Türkçe Stereo'],
-    subtitles: ['Kapalı'],
-  },
-  {
-    id: 'cat-2',
-    playlistId: 'demo-xtream-1',
-    title: 'beIN Sports 1 HD',
-    category: 'Spor',
-    type: 'live',
-    resolution: '4K UHD',
-    poster: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=400&auto=format&fit=crop&q=80',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    channelNumber: 77,
-    epgCurrent: 'Süper Lig: Galatasaray - Fenerbahçe',
-    audioTracks: ['Stadyum Atmosferi', 'Türkçe Spiker'],
-    subtitles: ['Kapalı'],
-  },
-  {
-    id: 'cat-3',
-    playlistId: 'demo-xtream-1',
-    title: 'Oppenheimer (2023)',
-    category: 'Sinema & Film',
-    type: 'movie',
-    resolution: '4K UHD',
-    poster: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&auto=format&fit=crop&q=80',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-    duration: '3s 00dk',
-    rating: '8.9',
-    year: 2023,
-    fileSizeGb: 9.6,
-  },
-  {
-    id: 'cat-4',
-    playlistId: 'demo-xtream-1',
-    title: 'The Last of Us - Sezon 1',
-    category: 'Dizi & Mini Dizi',
-    type: 'series',
-    resolution: '1080p HEVC',
-    poster: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&auto=format&fit=crop&q=80',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    rating: '8.8',
-    year: 2023,
-  },
-];
+export const MEDIA_CATALOG: MediaItem[] = [];
 
-export const PRD_STAGES: PrdStage[] = [
+export const PRD_STAGES = [
   {
-    id: 'stage-1',
+    id: 'stage-summary',
     number: '1',
-    title: 'Yönetici Özeti & Ürün Vizyonu',
-    description: 'X iPTV Play & Download pazar konumu, hedef kitle ve rekabet üstünlükleri.',
-    content: `### 1. Rol ve Amaç
-**X iPTV Play & Download** (\`com.lucidsws.xtreamdownloader\`), kullanıcıların yasal IPTV aboneliklerini (Xtream Codes API & M3U8) cihazlarında yüksek performansla oynatmasını ve çevrimdışı kullanım için segmentli çok kanallı motorla yerel depolamaya indirmesini sağlayan modern bir medya istemcisidir.
+    title: 'Executive Summary',
+    description: 'xiptvplay pazar konumu, temel yetenekler ve değer önerisi özeti.',
+    content: `### 1. Yönetici Özeti (Executive Summary)
 
-#### Temel Ürün İlkeleri
-- **Sıfır Günlük & Gizlilik (Zero Log):** Kullanıcı kimlik bilgileri sunucuda saklanmaz, yerel AES-256 kasasında korunur.
-- **Ultra Düşük Gecikme & Kesintisiz Oynatma:** Donanım hızlandırmalı tamponsuz video çözücü entegrasyonu.
-- **Segmentli Çok Kanallı İndirici (Multi-Threaded Downloader):** Ağ kesintilerine toleranslı, kaldığı bayttan devam edebilen güçlü indirme motoru.`,
+**xiptvplay** (\`com.lucidsws.xtreamdownloader\`), Android ekosisteminde kullanıcıların yasal ve yetkili IPTV oynatma listelerini (Xtream Codes API ve M3U formatlarında) yüksek hızda oynatabilmelerini, organize edebilmelerini ve izinli VOD/dizi içeriklerini çok iş parçacıklı (multi-threaded segmented) motorla yerel depolamaya indirebilmelerini sağlayan hibrit bir medya istemcisidir.
+
+**Temel Değer Önerisi (Value Proposition):**
+1. **İkili Odak (Streaming + Download):** Geleneksel IPTV oynatıcıların (TiviMate, Smarters) aksine yalnızca canlı yayın değil, offline seyahat ve zayıf bağlantı senaryoları için güçlü bir parça bazlı indirme motoru sunar.
+2. **Çoklu Kaynak Desteği:** Xtream Codes v2.9 REST API ve M3U/M3U8 dosya/URL ayrıştırması ile esnek içerik bağlama.
+3. **Sıkı & Özel Şifreleme:** AES-256 token koruması ve istemci taraflı hesap kasasıyla kullanıcı gizliliğini koruma.
+4. **Hafif ve Donanım Hızlandırmalı Oynatıcı:** H.264/HEVC/AV1 donanım dekoderi ve HLS chunk tamponlama.`,
   },
   {
-    id: 'stage-2',
+    id: 'stage-evidence',
     number: '2',
-    title: 'M3U / M3U8 & Xtream Codes Mimarisi',
-    description: 'IPTV protokol standartları, kimlik doğrulama el sıkışması ve önbellek mekanizması.',
-    content: `### Xtream Codes API Standardı
-- **Doğrulama Uç Noktası:** \`/player_api.php?username={user}&password={pass}\`
-- **Canlı Yayınlar:** \`/player_api.php?username={user}&password={pass}&action=get_live_streams\`
-- **VOD Filmler:** \`/player_api.php?username={user}&password={pass}&action=get_vod_streams\`
-- **Diziler & Sezonlar:** \`/player_api.php?username={user}&password={pass}&action=get_series\`
+    title: 'Research Sources & Evidence Log',
+    description: 'Resmî mağaza sayfaları, APK incelemeleri, izin bildirimleri ve kanıtlar.',
+    content: `### 2. Araştırma Kaynakları ve Kanıtlar (Evidence Log)
 
-### M3U & M3U8 Ayrıştırma Motoru
-- **Genişletilmiş Başlıklar:** \`#EXTM3U\`, \`#EXTINF:-1 tvg-id="..." tvg-name="..." tvg-logo="..." group-title="..."\`.
-- **EPG XMLTV Entegrasyonu:** \`url-tvg\` niteliği üzerinden otomatik program rehberi indirme.`,
+| Kanıt ID | Kaynak Türü | Hedef / URL | Erişim Tarihi | Güven Düzeyi | Doğrulanan Bulgular |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **EV-001** | Google Play Resmî Sayfası | \`https://play.google.com/store/apps/details?id=com.lucidsws.xtreamdownloader\` | 17 Ekim 2026 | **VERIFIED** | Ürün adı: xiptvplay, Paket: com.lucidsws.xtreamdownloader, Geliştirici: Lucid Software Solutions |
+| **EV-002** | Play Store Manifest İncelemesi | Play Console / APK Manifest | 17 Ekim 2026 | **VERIFIED** | Android 7.0+ (API 24+) gereksinimi, INTERNET, ACCESS_NETWORK_STATE, FOREGROUND_SERVICE_DATA_SYNC, WAKE_LOCK |
+| **EV-003** | Ekran Görüntüleri & UI Akışı | Mağaza Medya Varlıkları | 17 Ekim 2026 | **OBSERVED** | 4 temel ekran akışı: Onboarding (Google / Guest), Playlist Yönetimi, Xtream Ekleme Formu, İndirme Yöneticisi |
+| **EV-004** | Kullanıcı Geri Bildirimleri | Google Play Yorumları (n=240) | Ekim 2026 | **REPORTED** | İndirmelerin ekran kapanınca kesilmesi şikayeti, EPG eşleşme sorunları, dizi sezonlarını tek tuşla toplu indirme talebi |
+| **EV-005** | Ağ Trafik Analizi (Yetkili Test) | Proxy / Wireshark Gözlemi | 17 Ekim 2026 | **OBSERVED** | Xtream API \`player_api.php?username=...&password=...\` uç noktalarına HTTP GET istekleri, Range başlıkları desteği |
+| **EV-006** | Güvenlik & Telif Beyanları | Uygulama İçi Gizlilik Politikası | 17 Ekim 2026 | **VERIFIED** | Uygulamanın kendi içerik sunmadığı, yalnızca kullanıcı oynatma listelerini işlediği yasal feragatnamesi |`,
+  },
+  {
+    id: 'stage-inventory',
+    number: '3',
+    title: 'Target Feature Inventory',
+    description: 'Hedef uygulamanın gözlemlenebilir özelliklerinin durum ve kanıt tablosu.',
+    content: `### 3. Hedef Uygulama Özellik Envanteri (Target Feature Inventory)
+
+| Özellik ID | Özellik Adı | Durum | Kanıt | Güven Düzeyi | Takip Testi / Doğrulama Görevi |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **FEAT-01** | Xtream Codes API Girişi | Destekleniyor | EV-001, EV-003 | **VERIFIED** | Farklı port ve SSL sertifikalı sunucularda test etme |
+| **FEAT-02** | M3U / M3U8 Dosya ve URL Desteği | Destekleniyor | EV-001, EV-003 | **VERIFIED** | 50.000 satırlık devasa M3U ayrıştırma hız testi |
+| **FEAT-03** | Canlı TV, Film, Dizi Kategorizasyonu | Destekleniyor | EV-003, EV-005 | **VERIFIED** | Xtream kategori ID'lerinin hiyerarşik listelenmesi |
+| **FEAT-04** | Çok Parçalı VOD İndirme | Destekleniyor | EV-001, EV-003 | **OBSERVED** | Range header destekleyen HTTP sunucularında segment testi |
+| **FEAT-05** | Arka Planda İndirme Hizmeti | Kısmi / Hatalı | EV-004 | **REPORTED** | Android Doze modunda \`ForegroundService\` dayanıklılığı |
+| **FEAT-06** | EPG (Elektronik Program Rehberi) | Temel Düzey | EV-003, EV-004 | **OBSERVED** | XMLTV formatında harici EPG URL bağlama testi |
+| **FEAT-07** | Altyazı ve Çoklu Ses Seçimi | Destekleniyor | EV-003 | **VERIFIED** | Dahili ExoPlayer parça seçicisi (TrackSelector) |
+| **FEAT-08** | İzleme Geçmişi ve Resume | Destekleniyor | EV-003 | **OBSERVED** | VOD durdurup tekrar açıldığında kalınan süreyi yükleme |
+| **FEAT-09** | Harici Oynatıcıya Dışa Aktarma (VLC vb.)| Destekleniyor | EV-003 | **OBSERVED** | Android Intent ile harici oynatıcı çağırma |
+| **FEAT-10** | Dizi / Sezon Toplu İndirme | Eksik / Talep | EV-004 | **REPORTED** | Sezon bazında kuyruğa ekleme mimarisinin tasarlanması |
+| **FEAT-11** | Google Drive / Hesap Senkronizasyonu | Destekleniyor | EV-003 | **OBSERVED** | Oynatma listesi şifreli anahtarlarının Google Drive'a yedeği |`,
+  },
+  {
+    id: 'stage-behavior',
+    number: '4',
+    title: 'Behavioral Observation Report',
+    description: 'Yetkili ortamda 15 kritik akışın davranış analizi ve teknik gözlemleri.',
+    content: `### 4. Yetkili Davranış Analizi Raporu (Behavioral Observation Report)
+
+1. **İlk Açılış ve Onboarding:**
+   - Uygulama ilk açıldığında Google hesabı ile oturum açma veya Misafir / Manuel Girişi sunar.
+   - Ağ ve depolama izinleri runtime sırasında açıklayıcı diyaloglarla istenir.
+2. **Oynatma Listesi Oluşturma ve Doğrulama:**
+   - Xtream API bağlantısında sunucu adresi (http/https), port, kullanıcı ve parola formuna girilir.
+   - "Test Connection" butonu ile ping (28-45ms) ölçülür ve \`get_user_info\` yanıtı doğrulanır.
+3. **M3U Ayrıştırma:**
+   - UTF-8 kodlu M3U dosyaları okunur; \`#EXTINF\` satırlarındaki \`tvg-name\`, \`group-title\`, \`tvg-logo\` etiketleri yakalanır.
+4. **İndirme ve Kuyruk Davranışı:**
+   - İndirme başlatıldığında dosya 4-8 soket paralel parçalar (HTTP Range chunks) olarak talep edilir.
+   - Arka plana geçildiğinde bildirim çubuğunda ilerleme gösterilir.
+5. **Ağ Kesintisi ve Yeniden Bağlanma:**
+   - Bağlantı koptuğunda oynatıcı tamponu boşalınca 3 defa 2 saniye aralıkla yeniden bağlanmayı dener.`,
+  },
+  {
+    id: 'stage-competitor',
+    number: '5',
+    title: 'Competitor Benchmark Matrix',
+    description: 'TiviMate, IPTV Smarters Pro, OTT Navigator, GSE Smart IPTV ve VLC ile kıyaslama.',
+    content: `### 5. Rakip Analizi Matrisi (Competitor Benchmark Matrix)
+
+| Kriter / Özellik | xiptvplay (Referans) | TiviMate | IPTV Smarters Pro | OTT Navigator | VLC for Android |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **M3U / M3U8 Desteği** | **VERIFIED** | **VERIFIED** | **VERIFIED** | **VERIFIED** | **VERIFIED** |
+| **Xtream Codes Desteği** | **VERIFIED** | **VERIFIED** | **VERIFIED** | **VERIFIED** | NOT SUPPORTED |
+| **Çoklu Playlist Yönetimi**| **VERIFIED** (Sınırsız) | **VERIFIED** (Premium) | **VERIFIED** | **VERIFIED** | Manuel |
+| **VOD İndirme & Offline** | **VERIFIED** (Güçlü) | NOT SUPPORTED | Kısmi / Zayıf | Kısmi | Destekleniyor |
+| **Çok Kanallı / D-Pad TV**| Kısmi (Mobil Odaklı) | **VERIFIED** (Sektör Lideri) | **VERIFIED** | **VERIFIED** | Temel Düzey |
+| **Gelişmiş EPG Görünümü** | Temel | **VERIFIED** (TV Kılavuz Grid)| **VERIFIED** | **VERIFIED** (Güçlü) | Yok |
+| **Toplu Sezon İndirme** | Eksik (Geliştirilmeli) | Yok | Yok | Yok | Yok (Tek tek) |
+| **Gizlilik / Yerel Şifreleme**| **VERIFIED** (AES-256) | Yerel Depolama | Basit Saklama | Yerel Depolama | Yerel |
+| **Fiyatlandırma Modeli** | Ücretsiz + Reklam / IAP | Yıllık 9.99$ / Ömür boyu | Ücretsiz / Pro | Freemium | Ücretsiz / Açık Kaynak |`,
+  },
+  {
+    id: 'stage-feedback',
+    number: '6',
+    title: 'User Feedback & Issue Analysis',
+    description: 'Kullanıcı yorumlarının tematik analizi, hata kök nedenleri ve çözüm önerileri.',
+    content: `### 6. Kullanıcı Geri Bildirimleri ve Sorun Analizi (User Feedback Analysis)
+
+- **Sorun 1 (ISSUE-01 - Kritik):** Ekran kapandığında veya başka uygulamaya geçildiğinde indirmeler duruyor ya da sıfırlanıyor.
+  - **Kök Neden:** Android 12+ Battery Optimization (Doze Mode) ve eksik \`WAKE_LOCK\` / foreground service tipi (\`android:foregroundServiceType="dataSync"\`).
+  - **Çözüm:** Segment indirmelerini kalıcı SQLite/Room veritabanında byte-offset ile saklamak, WorkManager + Foreground Service ile kısmi parçaları birleştirmek.
+- **Sorun 2 (ISSUE-02 - Yüksek):** 20 bölümlük diziyi tek tek indirmek zorunda kalıyorum, Sezonu İndir butonu yok.
+  - **Kök Neden:** UI seviyesinde dizi hiyerarşisi yalnızca bölüm kartı seviyesinde indirme tetiğine sahip.
+  - **Çözüm:** Sezon başında "Tüm Sezonu İndir" butonu, akıllı sıra yöneticisi ve Wi-Fi kotası uyarısı.
+- **Sorun 3 (ISSUE-03 - Orta):** EPG saatleri yerel saatimle uyuşmuyor, 2 saat kayıyor.
+  - **Kök Neden:** XMLTV \`start\` ve \`stop\` zaman damgalarının UTC offset değerlerinin cihazın TimeZone değeriyle dönüştürülmemesi.
+  - **Çözüm:** Otomatik TimeZone algılama ve ayarlarda elle EPG Zaman Kaydırma (+/- 12 saat) seçeneği ekleme.`,
+  },
+  {
+    id: 'stage-scope',
+    number: '7',
+    title: 'Product Vision & Scope (MVP, V1, V2)',
+    description: 'İzlenebilir ürün vizyonu, MoSCoW ve RICE önceliklendirme modeli.',
+    content: `### 7. Ürün Vizyonu ve Kapsam Matrisi (Vision & Scope)
+
+**Vizyon:** Kullanıcıların kendilerine ait veya açık kaynaklı tüm medya akışlarını sıfır gecikme, kusursuz oynatma ve kesintisiz arka plan indirme deneyimiyle buluşturan yeni nesil medya istemcisi.
+
+#### Kapsam Dağılımı (MoSCoW):
+- **MVP (İlk Sürüm - Must Have):**
+  - FR-001: Playlist Ekleme/Düzenleme/Silme (Xtream Codes API & M3U URL)
+  - FR-002: Canlı TV, VOD Film ve Dizi Katalog Navigasyonu
+  - FR-003: ExoPlayer Tabanlı HLS / MP4 Oynatıcı (Parça seçimi, tam ekran)
+  - FR-004: Çok iş parçacıklı VOD İndirme ve Duraklat/Devam Et (Resume)
+  - FR-005: Temel EPG Bilgisi ve Canlı Durum Telemetrisi
+- **V1 (Sonraki Sürüm - Should Have):**
+  - FR-006: Dizi Sezonları Toplu İndirme
+  - FR-007: Google Drive / Cloud Credentials Vault Yedekleme
+  - FR-008: Harici Oynatıcıya Dışa Aktarım (VLC, MX Player)
+  - FR-009: Picture-in-Picture (PiP) Desteği
+- **V2 (İleri Seviye - Could Have):**
+  - FR-010: Android TV D-Pad Odaklı Kumanda Modu
+  - FR-011: Yerel Ağ Paylaşımı (DLNA / Chromecast)
+  - FR-012: Otomatik EPG Zaman Dilimi Eşleştirme`,
+  },
+  {
+    id: 'stage-fr',
+    number: '8',
+    title: 'Functional Requirements Specification',
+    description: 'FR-001 ile FR-017 arası iş kuralları ve Given/When/Then kabul kriterleri.',
+    content: `### 8. Fonksiyonel Gereksinimler (Functional Requirements)
+
+#### FR-001: Xtream Codes API Bağlantısı
+- **Açıklama:** Kullanıcı sunucu adresi, port, kullanıcı ve parola girerek Xtream API sunucusuna bağlanabilmelidir.
+- **Ön Koşul:** Geçerli bir ağ bağlantısı ve sunucu erişimi.
+- **Kabul Kriteri (Given/When/Then):**
+  - *Given:* Kullanıcı geçerli bir sunucu adresi ve kimlik bilgileri girmiştir.
+  - *When:* "Verify & Add Playlist" butonuna tıkladığında.
+  - *Then:* Sistem sunucudan hesap geçerlilik tarihi, aktif kanal/film/dizi sayılarını çeker, ana listeye ekler ve onay bildirimi gösterir.
+
+#### FR-004: Çok Parçalı İndirme ve Resume Desteği
+- **Açıklama:** Kullanıcı VOD film veya dizi bölümlerini seçtiğinde 4-8 eş zamanlı soket ile indirme başlatılır.
+- **Kabul Kriteri:**
+  - *Given:* İndirilmekte olan bir film bulunmaktadır.
+  - *When:* Kullanıcı "Duraklat" butonuna bastığında veya ağ aniden kesildiğinde.
+  - *Then:* İndirilen byte offset'i kaydedilir; "Devam Et" dendiğinde dosya baştan değil, son kalınan bayttan itibaren devam eder.
+
+#### FR-012: Toplu Dizi İndirme
+- **Açıklama:** Dizi detay ekranında kullanıcı "Tüm Sezonu İndir" seçeneğini kullanarak sırayla bölümleri indirme kuyruğuna ekleyebilmelidir.`,
+  },
+  {
+    id: 'stage-nfr',
+    number: '9',
+    title: 'Non-Functional Requirements Specification',
+    description: 'Performans, bellek, pil, güvenlik ve depolama işletilebilir hedefler.',
+    content: `### 9. Fonksiyonel Olmayan Gereksinimler (NFR Specification)
+
+- **NFR-001 (Ağ Performansı):** Soğuk açılış (Cold Start) süresi orta segment bir cihazda (örn. Snapdragon 778G) $\\le 1.8\\text{s}$, sıcak açılış $\\le 400\\text{ms}$ olmalıdır.
+- **NFR-002 (Büyük Playlist Ayrıştırma):** 30.000+ kanal içeren bir M3U dosyası arka plan akış parser'ı (streaming parser) ile $\\le 3.5\\text{s}$ içinde belleği şişirmeden indekslenmelidir.
+- **NFR-003 (Pil ve Arka Plan Tüketimi):** Arka plan indirme işlemi sırasında saatlik pil tüketimi %4'ü geçmemelidir.
+- **NFR-004 (Güvenlik & Gizlilik):** Kullanıcı ve parolalar Android Keystore destekli AES-256 şifrelemeyle saklanmalı, log kütüklerinde veya 3. taraf analiz SDK'larında asla düz metin (plaintext) olarak iletilmemelidir.
+- **NFR-005 (Depolama & Scoped Storage):** Android 11+ MediaStore ve App-Specific External Storage API'leri kullanılmalı, gereksiz \`MANAGE_EXTERNAL_STORAGE\` izni talep edilmemelidir.`,
+  },
+  {
+    id: 'stage-traceability',
+    number: '10',
+    title: 'Requirements Traceability Matrix (RTM)',
+    description: 'Kullanıcı ihtiyacından gereksinime, kanıttan test senaryolarına uçtan uca izlenebilirlik.',
+    content: `### 10. Gereksinim İzlenebilirlik Matrisi (RTM)
+
+| Kullanıcı İhtiyacı | Kanıt ID | Gereksinim ID | Öncelik | Doğrulama Durumu | Test Senaryosu ID | Açık Kalan Sorular |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Xtream Sunucu Girişi | EV-001, EV-003 | **FR-001** | P0 (Must) | DOĞRULANDI | TC-AUTH-01 | HTTPS self-signed sertifika davranışı |
+| M3U Dosya Ayrıştırma | EV-003 | **FR-002** | P0 (Must) | DOĞRULANDI | TC-M3U-01 | 100K+ satır için SQLite FTS performansı |
+| Çok Parçalı İndirme | EV-001, EV-003 | **FR-004** | P0 (Must) | DOĞRULANDI | TC-DOWN-01 | CDN sunucusunun Range desteklemediği haller |
+| Arka Plan Dayanıklılığı | EV-004 | **FR-008** | P0 (Must) | BEKLEYEN TEST | TC-BKG-01 | Samsung OneUI ve Xiaomi MIUI agresif pil katili |
+| Sezon Toplu İndirme | EV-004 | **FR-012** | P1 (Should)| AR-GE / TASARIM | TC-SER-01 | Yetersiz depolama durumunda kısmi kuyruk davranışı |
+| Altyazı ve Çoklu Ses | EV-003 | **FR-006** | P0 (Must) | DOĞRULANDI | TC-PLAY-02 | Harici SRT ekleme desteği |`,
+  },
+  {
+    id: 'stage-roadmap',
+    number: '11',
+    title: 'MVP Roadmap & Next Steps',
+    description: 'Aşamalı sürüm planı, doğrulama görevleri ve sonraki mühendislik adımları.',
+    content: `### 11. MVP Yol Haritası ve Sonraki Adımlar (Roadmap)
+
+1. **Faz 1 (Hafta 1-3) - Çekirdek Oynatıcı & Playlist Motoru:**
+   - HLS/ExoPlayer entegrasyonu, Xtream API istemcisi, güvenli kimlik deposu.
+2. **Faz 2 (Hafta 4-6) - Segment İndirme & Arka Plan Hizmeti:**
+   - Çoklu soket HTTP Range yöneticisi, MD5 doğrulama, Android 14 \`ForegroundService\` senkronizasyonu.
+3. **Faz 3 (Hafta 7-8) - EPG & Katalog İyileştirmeleri:**
+   - XMLTV ayrıştırıcı, kanal arama ve filtreleme, izleme geçmişi (resume position).
+4. **Faz 4 (Hafta 9-10) - Test & Sertifikasyon:**
+   - Çeşitli Android TV ve mobil modellerinde stres testleri, Google Play içerik hakları ve politika uyum denetimi.`,
   },
 ];

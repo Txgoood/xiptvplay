@@ -45,15 +45,13 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="h-16 px-3.5 max-w-7xl mx-auto flex items-center justify-between gap-2">
         {/* Brand identity */}
         <div className="flex items-center gap-2.5 min-w-0 shrink">
-          <img
-            alt="X iPTV Logo"
-            className="h-8 w-8 object-contain shrink-0 rounded-lg shadow-sm"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVA3ZOULNW0J3q7gIngmyl2aCoAb3KE_w80IZgMuO2GO6Ps2SMMLAvUCgmtCqVaOjb5W8LoIDzZFBySTorQWzHJ3qWWnsjFNiic9eVzP1evfhQfex6h-8OAR-v3Jb8-Gn5uQghu2G0lMIpL3oE-wyEthLQiiniBZjWOVgr6BiMKHwYs5I24JXFj-gDU6SX8tuZR9DrrJpbvpCI1knk5aU0_eJicd2zzwPM_9pmQackohf1dryOicNW"
-          />
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#0566d9] to-[#00f0ff] flex items-center justify-center text-[#00363a] font-headline font-black text-xs shadow-md shrink-0">
+            X
+          </div>
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="font-headline text-[16px] sm:text-[17px] font-bold text-[#e5e1e4] tracking-normal whitespace-nowrap">
-                X <span className="text-[#00f0ff] drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]">iPTV</span>
+                xiptv<span className="text-[#00f0ff] drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]">play</span>
               </span>
               <span className="px-1.5 py-0.5 rounded-full bg-[#65f2b5]/20 text-[#4edea3] text-[9px] sm:text-[10px] font-bold tracking-wider flex items-center gap-1 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#4edea3] animate-pulse"></span>
@@ -89,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
                   ? 'bg-[#0566d9] text-white shadow-[0_0_10px_rgba(5,102,217,0.45)]'
                   : 'text-[#b9cacb] hover:text-[#e5e1e4]'
               }`}
-              title="PM Gereksinim ve Araştırma Raporu (13 Aşama)"
+              title="PM Gereksinim ve Araştırma Raporu (11 Aşama)"
             >
               <FileText className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">PM Analiz</span>

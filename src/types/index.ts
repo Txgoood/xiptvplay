@@ -1,39 +1,16 @@
 export type ScreenType = 'onboarding' | 'playlists' | 'catalog' | 'downloads' | 'favorites' | 'settings';
 export type AppMode = 'app' | 'prd';
 
-export interface XtreamUserInfo {
-  username?: string;
-  password?: string;
-  message?: string;
-  auth?: number;
-  status?: string;
-  exp_date?: string | number;
-  is_trial?: string;
-  active_cons?: string;
-  created_at?: string;
-  max_connections?: string;
-  allowed_output_formats?: string[];
-}
-
-export interface XtreamServerInfo {
-  url?: string;
-  port?: string;
-  https_port?: string;
-  server_protocol?: string;
-  rtmp_port?: string;
-  timezone?: string;
-  time_now?: string;
-}
-
 export interface Playlist {
   id: string;
   name: string;
   type: 'xtream' | 'm3u';
   serverUrl?: string;
-  m3uUrl?: string;
   username?: string;
   password?: string;
-  status: 'active' | 'warning' | 'error' | 'syncing';
+  m3uUrl?: string;
+  m3uContent?: string;
+  status: 'active' | 'warning' | 'expired' | 'error';
   statusLabel: string;
   badge?: string;
   expiryDays: number;
@@ -41,13 +18,39 @@ export interface Playlist {
   liveCount: number;
   movieCount: number;
   seriesCount: number;
-  isCached?: boolean;
+  isCached: boolean;
   lastSync: string;
   pingMs?: number;
   isDemo?: boolean;
-  maxConnections?: number;
-  activeConnections?: number;
   errorMessage?: string;
+  activeConnections?: number;
+  maxConnections?: number;
+}
+
+export interface MediaItem {
+  id: string;
+  playlistId?: string;
+  title: string;
+  category: string;
+  type: 'live' | 'movie' | 'series';
+  resolution: '4K UHD' | 'FHD 60P' | '1080p HEVC' | 'HD';
+  duration?: string;
+  year?: number;
+  rating?: string;
+  poster: string;
+  backdrop?: string;
+  streamUrl: string;
+  epgCurrent?: string;
+  epgNext?: string;
+  epgProgressPercent?: number;
+  fileSizeGb?: number;
+  audioTracks: string[];
+  subtitles: string[];
+  isFavorite?: boolean;
+  channelNumber?: number;
+  streamId?: string | number;
+  containerExtension?: string;
+  rawStreamUrl?: string;
 }
 
 export interface DownloadItem {
@@ -55,41 +58,25 @@ export interface DownloadItem {
   mediaId: string;
   title: string;
   subtitle: string;
-  type: 'movie' | 'series';
+  type: 'movie' | 'series' | 'catchup';
   resolutionBadge: string;
   totalSizeGb: number;
   downloadedGb: number;
   speedMbps: number;
   eta: string;
   progressPercent: number;
-  status: 'downloading' | 'paused' | 'completed' | 'queued' | 'failed';
+  status: 'downloading' | 'paused' | 'queued' | 'completed' | 'error';
   statusLabel: string;
-  poster: string;
-  streamUrl?: string;
-  offlinePath?: string;
   queueOrder?: number;
-}
-
-export interface MediaItem {
-  id: string;
-  playlistId: string;
-  title: string;
-  category: string;
-  type: 'live' | 'movie' | 'series';
-  resolution: string;
   poster: string;
-  streamUrl: string;
-  channelNumber?: number;
-  epgCurrent?: string;
-  duration?: string;
-  rating?: string;
-  year?: number;
-  fileSizeGb?: number;
-  audioTracks?: string[];
-  subtitles?: string[];
-  isFavorite?: boolean;
-  streamId?: string | number;
-  containerExtension?: string;
+  verifiedMd5?: boolean;
+  offlinePath?: string;
+  recordedDate?: string;
+  streamUrl?: string;
+  rawStreamUrl?: string;
+  localUrl?: string;
+  fileUri?: string;
+  errorMessage?: string;
 }
 
 export interface SystemStats {
@@ -102,13 +89,70 @@ export interface SystemStats {
   usedPercent: number;
   downloadSpeedMbps: number;
   parallelSockets: number;
+  turboActive: boolean;
   wifiOnly: boolean;
+  engineVersion: string;
 }
 
-export interface PrdStage {
-  id: string;
-  number: string;
-  title: string;
-  description: string;
-  content: string;
+export interface XtreamUserInfo {
+  username: string;
+  status: string;
+  auth: number;
+  exp_date?: string;
+  is_trial?: string;
+  active_cons?: string;
+  max_connections?: string;
+  allowed_output_formats?: string[];
 }
+
+export interface XtreamServerInfo {
+  url?: string;
+  port?: string;
+  https_port?: string;
+  server_protocol?: string;
+  rtmp_port?: string;
+  timezone?: string;
+}
+
+export interface SeriesEpisode {
+  id: string | number;
+  episodeNum: number;
+  seasonNum: number;
+  title: string;
+  containerExtension: string;
+  duration?: string;
+  plot?: string;
+  rating?: string;
+  releaseDate?: string;
+  image?: string;
+  streamUrl: string;
+  rawStreamUrl?: string;
+}
+
+export interface SeriesSeason {
+  seasonNumber: number;
+  name?: string;
+  episodeCount?: number;
+  airDate?: string;
+  cover?: string;
+}
+
+export interface SeriesDetail {
+  name?: string;
+  cover?: string;
+  plot?: string;
+  cast?: string;
+  director?: string;
+  genre?: string;
+  releaseDate?: string;
+  rating?: string;
+  backdrop?: string;
+  seasons: SeriesSeason[];
+  episodes: Record<string | number, SeriesEpisode[]>;
+}
+
+export interface AppSettings {
+  bufferSeconds: number;
+  hardwareDecoder?: string;
+}
+

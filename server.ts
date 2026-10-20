@@ -10,23 +10,13 @@ import { Readable } from 'stream';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// IPTV Server Compatible User-Agent (IPTVSmartersPro / TiviMate) to bypass provider blocks
-const STANDARD_USER_AGENT = 'IPTVSmartersPro/3.1.5 (Linux; Android 11)';
+// IPTV Server Compatible User-Agent (VLC/3.0.18 / TiviMate/4.7.0) to bypass server-side blocks
+const STANDARD_USER_AGENT = 'VLC/3.0.18';
 
 function getUrlVariants(rawUrl: string): string[] {
-  let trimmed = rawUrl.trim().replace(/\/+$/, '');
-  // Strip common subpaths if mistakenly included by user
-  trimmed = trimmed.replace(/\/(player_api\.php|get\.php|c|live)(\/.*)?$/i, '');
+  let trimmed = rawUrl.trim();
   if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
     return [`http://${trimmed}`, `https://${trimmed}`];
-  }
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.port && parsed.port !== '80' && parsed.port !== '443') {
-      return [trimmed];
-    }
-  } catch {
-    // fallback
   }
   if (trimmed.startsWith('http://')) {
     return [trimmed, trimmed.replace(/^http:\/\//i, 'https://')];
@@ -185,9 +175,9 @@ async function startServer() {
     next();
   });
 
-  // Health check endpoint for monitoring & Android connectivity verification
+  // Health check endpoint
   app.get('/api/health', (_req: Request, res: Response) => {
-    res.json({ ok: true });
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
   // Real Latency Ping endpoint with protocol fallback
@@ -291,9 +281,9 @@ async function startServer() {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       ];
 
-      let response: globalThis.Response | null = null;
+      let response: Response | null = null;
       let finalUrl = targetUrl;
-      let lastErrorResponse: globalThis.Response | null = null;
+      let lastErrorResponse: Response | null = null;
 
       for (const ua of USER_AGENTS) {
         headers['User-Agent'] = ua;
@@ -429,14 +419,14 @@ async function startServer() {
 
         const rewritten = text
           .split('\n')
-          .map((line: string) => {
+          .map((line) => {
             const trimmed = line.trim();
             if (!trimmed) return line;
 
             // Handle HLS tags with URIs (like #EXT-X-KEY, #EXT-X-MEDIA, #EXT-X-MAP)
             if (trimmed.startsWith('#')) {
               if (trimmed.includes('URI=')) {
-                return trimmed.replace(/URI=(["'])(.*?)\1/g, (match: string, quote: string, uri: string) => {
+                return trimmed.replace(/URI=(["'])(.*?)\1/g, (match, quote, uri) => {
                   try {
                     const abs = new URL(uri, effectiveBaseUrl).toString();
                     return `URI="${quote ? '' : ''}/api/iptv/proxy?url=${encodeURIComponent(abs)}"`;
@@ -474,7 +464,7 @@ async function startServer() {
         const nodeStream = Readable.fromWeb(response.body as any);
         nodeStream.on('error', (_err) => {
           if (!res.headersSent) {
-            res.status(200).json({ error: 'Stream okuma hatası' });
+            res.status(502).end();
           } else {
             res.end();
           }
@@ -488,7 +478,7 @@ async function startServer() {
       if (controller.signal.aborted) {
         return; // Client disconnected or seeked, normal behavior
       }
-      return res.status(200).json({
+      return res.status(502).json({
         error: formatNetworkError(err, targetUrl),
       });
     }
@@ -498,23 +488,19 @@ async function startServer() {
   app.post('/api/iptv/xtream/verify', async (req: Request, res: Response) => {
     const { serverUrl, username, password } = req.body;
     if (!serverUrl || !username || !password) {
-      return res.json({
+      return res.status(400).json({
         success: false,
         error: 'Sunucu URL, kullanıcı adı ve şifre zorunludur.',
       });
     }
 
-    const cleanServer = serverUrl.trim().replace(/\/+$/, '');
-    const cleanUser = username.trim();
-    const cleanPass = password.trim();
-
-    const variants = getUrlVariants(cleanServer);
+    const variants = getUrlVariants(serverUrl.replace(/\/+$/, ''));
     let lastError = '';
 
     for (const baseServer of variants) {
       const apiUrl = `${baseServer}/player_api.php?username=${encodeURIComponent(
-        cleanUser
-      )}&password=${encodeURIComponent(cleanPass)}`;
+        username
+      )}&password=${encodeURIComponent(password)}`;
 
       try {
         const startTime = Date.now();
@@ -532,51 +518,9 @@ async function startServer() {
 
         clearTimeout(timeoutId);
         const pingMs = Date.now() - startTime;
-        const statusCode = response.status;
-
-        // Xtream Codes / XUI Nginx specific authentication response codes
-        if (statusCode === 512) {
-          return res.json({
-            success: false,
-            error: 'Kimlik doğrulama başarısız (HTTP 512): Sunucuya ulaşıldı ancak girilen kullanıcı adı veya şifre hatalı, ya da sağlayıcı bu hesabı dondurmuş / abonelik süresi dolmuş.',
-            pingMs,
-            statusCode,
-            effectiveServerUrl: baseServer,
-          });
-        }
-
-        if (statusCode === 401 || statusCode === 403) {
-          return res.json({
-            success: false,
-            error: `Erişim reddedildi (HTTP ${statusCode}): Kullanıcı adı veya şifre geçersiz, ya da IPTV sağlayıcınız bu IP adresinden bağlantıyı engelliyor.`,
-            pingMs,
-            statusCode,
-            effectiveServerUrl: baseServer,
-          });
-        }
-
-        if (statusCode === 511) {
-          return res.json({
-            success: false,
-            error: 'Ağ kimlik doğrulaması gerekli (HTTP 511): Kullanıcı adı veya şifre boş ya da geçersiz formatta iletildi.',
-            pingMs,
-            statusCode,
-            effectiveServerUrl: baseServer,
-          });
-        }
-
-        if (statusCode === 404) {
-          return res.json({
-            success: false,
-            error: 'Sunucuda Xtream API (player_api.php) bulunamadı (HTTP 404). Sunucu adresi veya port numarasının doğru olduğunu kontrol edin.',
-            pingMs,
-            statusCode,
-            effectiveServerUrl: baseServer,
-          });
-        }
 
         if (!response.ok) {
-          lastError = `Sunucu HTTP ${statusCode} hatası döndürdü (${response.statusText || 'Bilinmeyen Hata'}).`;
+          lastError = `Sunucu HTTP ${response.status} hatası (${response.statusText}).`;
           continue;
         }
 
@@ -585,7 +529,7 @@ async function startServer() {
         try {
           data = JSON.parse(text);
         } catch {
-          lastError = `Sunucu (${baseServer}) yanıt verdi ancak geçerli bir Xtream JSON verisi dönmedi. Port numarasını ve sunucu adresini kontrol edin.`;
+          lastError = 'Sunucu geçerli bir Xtream JSON yanıtı vermedi. URL veya portu kontrol edin.';
           continue;
         }
 
@@ -593,16 +537,15 @@ async function startServer() {
         const serverInfo = data.server_info;
 
         if (!userInfo || userInfo.auth !== 1) {
-          return res.json({
+          return res.status(401).json({
             success: false,
             error: 'Kimlik doğrulama başarısız! Kullanıcı adı veya şifre hatalı.',
             pingMs,
-            userInfo,
           });
         }
 
         if (userInfo.status && userInfo.status !== 'Active') {
-          return res.json({
+          return res.status(403).json({
             success: false,
             error: `Hesap aktif değil veya süresi dolmuş. Durum: ${userInfo.status}`,
             userInfo,
@@ -623,21 +566,37 @@ async function startServer() {
       }
     }
 
-    return res.json({
+    return res.status(502).json({
       success: false,
       error: lastError || 'Xtream sunucusuna bağlanılamadı. Sunucu URL ve portunu kontrol edin.',
     });
   });
 
-  // Xtream Codes Full Content Fetcher (Categories & Streams) with Protocol Fallback & Resilient Batching
+  // Xtream Codes Full Content Fetcher (Categories & Streams) with Protocol Fallback
   app.post('/api/iptv/xtream/catalog', async (req: Request, res: Response) => {
     const { serverUrl, username, password } = req.body;
     if (!serverUrl || !username || !password) {
-      return res.json({ success: false, error: 'Eksik kimlik bilgileri' });
+      return res.status(400).json({ error: 'Eksik kimlik bilgileri' });
     }
 
     const variants = getUrlVariants(serverUrl.replace(/\/+$/, ''));
     let workingServer = variants[0];
+
+    // Detect working server variant
+    for (const candidate of variants) {
+      try {
+        const testRes = await fetch(
+          `${candidate}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+          { method: 'HEAD', signal: AbortSignal.timeout(5000), redirect: 'follow' }
+        );
+        if (testRes.ok) {
+          workingServer = candidate;
+          break;
+        }
+      } catch {
+        // continue
+      }
+    }
 
     const baseApi = `${workingServer}/player_api.php?username=${encodeURIComponent(
       username
@@ -649,7 +608,7 @@ async function startServer() {
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
         try {
           const resp = await fetch(`${baseApi}&action=${action}`, {
-            headers: { 'User-Agent': STANDARD_USER_AGENT, 'Accept': 'application/json, text/plain, */*' },
+            headers: { 'User-Agent': STANDARD_USER_AGENT },
             signal: controller.signal,
             redirect: 'follow',
           });
@@ -663,26 +622,18 @@ async function startServer() {
         }
       };
 
-      // Fetch in safe batches to prevent Xtream Codes "max_connections: 1" lockouts
-      const liveCats = await fetchWithTimeout('get_live_categories', 10000);
-      const liveStreams = await fetchWithTimeout('get_live_streams', 18000);
+      const [liveCats, liveStreams, vodCats, vodStreams, seriesCats, seriesList] =
+        await Promise.all([
+          fetchWithTimeout('get_live_categories', 12000),
+          fetchWithTimeout('get_live_streams', 22000),
+          fetchWithTimeout('get_vod_categories', 12000),
+          fetchWithTimeout('get_vod_streams', 22000),
+          fetchWithTimeout('get_series_categories', 12000),
+          fetchWithTimeout('get_series', 22000),
+        ]);
 
-      // Fetch VOD
-      const vodCats = await fetchWithTimeout('get_vod_categories', 10000);
-      const vodStreams = await fetchWithTimeout('get_vod_streams', 18000);
-
-      // Fetch Series (optional, gracefully skip if timed out)
-      let seriesCats: any[] = [];
-      let seriesList: any[] = [];
-      try {
-        seriesCats = await fetchWithTimeout('get_series_categories', 8000);
-        seriesList = await fetchWithTimeout('get_series', 12000);
-      } catch {
-        // non-blocking
-      }
-
-      // Compact streams to keep transmission lightweight and ultra-fast
-      let compactLive = (Array.isArray(liveStreams) ? liveStreams : []).map((s: any) => ({
+      // Compact streams to keep transmission lightweight and ultra-fast for 72,000+ items
+      const compactLive = (Array.isArray(liveStreams) ? liveStreams : []).map((s: any) => ({
         stream_id: s.stream_id,
         name: s.name,
         stream_icon: s.stream_icon,
@@ -690,7 +641,7 @@ async function startServer() {
         epg_channel_id: s.epg_channel_id,
       }));
 
-      let compactVod = (Array.isArray(vodStreams) ? vodStreams : []).map((s: any) => ({
+      const compactVod = (Array.isArray(vodStreams) ? vodStreams : []).map((s: any) => ({
         stream_id: s.stream_id,
         name: s.name,
         stream_icon: s.stream_icon,
@@ -710,69 +661,12 @@ async function startServer() {
         year: s.year,
       }));
 
-      // FALLBACK: If JSON stream lists are empty (some panels disable JSON streams or restrict API actions),
-      // try fetching the M3U stream list via /get.php
-      if (compactLive.length === 0 && compactVod.length === 0) {
-        try {
-          const m3uUrl = `${workingServer}/get.php?username=${encodeURIComponent(
-            username
-          )}&password=${encodeURIComponent(password)}&type=m3u_plus`;
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 15000);
-
-          const m3uResp = await fetch(m3uUrl, {
-            headers: { 'User-Agent': STANDARD_USER_AGENT },
-            signal: controller.signal,
-            redirect: 'follow',
-          });
-          clearTimeout(timeout);
-
-          if (m3uResp.ok) {
-            const rawM3u = await m3uResp.text();
-            if (rawM3u && rawM3u.includes('#EXTINF')) {
-              // Parse basic channels from M3U
-              const lines = rawM3u.split('\n');
-              let curTitle = '';
-              let curCat = 'Canlı TV';
-              let curIcon = '';
-              let curId = 1;
-
-              for (const line of lines) {
-                const tr = line.trim();
-                if (tr.startsWith('#EXTINF:')) {
-                  const comma = tr.indexOf(',');
-                  curTitle = comma !== -1 ? tr.substring(comma + 1).trim() : `Kanal ${curId}`;
-                  const groupMatch = tr.match(/group-title="([^"]*)"/i);
-                  curCat = groupMatch ? groupMatch[1].trim() : 'Genel';
-                  const logoMatch = tr.match(/tvg-logo="([^"]*)"/i);
-                  curIcon = logoMatch ? logoMatch[1].trim() : '';
-                } else if (!tr.startsWith('#') && tr.startsWith('http')) {
-                  compactLive.push({
-                    stream_id: curId,
-                    name: curTitle || `Kanal ${curId}`,
-                    stream_icon: curIcon,
-                    category_id: curCat,
-                    epg_channel_id: '',
-                  });
-                  curId++;
-                  curTitle = '';
-                  curIcon = '';
-                }
-              }
-            }
-          }
-        } catch {
-          // ignore fallback error
-        }
-      }
-
       return res.json({
-        success: true,
         workingServer,
         counts: {
-          live: compactLive.length,
-          movie: compactVod.length,
-          series: compactSeries.length,
+          live: liveStreams.length,
+          movie: vodStreams.length,
+          series: seriesList.length,
         },
         liveCategories: liveCats,
         liveStreams: compactLive,
@@ -782,8 +676,7 @@ async function startServer() {
         seriesList: compactSeries,
       });
     } catch (err: any) {
-      return res.json({
-        success: false,
+      return res.status(502).json({
         error: formatNetworkError(err, workingServer),
       });
     }
@@ -793,20 +686,19 @@ async function startServer() {
   app.post('/api/iptv/xtream/series_info', async (req: Request, res: Response) => {
     const { serverUrl, username, password, seriesId } = req.body;
     if (!serverUrl || !username || !password || !seriesId) {
-      return res.json({
+      return res.status(400).json({
         success: false,
         error: 'Eksik parametreler (serverUrl, username, password, seriesId).',
       });
     }
 
-    const cleanServer = serverUrl.trim().replace(/\/+$/, '');
-    const variants = getUrlVariants(cleanServer);
+    const variants = getUrlVariants(serverUrl.replace(/\/+$/, ''));
     let lastError = '';
 
     for (const baseServer of variants) {
       const apiUrl = `${baseServer}/player_api.php?username=${encodeURIComponent(
-        username.trim()
-      )}&password=${encodeURIComponent(password.trim())}&action=get_series_info&series_id=${encodeURIComponent(seriesId)}`;
+        username
+      )}&password=${encodeURIComponent(password)}&action=get_series_info&series_id=${encodeURIComponent(seriesId)}`;
 
       try {
         const controller = new AbortController();
@@ -824,7 +716,7 @@ async function startServer() {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          lastError = `Sunucu HTTP ${response.status} hatası (${response.statusText || 'Bilinmeyen Hata'}).`;
+          lastError = `Sunucu HTTP ${response.status} hatası (${response.statusText}).`;
           continue;
         }
 
@@ -841,7 +733,7 @@ async function startServer() {
       }
     }
 
-    return res.json({
+    return res.status(502).json({
       success: false,
       error: lastError || 'Dizi bölümleri ve sezon bilgisi alınamadı.',
     });
@@ -851,7 +743,7 @@ async function startServer() {
   app.post('/api/iptv/m3u/fetch', async (req: Request, res: Response) => {
     const { url } = req.body;
     if (!url) {
-      return res.json({ success: false, error: 'M3U URL belirtilmedi.' });
+      return res.status(400).json({ error: 'M3U URL belirtilmedi.' });
     }
 
     const variants = getUrlVariants(url);
@@ -873,7 +765,7 @@ async function startServer() {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          lastError = `M3U sunucusu HTTP ${response.status} hatası (${response.statusText || 'Bilinmeyen Hata'}).`;
+          lastError = `M3U sunucusu HTTP ${response.status} hatası (${response.statusText}).`;
           continue;
         }
 
@@ -915,8 +807,7 @@ async function startServer() {
       }
     }
 
-    return res.json({
-      success: false,
+    return res.status(502).json({
       error: lastError || 'M3U adresi yüklenemedi. URL adresini veya sunucu bağlantısını kontrol edin.',
     });
   });

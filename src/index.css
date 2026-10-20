@@ -12,9 +12,10 @@
   --color-surface-container: #201f21;
   --color-surface-container-high: #2a2a2c;
   --color-surface-container-highest: #353437;
+
   --color-on-surface: #e5e1e4;
   --color-on-surface-variant: #b9cacb;
-  
+
   --color-primary: #dbfcff;
   --color-on-primary: #00363a;
   --color-primary-container: #00f0ff;
@@ -59,7 +60,7 @@
     word-break: normal;
     overflow-wrap: break-word;
   }
-  
+
   h1, h2, h3, h4, h5, h6, .font-headline {
     font-family: var(--font-headline);
     letter-spacing: normal;

@@ -21,7 +21,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     icon: React.ReactNode;
     badge?: number;
   }[] = [
-    { id: 'playlists', label: 'Playlistler', icon: <Tv className="w-5 h-5" /> },
+    { id: 'playlists', label: 'Playlists', icon: <Tv className="w-5 h-5" /> },
     { id: 'catalog', label: 'Katalog', icon: <Film className="w-5 h-5" /> },
     {
       id: 'downloads',

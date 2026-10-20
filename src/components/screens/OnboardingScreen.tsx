@@ -1,5 +1,5 @@
 import React from 'react';
-import { Gauge, Lock, CheckCircle2, Download, Key, SlidersHorizontal } from 'lucide-react';
+import { Gauge, Lock, CheckCircle2, Download, Key, SlidersHorizontal, Play } from 'lucide-react';
 
 interface OnboardingScreenProps {
   onContinueAsGuest: () => void;
@@ -22,11 +22,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         <div className="relative flex items-center justify-center w-28 h-28 mb-4">
           <div className="absolute inset-0 rounded-full bg-[#00f0ff]/30 blur-xl animate-pulse"></div>
           <div className="relative z-10 w-24 h-24 rounded-full bg-[#2a2a2c]/90 p-1 shadow-2xl flex items-center justify-center border border-white/10">
-            <img
-              alt="X iPTV Logo"
-              className="w-full h-full object-contain rounded-full shadow-lg shadow-[#00f0ff]/30"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-mwbqqlZz_MRhwkvWdbA_znx9KqwVieg9VnY9iGqDtm1PYlShId7gtucHMijkSVTN235ET6vYiMaSq7AMaDz_5kzfTRgMivHAlyd_WQfiCPyM6CO8PcIi0k_hlZxsNe6468M7Iw3yEJKOMFBkDIPxlA2WQLoFot6Bi9hcpcDCc5phKfdK1AacuJxVOxIwAeZ0NmI5qvP241XYFYpnsWu75uT1mGK2ViJr9UiSsILk_Gh5AG_3UZ4F"
-            />
+            <div className="w-full h-full rounded-full bg-gradient-to-tr from-[#0566d9] via-[#00363a] to-[#00f0ff] flex items-center justify-center shadow-inner">
+              <Play className="w-10 h-10 text-[#00f0ff] fill-[#00f0ff] ml-1 drop-shadow-[0_0_10px_rgba(0,240,255,0.8)]" />
+            </div>
           </div>
           {/* Floating Orbital Dot */}
           <div className="absolute top-1 right-2 w-2.5 h-2.5 rounded-full bg-[#6ffbbe] shadow-[0_0_8px_#6ffbbe]"></div>
@@ -41,7 +39,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         </div>
 
         <h1 className="font-headline text-3xl sm:text-4xl text-[#dbfcff] font-bold tracking-normal">
-          X <span className="text-[#00f0ff] drop-shadow-[0_0_14px_rgba(0,240,255,0.55)]">iPTV</span>
+          xiptv<span className="text-[#00f0ff] drop-shadow-[0_0_14px_rgba(0,240,255,0.55)]">play</span>
         </h1>
         <p className="text-[14px] text-[#b9cacb] max-w-xs mt-1 leading-snug">
           Güvenli Canlı Yayın &amp; Hızlı Çevrimdışı İndirme
@@ -56,11 +54,11 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         </div>
         <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1c1b1d] text-[#b9cacb] border border-white/5 shadow-sm">
           <Lock className="w-3.5 h-3.5 text-[#00f0ff]" />
-          <span className="font-headline text-[11px] font-medium">Sıfır Günlük AES-256</span>
+          <span className="font-headline text-[11px] font-medium">Sıkı AES-256</span>
         </div>
       </div>
 
-      {/* Feature Highlights (Pill Bento List) */}
+      {/* Feature Highlights */}
       <div className="flex flex-col gap-2.5 my-3 w-full z-10">
         {/* Feature 1 */}
         <div className="group relative flex items-center gap-3.5 px-4 py-3 rounded-2xl bg-[#2a2a2c]/50 backdrop-blur-md border border-white/5 transition-all duration-300 hover:bg-[#2a2a2c]/80 shadow-md">
@@ -110,7 +108,6 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
 
       {/* Call-to-Action Controls */}
       <div className="flex flex-col gap-2.5 mt-2 w-full z-10">
-        {/* Primary Google Sign-In Pill */}
         <button
           onClick={onSignInWithGoogle}
           className="group relative flex items-center justify-center gap-3 w-full py-3.5 px-6 rounded-full bg-white text-[#0e0e10] font-headline text-[14px] font-bold shadow-xl shadow-[#00f0ff]/10 active:scale-[0.98] hover:bg-slate-100 transition-all cursor-pointer"
@@ -137,7 +134,6 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
           <span>Google ile Giriş Yap</span>
         </button>
 
-        {/* Secondary Guest / Manual Entry Pill */}
         <button
           onClick={onContinueAsGuest}
           className="relative flex items-center justify-center gap-2 w-full py-3.5 px-6 rounded-full bg-[#2a2a2c]/80 backdrop-blur-md text-[#e5e1e4] font-headline text-[13px] font-semibold border border-white/10 shadow-md active:scale-[0.98] transition-all hover:bg-[#353437] cursor-pointer"
@@ -148,10 +144,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         </button>
       </div>
 
-      {/* Legal & Playlist Compliance Disclaimer */}
+      {/* Legal & Compliance Disclaimer */}
       <div className="mt-4 text-center px-4 z-10">
         <p className="text-[11px] text-[#849495] leading-relaxed">
-          Devam ederek Hizmet Koşullarını kabul etmiş ve akış çalma listelerinizin meşru haklarına sahip olduğunuzu onaylamış olursunuz.
+          Devam ederek Hizmet Koşullarını kabul etmiş ve akış oynatma listelerinizin meşru haklarına sahip olduğunuzu onaylamış olursunuz.
         </p>
       </div>
     </div>
