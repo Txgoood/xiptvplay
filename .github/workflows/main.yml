@@ -8,40 +8,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Build Web Asset & Prepare Capacitor
+      - name: Build Web Project
         run: |
           npm install || true
           npm run build || true
-          mkdir -p www
-          cp -r dist/* www/ 2>/dev/null || true
-          cp index.html www/ 2>/dev/null || true
-          cp -r src www/ 2>/dev/null || true
-          npx @capacitor/cli init "X IPTV" "com.xiptv.app" --web-dir www --web-dir dist || true
-          npx @capacitor/cli add android || true
-          npx @capacitor/cli copy android || true
 
-      - name: Build Debug APK
+      - name: Create Native Android Project
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          npm install -g cordova
+          cordova create myApp com.xiptv.app "X IPTV"
+          cd myApp
+          cordova platform add android
+          rm -rf www/*
+          cp -r ../dist/* www/ 2>/dev/null || cp -r ../* www/ 2>/dev/null || true
+
+      - name: Build APK
+        run: |
+          cd myApp
+          cordova build android --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: myApp/platforms/android/app/build/outputs/apk/debug/app-debug-unsigned.apk
