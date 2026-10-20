@@ -26,42 +26,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Vite web app
+      - name: Build web app
         run: npm run build
 
       - name: Verify production build
         run: |
           test -s dist/index.html
-          echo "Production index.html:"
-          sed -n '1,100p' dist/index.html
           if grep -Eq 'src=["\x27]\.\.?/src/main\.tsx|src=["\x27]/src/main\.tsx' dist/index.html; then
-            echo "ERROR: dist/index.html still points to the uncompiled TSX source."
+            echo "ERROR: dist/index.html still points to uncompiled TSX source."
             exit 1
           fi
-          if ! find dist/assets -maxdepth 1 -type f | grep -q .; then
-            echo "ERROR: Vite did not generate dist/assets files."
-            exit 1
-          fi
+          test -d dist/assets
+          find dist/assets -maxdepth 1 -type f | grep -q .
 
-      - name: Create Cordova Android project
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Build Capacitor APK
         run: |
-          npm install --global cordova
-          cordova create myApp com.xiptv.app "X IPTV"
-          cd myApp
-          cordova platform add android
-          rm -rf www/*
-          cp -R ../dist/. www/
-          test -s www/index.html
-          test -d www/assets
-          echo "Packaged web files:"
-          find www -maxdepth 2 -type f | sort | head -100
-
-      - name: Build APK
-        run: cd myApp && cordova build android --debug
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: myApp/platforms/android/app/build/outputs/apk/debug/*.apk
+          path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
