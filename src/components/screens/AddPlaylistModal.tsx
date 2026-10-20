@@ -62,6 +62,9 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [autoDetectedInfo, setAutoDetectedInfo] = useState<string | null>(null);
+  const [canAddAnyway, setCanAddAnyway] = useState(false);
+
   if (!isOpen) return null;
 
   // Real ping test
@@ -139,8 +142,6 @@ export const AddPlaylistModal: React.FC<AddPlaylistModalProps> = ({
     reader.readAsText(file);
   };
 
-  const [autoDetectedInfo, setAutoDetectedInfo] = useState<string | null>(null);
-  const [canAddAnyway, setCanAddAnyway] = useState(false);
 
   // Auto-detect and parse Xtream credentials if user pastes a full M3U / player_api URL
   const handleServerUrlChange = (val: string) => {
