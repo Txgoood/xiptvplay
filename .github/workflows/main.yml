@@ -20,33 +20,48 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '22'
+          cache: 'npm'
 
-      - name: Build Web Project
-        run: |
-          npm install || true
-          npm run build || true
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Create Native Android Project
+      - name: Build Vite web app
+        run: npm run build
+
+      - name: Verify production build
         run: |
-          npm install -g cordova
+          test -s dist/index.html
+          echo "Production index.html:"
+          sed -n '1,100p' dist/index.html
+          if grep -Eq 'src=["\x27]\.\.?/src/main\.tsx|src=["\x27]/src/main\.tsx' dist/index.html; then
+            echo "ERROR: dist/index.html still points to the uncompiled TSX source."
+            exit 1
+          fi
+          if ! find dist/assets -maxdepth 1 -type f | grep -q .; then
+            echo "ERROR: Vite did not generate dist/assets files."
+            exit 1
+          fi
+
+      - name: Create Cordova Android project
+        run: |
+          npm install --global cordova
           cordova create myApp com.xiptv.app "X IPTV"
           cd myApp
           cordova platform add android
           rm -rf www/*
-          cp -r ../dist/* www/ 2>/dev/null || cp -r ../* www/ 2>/dev/null || true
-          
-          # HTML içindeki mutlak yolları (leading slashes) bağıl yollara dönüştür
-          sed -i 's/href="\//href="./g' www/index.html 2>/dev/null || true
-          sed -i 's/src="\//src="./g' www/index.html 2>/dev/null || true
+          cp -R ../dist/. www/
+          test -s www/index.html
+          test -d www/assets
+          echo "Packaged web files:"
+          find www -maxdepth 2 -type f | sort | head -100
 
       - name: Build APK
-        run: |
-          cd myApp
-          cordova build android --debug
+        run: cd myApp && cordova build android --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: myApp/**/*.apk
+          path: myApp/platforms/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
