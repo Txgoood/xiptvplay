@@ -1,15 +1,32 @@
-import { Playlist, DownloadItem, MediaItem } from '../types';
-import { INITIAL_PLAYLISTS, INITIAL_DOWNLOADS, MEDIA_CATALOG } from '../data/mockData';
+import { Playlist, MediaItem, DownloadItem } from '../types';
 
-const PLAYLISTS_KEY = 'xiptv_playlists_v2';
-const DOWNLOADS_KEY = 'xiptv_downloads_v2';
-const FAVORITES_KEY = 'xiptv_favorites_v2';
-const ITEMS_PREFIX = 'xiptv_items_';
+const STORAGE_KEYS = {
+  PLAYLISTS: 'xiptvplay_playlists_v3',
+  PLAYLIST_ITEMS_PREFIX: 'xiptvplay_items_v3_',
+  DOWNLOADS: 'xiptvplay_downloads_v3',
+  FAVORITES: 'xiptvplay_favorites_v3',
+  FAVORITE_ITEMS: 'xiptvplay_favorite_items_v1',
+  ACTIVE_PLAYLIST_ID: 'xiptvplay_active_playlist_v1',
+  SETTINGS: 'xiptvplay_settings_v3',
+};
 
+// Safe localStorage wrapper for xiptvplay
 export class StorageService {
-  static getPlaylists(): Playlist[] {
+  static getActivePlaylistId(): string | null {
+    return localStorage.getItem(STORAGE_KEYS.ACTIVE_PLAYLIST_ID);
+  }
+
+  static setActivePlaylistId(id: string | null): void {
+    if (id) {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_PLAYLIST_ID, id);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_PLAYLIST_ID);
+    }
+  }
+
+  static getFavoriteItems(): MediaItem[] {
     try {
-      const raw = localStorage.getItem(PLAYLISTS_KEY);
+      const raw = localStorage.getItem(STORAGE_KEYS.FAVORITE_ITEMS);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed : [];
@@ -18,120 +35,278 @@ export class StorageService {
     }
   }
 
-  static savePlaylists(playlists: Playlist[]): void {
+  static saveFavoriteItems(items: MediaItem[]): boolean {
     try {
-      localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists));
-    } catch (err) {
-      console.warn('[StorageService] Failed to save playlists:', err);
+      localStorage.setItem(STORAGE_KEYS.FAVORITE_ITEMS, JSON.stringify(items));
+      return true;
+    } catch {
+      return false;
     }
   }
 
-  static upsertPlaylist(playlist: Playlist): void {
+  /**
+   * Retrieves all saved user playlists. Returns empty array if none exist.
+   */
+  static getPlaylists(): Playlist[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.PLAYLISTS);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      console.error('[StorageService] Failed to load playlists:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Persists the entire playlist array to localStorage.
+   */
+  static savePlaylists(playlists: Playlist[]): boolean {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(playlists));
+      return true;
+    } catch (err) {
+      console.error('[StorageService] Failed to save playlists:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Adds or updates a playlist.
+   */
+  static upsertPlaylist(playlist: Playlist): boolean {
     const list = this.getPlaylists();
-    const idx = list.findIndex((p) => p.id === playlist.id);
-    if (idx >= 0) {
-      list[idx] = playlist;
+    const index = list.findIndex((p) => p.id === playlist.id);
+    if (index >= 0) {
+      list[index] = playlist;
     } else {
       list.unshift(playlist);
     }
-    this.savePlaylists(list);
+    return this.savePlaylists(list);
   }
 
-  static deletePlaylist(id: string): void {
-    const list = this.getPlaylists().filter((p) => p.id !== id);
-    this.savePlaylists(list);
-    try {
-      localStorage.removeItem(`${ITEMS_PREFIX}${id}`);
-    } catch {
-      // ignore
-    }
-  }
+  private static getDB = (): Promise<IDBDatabase> => {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('xiptvplay-db', 1);
+      request.onupgradeneeded = (event: any) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('playlistItems')) {
+          db.createObjectStore('playlistItems', { keyPath: 'playlistId' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  };
 
-  static getPlaylistItems(playlistId: string): MediaItem[] {
+  static async savePlaylistItemsPersistent(playlistId: string, items: MediaItem[]): Promise<void> {
     try {
-      const raw = localStorage.getItem(`${ITEMS_PREFIX}${playlistId}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore
-    }
-    // Fallback for demo playlists
-    if (playlistId.startsWith('demo-')) {
-      return MEDIA_CATALOG.filter((item) => item.playlistId === playlistId || item.playlistId === 'demo-xtream-1');
-    }
-    return [];
-  }
-
-  static savePlaylistItems(playlistId: string, items: MediaItem[]): void {
-    try {
-      localStorage.setItem(`${ITEMS_PREFIX}${playlistId}`, JSON.stringify(items));
+      const db = await this.getDB();
+      const tx = db.transaction('playlistItems', 'readwrite');
+      tx.objectStore('playlistItems').put({ playlistId, items, savedAt: Date.now() });
     } catch (err) {
-      console.warn('[StorageService] Failed to cache playlist items:', err);
+      console.warn('[StorageService] Persistent storage failed:', err);
     }
   }
 
+  static async loadPlaylistItemsPersistent(playlistId: string): Promise<MediaItem[] | null> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction('playlistItems', 'readonly');
+        const request = tx.objectStore('playlistItems').get(playlistId);
+        request.onsuccess = () => resolve(request.result ? request.result.items : null);
+        request.onerror = () => resolve(null);
+      });
+    } catch (err) {
+      console.warn('[StorageService] Persistent load failed:', err);
+      return null;
+    }
+  }
+
+  static async deletePlaylistItemsPersistent(playlistId: string): Promise<void> {
+    try {
+      const db = await this.getDB();
+      const tx = db.transaction('playlistItems', 'readwrite');
+      tx.objectStore('playlistItems').delete(playlistId);
+    } catch (err) {
+      console.warn('[StorageService] Persistent delete failed:', err);
+    }
+  }
+
+  /**
+   * Permanently deletes a playlist and its cached items.
+   */
+  static deletePlaylist(id: string): boolean {
+    try {
+      const list = this.getPlaylists().filter((p) => p.id !== id);
+      this.savePlaylists(list);
+      localStorage.removeItem(`${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${id}`);
+      this.deletePlaylistItemsPersistent(id); // Added
+      return true;
+    } catch (err) {
+      console.error('[StorageService] Failed to delete playlist:', err);
+      return false;
+    }
+  }
+
+  private static inMemoryPlaylistItems = new Map<string, MediaItem[]>();
+
+  /**
+   * Retrieves cached media items for a specific playlist. Returns empty array if none.
+   */
+  static getPlaylistItems(playlistId: string): MediaItem[] {
+    // 1. Check in-memory session cache first (holds full 72,000+ catalog)
+    if (this.inMemoryPlaylistItems.has(playlistId)) {
+      return this.inMemoryPlaylistItems.get(playlistId)!;
+    }
+
+    // 2. Fallback to localStorage cache
+    try {
+      const raw = localStorage.getItem(`${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${playlistId}`);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        this.inMemoryPlaylistItems.set(playlistId, parsed);
+        return parsed;
+      }
+      return [];
+    } catch (err) {
+      console.error('[StorageService] Failed to get playlist items:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Saves cached media items for a specific playlist.
+   */
+  static savePlaylistItems(playlistId: string, items: MediaItem[]): boolean {
+    // Store complete unfiltered catalog in-memory
+    this.inMemoryPlaylistItems.set(playlistId, items);
+
+    // Persist as many as possible safely in localStorage (compacted)
+    try {
+      const trimmed = items.slice(0, 3000);
+      localStorage.setItem(
+        `${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${playlistId}`,
+        JSON.stringify(trimmed)
+      );
+    } catch (err) {
+      console.warn('[StorageService] LocalStorage quota exceeded, kept in memory cache:', err);
+    }
+    
+    // Asynchronously persist full catalog
+    this.savePlaylistItemsPersistent(playlistId, items);
+    
+    return true;
+  }
+
+  /**
+   * Retrieves downloads from storage. Returns empty array if none.
+   */
   static getDownloads(): DownloadItem[] {
     try {
-      const raw = localStorage.getItem(DOWNLOADS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
+      const raw = localStorage.getItem(STORAGE_KEYS.DOWNLOADS);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      // ignore
+      return [];
     }
-    return INITIAL_DOWNLOADS;
   }
 
-  static saveDownloads(downloads: DownloadItem[]): void {
+  /**
+   * Saves downloads to storage.
+   */
+  static saveDownloads(downloads: DownloadItem[]): boolean {
     try {
-      localStorage.setItem(DOWNLOADS_KEY, JSON.stringify(downloads));
-    } catch (err) {
-      console.warn('[StorageService] Failed to save downloads:', err);
+      localStorage.setItem(STORAGE_KEYS.DOWNLOADS, JSON.stringify(downloads));
+      return true;
+    } catch {
+      return false;
     }
   }
 
+  /**
+   * Retrieves app settings from storage.
+   */
+  static getSettings(): Record<string, any> {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return typeof parsed === 'object' && parsed !== null ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * Saves app settings to storage.
+   */
+  static saveSettings(settings: Record<string, any>): boolean {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Retrieves favorites media IDs. Returns empty array if none.
+   */
   static getFavorites(): string[] {
     try {
-      const raw = localStorage.getItem(FAVORITES_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
+      const raw = localStorage.getItem(STORAGE_KEYS.FAVORITES);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      // ignore
+      return [];
     }
-    return ['cat-1', 'cat-2'];
   }
 
-  static saveFavorites(ids: string[]): void {
+  /**
+   * Saves favorites media IDs.
+   */
+  static saveFavorites(ids: string[]): boolean {
     try {
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(ids));
-    } catch (err) {
-      console.warn('[StorageService] Failed to save favorites:', err);
+      localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(ids));
+      return true;
+    } catch {
+      return false;
     }
   }
 
-  static loadDemoPlaylists(): Playlist[] {
-    this.savePlaylists(INITIAL_PLAYLISTS);
-    this.savePlaylistItems(INITIAL_PLAYLISTS[0].id, MEDIA_CATALOG);
-    this.saveDownloads(INITIAL_DOWNLOADS);
-    return INITIAL_PLAYLISTS;
-  }
-
+  /**
+   * Completely clears user data.
+   */
   static clearAll(): void {
     try {
       const playlists = this.getPlaylists();
       playlists.forEach((p) => {
-        localStorage.removeItem(`${ITEMS_PREFIX}${p.id}`);
+        localStorage.removeItem(`${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${p.id}`);
+        this.deletePlaylistItemsPersistent(p.id); // Added
       });
-      localStorage.removeItem(PLAYLISTS_KEY);
-      localStorage.removeItem(DOWNLOADS_KEY);
-      localStorage.removeItem(FAVORITES_KEY);
+      localStorage.removeItem(STORAGE_KEYS.PLAYLISTS);
+      localStorage.removeItem(STORAGE_KEYS.DOWNLOADS);
+      localStorage.removeItem(STORAGE_KEYS.FAVORITES);
+      localStorage.removeItem(STORAGE_KEYS.FAVORITE_ITEMS);
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_PLAYLIST_ID);
+      localStorage.removeItem(STORAGE_KEYS.SETTINGS);
+      // Also clear old version keys if present
+      localStorage.removeItem('xiptvplay_playlists_v1');
+      localStorage.removeItem('xiptvplay_downloads_v1');
+      localStorage.removeItem('xiptvplay_favorites_v1');
+      localStorage.removeItem('xiptv_playlists_v2');
+      localStorage.removeItem('xiptv_downloads_v2');
+      localStorage.removeItem('xiptv_favorites_v2');
+      indexedDB.deleteDatabase('xiptvplay-db'); // Added
     } catch (err) {
-      console.warn('[StorageService] Failed to clear storage:', err);
+      console.error('[StorageService] Error clearing all data:', err);
     }
   }
 }
+
