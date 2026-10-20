@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Playlist, SystemStats } from '../../types';
+import { EditPlaylistModal } from './EditPlaylistModal';
 import {
   Wifi,
   RefreshCw,
@@ -22,6 +23,7 @@ import {
   Trash2,
   Eye,
   ListPlus,
+  Edit3,
 } from 'lucide-react';
 
 interface PlaylistsScreenProps {
@@ -31,7 +33,7 @@ interface PlaylistsScreenProps {
   onSelectPlaylist: (playlist: Playlist) => void;
   onRefreshPlaylist: (id: string) => Promise<void>;
   onDeletePlaylist: (id: string) => void;
-  onLoadDemoData: () => void;
+  onUpdatePlaylist: (playlist: Playlist) => void;
 }
 
 export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
@@ -41,12 +43,13 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
   onSelectPlaylist,
   onRefreshPlaylist,
   onDeletePlaylist,
-  onLoadDemoData,
+  onUpdatePlaylist,
 }) => {
   const [filterType, setFilterType] = useState<'all' | 'xtream' | 'm3u'>('all');
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
 
   const handleSyncAll = async () => {
     setIsSyncingAll(true);
@@ -75,7 +78,6 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
       {/* Summary Dashboard Glass Card */}
       <div className="relative overflow-hidden rounded-2xl bg-[#201f21]/80 backdrop-blur-xl p-4 border border-white/5 shadow-xl flex flex-col gap-3.5">
         <div className="absolute -right-12 -top-12 w-36 h-36 bg-[#00f0ff]/10 rounded-full blur-2xl pointer-events-none"></div>
-
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#2a2a2c] flex items-center justify-center text-[#00f0ff] border border-white/5 shadow-inner">
@@ -86,7 +88,6 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
               <span className="text-[11px] text-[#b9cacb]">Bağlantı &amp; Veri Akışı</span>
             </div>
           </div>
-
           <button
             onClick={handleSyncAll}
             disabled={isSyncingAll || playlists.length === 0}
@@ -119,7 +120,6 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
               {playlists.length > 0 ? 'Kalıcı depolama aktif' : 'Bağlı hat bulunmuyor'}
             </span>
           </div>
-
           <div className="flex flex-col p-3 rounded-xl bg-[#1c1b1d]/90 border border-white/5">
             <div className="flex items-center gap-1.5 text-[#b9cacb]">
               <HardDrive className="w-3.5 h-3.5 text-[#00f0ff]" />
@@ -140,7 +140,6 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
       >
         <div className="absolute inset-0 bg-gradient-to-r from-[#00f0ff]/15 via-[#0566d9]/20 to-transparent pointer-events-none"></div>
         <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-[#00f0ff]/15 rounded-full blur-xl pointer-events-none"></div>
-
         <div className="flex items-center justify-between relative z-10">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-[#00f0ff] text-[#00363a] flex items-center justify-center shadow-[0_0_16px_rgba(0,240,255,0.4)]">
@@ -251,18 +250,18 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
                 Eklediğiniz çalma listeleri kalıcı depolamada saklanır.
               </p>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
               <button
                 onClick={() => onOpenAddModal('xtream')}
-                className="px-5 py-2.5 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold shadow-[0_0_12px_rgba(0,240,255,0.4)] active:scale-95 cursor-pointer"
+                className="px-6 py-2.5 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold shadow-[0_0_12px_rgba(0,240,255,0.4)] active:scale-95 cursor-pointer"
               >
-                + Playlist Ekle
+                + Xtream API Ekle
               </button>
               <button
-                onClick={onLoadDemoData}
-                className="px-4 py-2.5 rounded-full bg-[#201f21] hover:bg-[#2a2a2c] text-[#adc6ff] font-headline text-xs font-semibold border border-white/5 cursor-pointer"
+                onClick={() => onOpenAddModal('m3u')}
+                className="px-5 py-2.5 rounded-full bg-[#201f21] hover:bg-[#2a2a2c] text-[#e5e1e4] font-headline text-xs font-semibold border border-white/5 cursor-pointer"
               >
-                Test Amaçlı Demo Yükle
+                + M3U URL / Dosya
               </button>
             </div>
           </div>
@@ -300,17 +299,11 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
                           <Globe className="w-6 h-6 text-[#b9cacb]" />
                         )}
                       </div>
-
                       <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-headline text-[15px] font-bold text-[#e5e1e4] truncate">
                             {playlist.name}
                           </span>
-                          {playlist.isDemo && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-headline font-bold uppercase tracking-wider">
-                              DEMO
-                            </span>
-                          )}
                           {playlist.badge && (
                             <span
                               className={`px-1.5 py-0.5 rounded-full text-[10px] font-headline font-bold uppercase tracking-wider ${
@@ -328,7 +321,6 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
                         </span>
                       </div>
                     </div>
-
                     <div className="relative">
                       <button
                         onClick={() =>
@@ -338,7 +330,6 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
                       >
                         <MoreVertical className="w-4 h-4" />
                       </button>
-
                       {activeMenuId === playlist.id && (
                         <div className="absolute right-0 top-9 z-20 w-44 py-1 bg-[#2a2a2c] rounded-xl border border-white/10 shadow-2xl flex flex-col">
                           <button
@@ -360,6 +351,16 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
                           >
                             <Eye className="w-3.5 h-3.5 text-[#adc6ff]" />
                             <span>Kanalları Göster</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingPlaylist(playlist);
+                              setActiveMenuId(null);
+                            }}
+                            className="px-3 py-2 text-left text-xs text-[#e5e1e4] hover:bg-white/10 flex items-center gap-2 cursor-pointer"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-[#4edea3]" />
+                            <span>Düzenle</span>
                           </button>
                           <button
                             onClick={() => {
@@ -398,7 +399,6 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
                       ></span>
                       {playlist.statusLabel}
                     </span>
-
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0e0e10] text-[#b9cacb] font-headline text-[11px]">
                       {isWarning ? (
                         <Zap className="w-3.5 h-3.5 text-[#ffb4ab]" />
@@ -487,6 +487,17 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
           <span>+ M3U İçe Aktar</span>
         </button>
       </div>
+
+      {/* Edit Playlist Modal */}
+      <EditPlaylistModal
+        playlist={editingPlaylist}
+        isOpen={!!editingPlaylist}
+        onClose={() => setEditingPlaylist(null)}
+        onSave={(updated) => {
+          onUpdatePlaylist(updated);
+          setEditingPlaylist(null);
+        }}
+      />
     </div>
   );
 };
