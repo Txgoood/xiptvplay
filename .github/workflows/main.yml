@@ -48,6 +48,20 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: Verify APK integrity and package metadata
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          test -s "$APK"
+          unzip -t "$APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose "$APK"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | tee /tmp/apk-badging.txt
+          grep -q "package: name='com.xiptvplay.app'" /tmp/apk-badging.txt
+          grep -q "sdkVersion:'24'" /tmp/apk-badging.txt
+          sha256sum "$APK"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
