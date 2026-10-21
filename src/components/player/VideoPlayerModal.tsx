@@ -87,6 +87,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [nativePlayerUnavailable, setNativePlayerUnavailable] = useState(false);
 
   // Gesture HUD & Ripple Feedback States
   const [hudFeedback, setHudFeedback] = useState<{ icon: 'volume' | 'brightness'; text: string } | null>(null);
@@ -321,7 +322,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       nativeLaunchKeyRef.current = null;
       return;
     }
-    if (Capacitor.getPlatform() !== 'android') return;
+    if (Capacitor.getPlatform() !== 'android' || nativePlayerUnavailable) return;
 
     const launchKey = String(media.id);
     if (nativeLaunchKeyRef.current === launchKey) return;
@@ -331,14 +332,15 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       .then(() => onClose())
       .catch((error) => {
         nativeLaunchKeyRef.current = null;
+        setNativePlayerUnavailable(true);
         console.error('[NativeMediaPlayer] Could not start Media3 player:', error);
         triggerNotice('Yerel oynatıcı açılamadı; uygulama içi oynatıcı kullanılacak.');
       });
-  }, [isOpen, media?.id, effectiveUrl, media?.title, onClose, triggerNotice]);
+  }, [isOpen, media?.id, effectiveUrl, media?.title, onClose, triggerNotice, nativePlayerUnavailable]);
 
   // Akış motoru bağlama ve çalıştırma (HLS.js / Native Video)
   useEffect(() => {
-    if (Capacitor.getPlatform() === 'android' && isOpen && media) return;
+    if (Capacitor.getPlatform() === 'android' && isOpen && media && !nativePlayerUnavailable) return;
     if (!isOpen || !media || !videoRef.current) {
       if (hlsRef.current) {
         hlsRef.current.destroy();
