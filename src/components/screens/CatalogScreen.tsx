@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { MediaItem, Playlist } from '../../types';
+import { StorageService } from '../../services/storage';
 import {
   ArrowLeft,
   Search,
@@ -12,6 +13,8 @@ import {
   Film,
   Sparkles,
   ChevronDown,
+  ListFilter,
+  ArrowDownAZ,
 } from 'lucide-react';
 
 interface CatalogScreenProps {
@@ -41,6 +44,11 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_CHUNK);
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
+  const [categorySort, setCategorySort] = useState<'az' | 'za' | 'oldest' | 'newest'>('az');
+  const hideAdultCategories = Boolean(StorageService.getSettings().hideAdultCategories);
+  const isAdultCategory = (name: string) => /(^|[^a-z])(xxx|adult|adults|18\s*\+|erotik|erotic|porn|porno)([^a-z]|$)/i.test(name) || /❤️|♥️|💗|💖/.test(name) && /xxx|adult|erotik|erotic|porn|porno/i.test(name);
 
   // 2- İçerik Sayılarının Örtüşmesi (Rozetlerin Gerçek Sunucu Toplamını Göstermesi)
   const serverLiveTotal =
@@ -67,10 +75,15 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
 
   // 1- Dinamik Kategori / Alt Klasör Filtrelemesi:
   // Seçili sekmeye (live, movie, series) ait içerikler
+  const visibleCatalog = useMemo(() => hideAdultCategories
+    ? catalog.filter((item) => !isAdultCategory((item.category || 'Genel').trim()))
+    : catalog,
+  [catalog, hideAdultCategories]);
+
   const itemsForActiveTab = useMemo(() => {
-    if (activeTab === 'all') return catalog;
-    return catalog.filter((item) => item.type === activeTab);
-  }, [catalog, activeTab]);
+    if (activeTab === 'all') return visibleCatalog;
+    return visibleCatalog.filter((item) => item.type === activeTab);
+  }, [visibleCatalog, activeTab]);
 
   // Seçili sekmeye ait dinamik kategoriler ve içerik adetleri
   const categoriesForTab = useMemo(() => {
@@ -92,6 +105,32 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
     ];
   }, [itemsForActiveTab]);
 
+  const sortedCategories = useMemo(() => {
+    const categories = categoriesForTab.filter((cat) => !hideAdultCategories || cat.name === 'Tümü' || !isAdultCategory(cat.name));
+    const allCategory = categories.find((cat) => cat.name === 'Tümü');
+    const children = categories.filter((cat) => cat.name !== 'Tümü');
+    const yearForCategory = (name: string) => {
+      const years = visibleCatalog.filter((item) => (item.category || 'Genel').trim() === name && typeof item.year === 'number' && item.year > 0).map((item) => item.year as number);
+      return years.length ? Math.min(...years) : null;
+    };
+    children.sort((a, b) => {
+      if (categorySort === 'za') return b.name.localeCompare(a.name, 'tr', { sensitivity: 'base' });
+      if (categorySort === 'oldest' || categorySort === 'newest') {
+        const ay = yearForCategory(a.name), by = yearForCategory(b.name);
+        if (ay === null && by !== null) return 1;
+        if (by === null && ay !== null) return -1;
+        if (ay !== null && by !== null && ay !== by) return categorySort === 'oldest' ? ay - by : by - ay;
+      }
+      return a.name.localeCompare(b.name, 'tr', { sensitivity: 'base' });
+    });
+    return allCategory ? [allCategory, ...children] : children;
+  }, [categoriesForTab, categorySort, visibleCatalog, hideAdultCategories]);
+
+  const searchedCategories = useMemo(() => {
+    const q = categorySearch.trim().toLocaleLowerCase('tr-TR');
+    return sortedCategories.filter((cat) => !q || cat.name.toLocaleLowerCase('tr-TR').includes(q));
+  }, [sortedCategories, categorySearch]);
+
   // Sekme değiştirildiğinde kategoriyi otomatik 'Tümü' yap ve sayfa limitini sıfırla
   const handleTabChange = (tab: 'all' | 'live' | 'movie' | 'series') => {
     setActiveTab(tab);
@@ -108,7 +147,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   // Arama veya kategori filtresi
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return catalog.filter((item) => {
+    return visibleCatalog.filter((item) => {
       if (activeTab !== 'all' && item.type !== activeTab) return false;
       if (
         selectedCategory !== 'Tümü' &&
@@ -123,7 +162,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
       }
       return true;
     });
-  }, [catalog, activeTab, selectedCategory, searchQuery]);
+  }, [visibleCatalog, activeTab, selectedCategory, searchQuery]);
 
   // Performanslı DOM gösterimi için sayfalanmış içerik
   const visibleItems = useMemo(() => {
@@ -240,31 +279,50 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         </button>
       </div>
 
-      {/* 1- Dinamik Kategori Çipleri (O an seçili sekmeye ait alt klasörler) */}
+      {/* Kategori çipleri ve tüm alt kategorileri açan menü */}
       {categoriesForTab.length > 1 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-          {categoriesForTab.map((cat) => (
-            <button
-              key={cat.name}
-              onClick={() => handleCategorySelect(cat.name)}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-headline font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedCategory === cat.name
-                  ? 'bg-[#0566d9] text-white shadow-[0_0_8px_rgba(5,102,217,0.4)]'
-                  : 'bg-[#201f21] text-[#b9cacb] hover:text-[#e5e1e4] border border-white/5'
-              }`}
-            >
-              <span className="truncate max-w-[180px]">{cat.name}</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                  selectedCategory === cat.name
-                    ? 'bg-white/20 text-white'
-                    : 'bg-[#2a2a2c] text-[#849495]'
-                }`}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+            {categoriesForTab.filter((cat) => !hideAdultCategories || cat.name === 'Tümü' || !isAdultCategory(cat.name)).map((cat) => (
+              <button
+                key={cat.name}
+                onClick={() => handleCategorySelect(cat.name)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-headline font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${selectedCategory === cat.name ? 'bg-[#0566d9] text-white shadow-[0_0_8px_rgba(5,102,217,0.4)]' : 'bg-[#201f21] text-[#b9cacb] hover:text-[#e5e1e4] border border-white/5'}`}
               >
-                {cat.count.toLocaleString('tr-TR')}
-              </span>
-            </button>
-          ))}
+                <span className="truncate max-w-[180px]">{cat.name}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${selectedCategory === cat.name ? 'bg-white/20 text-white' : 'bg-[#2a2a2c] text-[#849495]'}`}>{cat.count.toLocaleString('tr-TR')}</span>
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={() => { setIsCategoryMenuOpen(true); setCategorySearch(''); }} aria-label="Alt kategorileri listele" title="Alt kategorileri listele" className="shrink-0 w-10 h-10 rounded-xl bg-[#201f21] border border-white/10 text-[#00f0ff] flex items-center justify-center hover:bg-[#2a2a2c]">
+            <ListFilter className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
+      {isCategoryMenuOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/75 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setIsCategoryMenuOpen(false)}>
+          <section role="dialog" aria-modal="true" aria-label="Alt kategoriler" onClick={(e) => e.stopPropagation()} className="w-full max-w-xl max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#151517] border border-white/10 shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between gap-3">
+              <div className="min-w-0"><h2 className="text-base font-bold text-[#e5e1e4]">Alt Kategoriler</h2><p className="text-xs text-[#849495] mt-1">{activeTab === 'all' ? 'Tüm içerikler' : activeTab === 'live' ? 'Canlı TV' : activeTab === 'movie' ? 'Filmler' : 'Diziler'} · {searchedCategories.length.toLocaleString('tr-TR')} kategori</p></div>
+              <button type="button" onClick={() => setIsCategoryMenuOpen(false)} className="w-9 h-9 rounded-full bg-[#252527] text-[#e5e1e4] flex items-center justify-center" aria-label="Menüyü kapat"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-4 flex flex-col gap-3">
+              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#849495]" /><input value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} placeholder="Alt kategori ara..." className="w-full bg-[#222224] border border-white/10 rounded-xl py-3 pl-10 pr-3 text-sm text-[#e5e1e4] outline-none focus:border-[#00f0ff]/50" /></div>
+              <label className="text-xs text-[#b9cacb] flex flex-col gap-1.5">Sıralama
+                <select value={categorySort} onChange={(e) => setCategorySort(e.target.value as typeof categorySort)} className="w-full bg-[#222224] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-[#e5e1e4] outline-none">
+                  <option value="az">Alfabetik (A–Z)</option><option value="za">Alfabetik (Z–A)</option><option value="oldest">En eski içerik önce</option><option value="newest">En yeni içerik önce</option>
+                </select>
+              </label>
+            </div>
+            <div className="overflow-y-auto px-4 pb-5 min-h-0">
+              {searchedCategories.length ? searchedCategories.map((cat) => (
+                <button key={cat.name} type="button" onClick={() => { handleCategorySelect(cat.name); setIsCategoryMenuOpen(false); }} className={`w-full flex items-center justify-between gap-3 px-3 py-3 mb-1 rounded-xl text-left border ${selectedCategory === cat.name ? 'bg-[#00f0ff]/10 border-[#00f0ff]/40 text-[#00f0ff]' : 'bg-[#202022] border-white/5 text-[#e5e1e4]'}`}>
+                  <span className="text-sm break-words">{cat.name}</span><span className="shrink-0 text-xs font-mono text-[#849495]">{cat.count.toLocaleString('tr-TR')}</span>
+                </button>
+              )) : <p className="text-center text-sm text-[#849495] py-8">Aramanla eşleşen kategori bulunamadı.</p>}
+            </div>
+          </section>
         </div>
       )}
 
