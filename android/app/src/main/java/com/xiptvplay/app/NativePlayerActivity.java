@@ -6,6 +6,8 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.OrientationEventListener;
 import android.view.View;
@@ -52,6 +54,9 @@ public class NativePlayerActivity extends Activity {
     private float lastBrightness = 0.7f;
     private String nextUrl;
     private String nextTitle;
+    private final Handler controlsHandler = new Handler(Looper.getMainLooper());
+    private boolean controlsVisible = true;
+    private final Runnable hideControlsRunnable = () -> setControlsVisible(false);
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -76,6 +81,11 @@ public class NativePlayerActivity extends Activity {
 
         buildCustomControls();
         setContentView(root);
+        playerView.setOnClickListener(v -> {
+            if (controlsVisible) setControlsVisible(false);
+            else showControlsTemporarily();
+        });
+        showControlsTemporarily();
 
         String url = getIntent().getStringExtra("url");
         if (url == null || url.trim().isEmpty()) {
@@ -230,13 +240,31 @@ public class NativePlayerActivity extends Activity {
             : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         fullscreenButton.setText(enabled ? "↙ Ekrandan çık" : "⛶ Tam ekran");
+        // Portreye dönerken sensörün eski yatay konumu tekrar tam ekranı açmasın.
         int flags = enabled
             ? View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             : View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
         getWindow().getDecorView().setSystemUiVisibility(flags);
-        root.postDelayed(() -> changingOrientation = false, 900);
+        root.postDelayed(() -> changingOrientation = false, 1800);
+        showControlsTemporarily();
+    }
+
+    private void showControlsTemporarily() {
+        setControlsVisible(true);
+        controlsHandler.removeCallbacks(hideControlsRunnable);
+        controlsHandler.postDelayed(hideControlsRunnable, 3500);
+    }
+
+    private void setControlsVisible(boolean visible) {
+        controlsVisible = visible;
+        if (topBar != null) topBar.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (bottomBar != null) bottomBar.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (playerView != null) {
+            if (visible) playerView.showController();
+            else playerView.hideController();
+        }
     }
 
     private void showSubtitleTracks() {
@@ -386,6 +414,7 @@ public class NativePlayerActivity extends Activity {
         if (titleToPlay != null && !titleToPlay.isEmpty()) {
             Toast.makeText(this, "Oynatılıyor: " + titleToPlay, Toast.LENGTH_SHORT).show();
         }
+        showControlsTemporarily();
     }
 
     @Override
@@ -397,6 +426,7 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onStop() {
         super.onStop();
+        controlsHandler.removeCallbacks(hideControlsRunnable);
         if (orientationListener != null) orientationListener.disable();
         if (player != null) {
             player.release();
