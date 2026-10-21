@@ -13,6 +13,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -161,7 +162,13 @@ public class NativePlayerActivity extends Activity {
         FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM
         );
-        root.addView(bottomBar, bottomParams);
+        HorizontalScrollView controlsScroll = new HorizontalScrollView(this);
+        controlsScroll.setHorizontalScrollBarEnabled(false);
+        controlsScroll.setFillViewport(true);
+        controlsScroll.addView(bottomBar, new HorizontalScrollView.LayoutParams(
+            HorizontalScrollView.LayoutParams.WRAP_CONTENT, HorizontalScrollView.LayoutParams.WRAP_CONTENT
+        ));
+        root.addView(controlsScroll, bottomParams);
 
         subtitleButton = makeButton("Altyazı");
         subtitleButton.setOnClickListener(v -> showSubtitleTracks());
@@ -322,15 +329,20 @@ public class NativePlayerActivity extends Activity {
             Toast.makeText(this, "Sonraki bölüm bilgisi bulunamadı.", Toast.LENGTH_SHORT).show();
             return;
         }
+        String urlToPlay = nextUrl;
+        String titleToPlay = nextTitle;
+        nextUrl = null;
+        nextTitle = null;
+        nextButton.setVisibility(View.GONE);
         MediaItem next = new MediaItem.Builder()
-            .setUri(Uri.parse(nextUrl))
-            .setMediaId(nextTitle == null ? "Sonraki bölüm" : nextTitle)
+            .setUri(Uri.parse(urlToPlay))
+            .setMediaId(titleToPlay == null ? "Sonraki bölüm" : titleToPlay)
             .build();
         player.setMediaItem(next);
         player.prepare();
         player.play();
-        if (nextTitle != null && !nextTitle.isEmpty()) {
-            Toast.makeText(this, "Oynatılıyor: " + nextTitle, Toast.LENGTH_SHORT).show();
+        if (titleToPlay != null && !titleToPlay.isEmpty()) {
+            Toast.makeText(this, "Oynatılıyor: " + titleToPlay, Toast.LENGTH_SHORT).show();
         }
     }
 
