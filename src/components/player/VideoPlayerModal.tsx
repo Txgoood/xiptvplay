@@ -57,7 +57,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const hlsRef = useRef<Hls | null>(null);\n  const nativeLaunchKeyRef = useRef<string | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
+  const nativeLaunchKeyRef = useRef<string | null>(null);
 
   // Playback Auto-Fallback Stage: Always defaults to 'proxy-hls' on open
   const [fallbackStage, setFallbackStage] = useState<FallbackStage>('proxy-hls');
@@ -314,8 +315,30 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     }
   }, [isOpen, media?.id, rawUrl]);
 
+  // Android APK uses the native Media3 / ExoPlayer screen; browser playback stays unchanged.
+  useEffect(() => {
+    if (!isOpen || !media) {
+      nativeLaunchKeyRef.current = null;
+      return;
+    }
+    if (Capacitor.getPlatform() !== 'android') return;
+
+    const launchKey = String(media.id);
+    if (nativeLaunchKeyRef.current === launchKey) return;
+    nativeLaunchKeyRef.current = launchKey;
+
+    NativeMediaPlayer.play({ url: effectiveUrl, title: media.title || 'XIPTV Play' })
+      .then(() => onClose())
+      .catch((error) => {
+        nativeLaunchKeyRef.current = null;
+        console.error('[NativeMediaPlayer] Could not start Media3 player:', error);
+        triggerNotice('Yerel oynatıcı açılamadı; uygulama içi oynatıcı kullanılacak.');
+      });
+  }, [isOpen, media?.id, effectiveUrl, media?.title, onClose, triggerNotice]);
+
   // Akış motoru bağlama ve çalıştırma (HLS.js / Native Video)
   useEffect(() => {
+    if (Capacitor.getPlatform() === 'android' && isOpen && media) return;
     if (!isOpen || !media || !videoRef.current) {
       if (hlsRef.current) {
         hlsRef.current.destroy();
