@@ -22,7 +22,7 @@ interface SeriesDetailModalProps {
   activePlaylist: Playlist | null;
   isOpen: boolean;
   onClose: () => void;
-  onPlayEpisode: (episode: SeriesEpisode, seriesItem: MediaItem) => void;
+  onPlayEpisode: (episode: SeriesEpisode, seriesItem: MediaItem, nextEpisode?: SeriesEpisode) => void;
   onDownloadEpisode: (episode: SeriesEpisode, seriesItem: MediaItem) => void;
 }
 
@@ -332,7 +332,20 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                             <span className="hidden sm:inline">İndir</span>
                           </button>
                           <button
-                            onClick={() => onPlayEpisode(episode, seriesItem)}
+                            onClick={() => {
+                              const currentIndex = currentEpisodes.findIndex((item) => item.id === episode.id);
+                              let nextEpisode = currentIndex >= 0 ? currentEpisodes[currentIndex + 1] : undefined;
+                              if (!nextEpisode && seriesDetail?.seasons) {
+                                const orderedSeasons = [...seriesDetail.seasons].sort((a, b) => a.seasonNumber - b.seasonNumber);
+                                const currentSeasonIndex = orderedSeasons.findIndex((season) => season.seasonNumber === selectedSeason);
+                                const nextSeason = currentSeasonIndex >= 0 ? orderedSeasons[currentSeasonIndex + 1] : undefined;
+                                if (nextSeason) {
+                                  nextEpisode = (seriesDetail.episodes[nextSeason.seasonNumber] ||
+                                    seriesDetail.episodes[String(nextSeason.seasonNumber)] || [])[0];
+                                }
+                              }
+                              onPlayEpisode(episode, seriesItem, nextEpisode);
+                            }}
                             className="h-8 px-4 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
