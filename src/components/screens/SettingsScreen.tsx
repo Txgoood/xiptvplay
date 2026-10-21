@@ -25,6 +25,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [defaultSubtitle, setDefaultSubtitle] = useState('Türkçe (Kapalı)');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hideAdultCategories, setHideAdultCategories] = useState(() => Boolean(StorageService.getSettings().hideAdultCategories));
+  const [showOnlyTurkishCategories, setShowOnlyTurkishCategories] = useState(() => Boolean(StorageService.getSettings().showOnlyTurkishCategories));
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -55,6 +56,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <button type="button" role="switch" aria-checked={hideAdultCategories} onClick={() => { const next = !hideAdultCategories; setHideAdultCategories(next); StorageService.saveSettings({ ...StorageService.getSettings(), hideAdultCategories: next }); showToast(next ? 'Yetişkin kategorileri gizlendi' : 'Yetişkin kategorileri gösteriliyor'); }} className={`w-11 h-6 rounded-full transition-colors duration-200 p-0.5 flex items-center shrink-0 ${hideAdultCategories ? 'bg-[#0566d9]' : 'bg-[#2a2a2c]'}`}><span className={`w-5 h-5 rounded-full transition-transform duration-200 shadow-md ${hideAdultCategories ? 'translate-x-5 bg-[#00f0ff]' : 'translate-x-0 bg-[#849495]'}`}></span></button>
         </div>
         <p className="text-[10px] text-[#849495]">Bu ayar uygulama arayüzünde gizleme yapar; tek başına ebeveyn kilidi veya içerik erişim koruması değildir.</p>
+        <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/5">
+          <div className="flex flex-col pr-2 gap-1"><span className="text-xs font-semibold text-[#e5e1e4]">Yalnızca Türkiye (TR) listelerini göster</span><span className="text-[11px] text-[#b9cacb]">Canlı, film ve dizide kategori adı TR ile başlamayan içerikleri katalogdan ve aramadan gizler.</span></div>
+          <button type="button" role="switch" aria-checked={showOnlyTurkishCategories} onClick={() => { const next = !showOnlyTurkishCategories; setShowOnlyTurkishCategories(next); StorageService.saveSettings({ ...StorageService.getSettings(), showOnlyTurkishCategories: next }); showToast(next ? 'Yalnızca TR kategorileri gösteriliyor' : 'Tüm ülke kategorileri gösteriliyor'); }} className={`w-11 h-6 rounded-full transition-colors duration-200 p-0.5 flex items-center shrink-0 ${showOnlyTurkishCategories ? 'bg-[#0566d9]' : 'bg-[#2a2a2c]'}`}><span className={`w-5 h-5 rounded-full transition-transform duration-200 shadow-md ${showOnlyTurkishCategories ? 'translate-x-5 bg-[#00f0ff]' : 'translate-x-0 bg-[#849495]'}`}></span></button>
+        </div>
+
       </div>
 
       {/* Video & Playback Settings */}
