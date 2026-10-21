@@ -53,6 +53,8 @@ export interface MediaItem {
   rawStreamUrl?: string;
   nextEpisodeUrl?: string;
   nextEpisodeTitle?: string;
+  nextNextEpisodeUrl?: string;
+  nextNextEpisodeTitle?: string;
 }
 
 export interface DownloadItem {
