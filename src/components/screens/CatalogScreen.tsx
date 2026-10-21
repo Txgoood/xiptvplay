@@ -46,7 +46,10 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [categorySort, setCategorySort] = useState<'az' | 'za' | 'oldest' | 'newest'>('az');
-  const hideAdultCategories = Boolean(StorageService.getSettings().hideAdultCategories);
+  const appSettings = StorageService.getSettings();
+  const hideAdultCategories = Boolean(appSettings.hideAdultCategories);
+  const showOnlyTurkishCategories = Boolean(appSettings.showOnlyTurkishCategories);
+  const isTurkishCategory = (name: string) => /^\s*TR\b/i.test(name);
   const isAdultCategory = (name: string) => /(^|[^a-z])(xxx|adult|adults|18\s*\+|erotik|erotic|porn|porno)([^a-z]|$)/i.test(name) || /❤️|♥️|💗|💖/.test(name) && /xxx|adult|erotik|erotic|porn|porno/i.test(name);
 
   // 2- İçerik Sayılarının Örtüşmesi (Rozetlerin Gerçek Sunucu Toplamını Göstermesi)
@@ -74,10 +77,12 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
 
   // 1- Dinamik Kategori / Alt Klasör Filtrelemesi:
   // Seçili sekmeye (live, movie, series) ait içerikler
-  const visibleCatalog = useMemo(() => hideAdultCategories
-    ? catalog.filter((item) => !isAdultCategory((item.category || 'Genel').trim()))
-    : catalog,
-  [catalog, hideAdultCategories]);
+  const visibleCatalog = useMemo(() => catalog.filter((item) => {
+    const category = (item.category || 'Genel').trim();
+    if (hideAdultCategories && isAdultCategory(category)) return false;
+    if (showOnlyTurkishCategories && !isTurkishCategory(category)) return false;
+    return true;
+  }), [catalog, hideAdultCategories, showOnlyTurkishCategories]);
 
   const itemsForActiveTab = useMemo(() => {
     if (activeTab === 'all') return visibleCatalog;
@@ -105,7 +110,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   }, [itemsForActiveTab]);
 
   const sortedCategories = useMemo(() => {
-    const categories = categoriesForTab.filter((cat) => !hideAdultCategories || cat.name === 'Tümü' || !isAdultCategory(cat.name));
+    const categories = categoriesForTab.filter((cat) => (!hideAdultCategories || cat.name === 'Tümü' || !isAdultCategory(cat.name)) && (!showOnlyTurkishCategories || cat.name === 'Tümü' || isTurkishCategory(cat.name)));
     const allCategory = categories.find((cat) => cat.name === 'Tümü');
     const children = categories.filter((cat) => cat.name !== 'Tümü');
     const yearForCategory = (name: string) => {
@@ -123,7 +128,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
       return a.name.localeCompare(b.name, 'tr', { sensitivity: 'base' });
     });
     return allCategory ? [allCategory, ...children] : children;
-  }, [categoriesForTab, categorySort, visibleCatalog, hideAdultCategories]);
+  }, [categoriesForTab, categorySort, visibleCatalog, hideAdultCategories, showOnlyTurkishCategories]);
 
   const searchedCategories = useMemo(() => {
     const q = categorySearch.trim().toLocaleLowerCase('tr-TR');
@@ -282,7 +287,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
       {categoriesForTab.length > 1 && (
         <div className="flex items-center gap-2 min-w-0">
           <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-            {categoriesForTab.filter((cat) => !hideAdultCategories || cat.name === 'Tümü' || !isAdultCategory(cat.name)).map((cat) => (
+            {categoriesForTab.filter((cat) => (!hideAdultCategories || cat.name === 'Tümü' || !isAdultCategory(cat.name)) && (!showOnlyTurkishCategories || cat.name === 'Tümü' || isTurkishCategory(cat.name))).map((cat) => (
               <button
                 key={cat.name}
                 onClick={() => handleCategorySelect(cat.name)}
