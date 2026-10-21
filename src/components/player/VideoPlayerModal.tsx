@@ -320,6 +320,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   useEffect(() => {
     if (!isOpen || !media) {
       nativeLaunchKeyRef.current = null;
+      setNativePlayerUnavailable(false);
       return;
     }
     if (Capacitor.getPlatform() !== 'android' || nativePlayerUnavailable) return;
