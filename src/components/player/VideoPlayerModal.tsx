@@ -38,7 +38,7 @@ interface VideoPlayerModalProps {
 const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 
 const NativeMediaPlayer = registerPlugin<{
-  play(options: { url: string; title: string }): Promise<{ started: boolean }>;
+  play(options: { url: string; title: string; nextUrl?: string; nextTitle?: string }): Promise<{ started: boolean }>;
 }>('NativeMediaPlayer');
 
 // 4 Kademeli Otomatik Kurtarma (Auto-Fallback) Seviyeleri:
@@ -329,7 +329,17 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     if (nativeLaunchKeyRef.current === launchKey) return;
     nativeLaunchKeyRef.current = launchKey;
 
-    NativeMediaPlayer.play({ url: effectiveUrl, title: media.title || 'XIPTV Play' })
+    const mediaData = media as any;
+    const nextEpisode = mediaData.nextEpisode || mediaData.nextEpisodeItem || null;
+    const nextEpisodeUrl = mediaData.nextEpisodeUrl || nextEpisode?.streamUrl || nextEpisode?.url || null;
+    const nextEpisodeTitle = mediaData.nextEpisodeTitle || nextEpisode?.title || nextEpisode?.name || null;
+
+    NativeMediaPlayer.play({
+      url: effectiveUrl,
+      title: media.title || 'XIPTV Play',
+      ...(nextEpisodeUrl ? { nextUrl: nextEpisodeUrl } : {}),
+      ...(nextEpisodeTitle ? { nextTitle: nextEpisodeTitle } : {}),
+    })
       .then(() => onClose())
       .catch((error) => {
         nativeLaunchKeyRef.current = null;
