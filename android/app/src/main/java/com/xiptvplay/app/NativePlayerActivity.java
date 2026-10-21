@@ -211,7 +211,6 @@ public class NativePlayerActivity extends Activity {
 
         timeBar = new DefaultTimeBar(this, null);
         timeBar.setFocusable(true);
-        timeBar.setScrubbingEnabled(true);
         timelineRow.addView(timeBar, new LinearLayout.LayoutParams(0, dp(28), 1));
 
         durationText = new TextView(this);
@@ -221,7 +220,7 @@ public class NativePlayerActivity extends Activity {
         durationText.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         timelineRow.addView(durationText, new LinearLayout.LayoutParams(dp(48), -2));
 
-        timeBar.addListener(new DefaultTimeBar.OnScrubListener() {
+        timeBar.addListener(new androidx.media3.ui.TimeBar.OnScrubListener() {
             @Override public void onScrubStart(androidx.media3.ui.TimeBar bar, long position) {}
             @Override public void onScrubMove(androidx.media3.ui.TimeBar bar, long position) {
                 positionText.setText(formatTime(position));
