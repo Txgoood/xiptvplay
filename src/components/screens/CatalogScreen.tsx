@@ -14,7 +14,6 @@ import {
   Sparkles,
   ChevronDown,
   ListFilter,
-  ArrowDownAZ,
 } from 'lucide-react';
 
 interface CatalogScreenProps {
