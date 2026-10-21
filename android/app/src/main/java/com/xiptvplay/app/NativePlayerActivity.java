@@ -54,6 +54,8 @@ public class NativePlayerActivity extends Activity {
     private float lastBrightness = 0.7f;
     private String nextUrl;
     private String nextTitle;
+    private String nextNextUrl;
+    private String nextNextTitle;
     private final Handler controlsHandler = new Handler(Looper.getMainLooper());
     private boolean controlsVisible = true;
     private final Runnable hideControlsRunnable = () -> setControlsVisible(false);
@@ -95,6 +97,8 @@ public class NativePlayerActivity extends Activity {
         }
         nextUrl = getIntent().getStringExtra("nextUrl");
         nextTitle = getIntent().getStringExtra("nextTitle");
+        nextNextUrl = getIntent().getStringExtra("nextNextUrl");
+        nextNextTitle = getIntent().getStringExtra("nextNextTitle");
         nextButton.setVisibility(nextUrl == null || nextUrl.trim().isEmpty() ? View.GONE : View.VISIBLE);
 
         player = new ExoPlayer.Builder(this).build();
@@ -401,9 +405,11 @@ public class NativePlayerActivity extends Activity {
         }
         String urlToPlay = nextUrl;
         String titleToPlay = nextTitle;
-        nextUrl = null;
-        nextTitle = null;
-        nextButton.setVisibility(View.GONE);
+        nextUrl = nextNextUrl;
+        nextTitle = nextNextTitle;
+        nextNextUrl = null;
+        nextNextTitle = null;
+        nextButton.setVisibility(nextUrl == null || nextUrl.trim().isEmpty() ? View.GONE : View.VISIBLE);
         MediaItem next = new MediaItem.Builder()
             .setUri(Uri.parse(urlToPlay))
             .setMediaId(titleToPlay == null ? "Sonraki bölüm" : titleToPlay)
