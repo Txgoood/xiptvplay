@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { MediaItem, DownloadItem } from '../../types';
 import { isNative } from '../../services/net';
 import { XtreamClientService } from '../../services/xtreamClient';
@@ -37,6 +37,10 @@ interface VideoPlayerModalProps {
 
 const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 
+const NativeMediaPlayer = registerPlugin<{
+  play(options: { url: string; title: string }): Promise<{ started: boolean }>;
+}>('NativeMediaPlayer');
+
 // 4 Kademeli Otomatik Kurtarma (Auto-Fallback) Seviyeleri:
 // 1. proxy-hls: Proxy + HLS.js (M3U8 / HLS akışları)
 // 2. proxy-native: Proxy + HTML5 Native (206 Range MP4/MKV akışları)
@@ -53,7 +57,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const hlsRef = useRef<Hls | null>(null);
+  const hlsRef = useRef<Hls | null>(null);\n  const nativeLaunchKeyRef = useRef<string | null>(null);
 
   // Playback Auto-Fallback Stage: Always defaults to 'proxy-hls' on open
   const [fallbackStage, setFallbackStage] = useState<FallbackStage>('proxy-hls');
