@@ -43,6 +43,7 @@ public class NativePlayerActivity extends Activity {
     private Button fullscreenButton;
     private Button speedButton;
     private Button subtitleButton;
+    private Button audioButton;
     private Button nextButton;
     private OrientationEventListener orientationListener;
     private boolean fullscreen = false;
@@ -87,6 +88,12 @@ public class NativePlayerActivity extends Activity {
         nextButton.setVisibility(nextUrl == null || nextUrl.trim().isEmpty() ? View.GONE : View.VISIBLE);
 
         player = new ExoPlayer.Builder(this).build();
+        // Türkçe izi varsa tercih et; yoksa ExoPlayer varsayılan ses izini seçer.
+        player.setTrackSelectionParameters(
+            player.getTrackSelectionParameters().buildUpon()
+                .setPreferredAudioLanguage("tr")
+                .build()
+        );
         playerView.setPlayer(player);
         player.addListener(new Player.Listener() {
             @Override
@@ -98,6 +105,7 @@ public class NativePlayerActivity extends Activity {
             @Override
             public void onTracksChanged(Tracks tracks) {
                 updateSubtitleButton(tracks);
+                updateAudioButton(tracks);
             }
 
             @Override
@@ -169,6 +177,10 @@ public class NativePlayerActivity extends Activity {
             HorizontalScrollView.LayoutParams.WRAP_CONTENT, HorizontalScrollView.LayoutParams.WRAP_CONTENT
         ));
         root.addView(controlsScroll, bottomParams);
+
+        audioButton = makeButton("Ses parçası");
+        audioButton.setOnClickListener(v -> showAudioTracks());
+        bottomBar.addView(audioButton);
 
         subtitleButton = makeButton("Altyazı");
         subtitleButton.setOnClickListener(v -> showSubtitleTracks());
@@ -244,6 +256,36 @@ public class NativePlayerActivity extends Activity {
             .setAllowAdaptiveSelections(false)
             .build()
             .show();
+    }
+
+    private void showAudioTracks() {
+        if (player == null) return;
+        boolean hasAudioTracks = false;
+        for (Tracks.Group group : player.getCurrentTracks().getGroups()) {
+            if (group.getType() == C.TRACK_TYPE_AUDIO && group.length > 0) {
+                hasAudioTracks = true;
+                break;
+            }
+        }
+        if (!hasAudioTracks) {
+            Toast.makeText(this, "Bu yayında seçilebilir ses parçası bulunamadı.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new TrackSelectionDialogBuilder(this, "Ses parçası seçimi", player, C.TRACK_TYPE_AUDIO)
+            .setAllowAdaptiveSelections(false)
+            .build()
+            .show();
+    }
+
+    private void updateAudioButton(Tracks tracks) {
+        boolean available = false;
+        for (Tracks.Group group : tracks.getGroups()) {
+            if (group.getType() == C.TRACK_TYPE_AUDIO && group.length > 0) {
+                available = true;
+                break;
+            }
+        }
+        if (audioButton != null) audioButton.setAlpha(available ? 1f : 0.65f);
     }
 
     private void updateSubtitleButton(Tracks tracks) {
