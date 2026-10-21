@@ -249,6 +249,14 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
   useEffect(() => { if (videoRef.current) videoRef.current.playbackRate = playbackSpeed; }, [playbackSpeed]);
 
+  // Keep the native video element's audio state in sync after source/key changes.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.volume = Math.max(0, Math.min(1, volume));
+    video.muted = isMuted || volume === 0;
+  }, [volume, isMuted, isOpen, media?.id, fallbackStage]);
+
   // 1- Oynatıcı açılırken video kaynağını, başlıkları ve modu anında resetleyip sıfırdan yükleyin
   useEffect(() => {
     if (isOpen && media) {
