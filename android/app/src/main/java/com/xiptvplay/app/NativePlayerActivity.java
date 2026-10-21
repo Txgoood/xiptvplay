@@ -19,6 +19,7 @@ import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import androidx.media3.ui.DefaultTimeBar;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -47,6 +48,15 @@ public class NativePlayerActivity extends Activity {
     private Button subtitleButton;
     private Button audioButton;
     private Button nextButton;
+    private TextView positionText;
+    private TextView durationText;
+    private DefaultTimeBar timeBar;
+    private final Runnable progressUpdater = new Runnable() {
+        @Override public void run() {
+            updateProgressLabels();
+            if (player != null) controlsHandler.postDelayed(this, 500);
+        }
+    };
     private OrientationEventListener orientationListener;
     private boolean fullscreen = false;
     private boolean changingOrientation = false;
@@ -83,6 +93,7 @@ public class NativePlayerActivity extends Activity {
 
         buildCustomControls();
         setContentView(root);
+        controlsHandler.post(progressUpdater);
         playerView.setOnClickListener(v -> {
             if (controlsVisible) setControlsVisible(false);
             else showControlsTemporarily();
@@ -178,43 +189,87 @@ public class NativePlayerActivity extends Activity {
 
         bottomBar = new LinearLayout(this);
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
-        bottomBar.setOrientation(LinearLayout.HORIZONTAL);
-        bottomBar.setPadding(dp(8), dp(8), dp(8), dp(8));
+        bottomBar.setOrientation(LinearLayout.VERTICAL);
+        bottomBar.setPadding(dp(8), dp(6), dp(8), dp(6));
         bottomBar.setBackgroundColor(0xCC000000);
         FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM
         );
+        root.addView(bottomBar, bottomParams);
+
+        LinearLayout timelineRow = new LinearLayout(this);
+        timelineRow.setGravity(Gravity.CENTER_VERTICAL);
+        timelineRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomBar.addView(timelineRow, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(32)
+        ));
+        positionText = new TextView(this);
+        positionText.setText("00:00");
+        positionText.setTextColor(Color.WHITE);
+        positionText.setTextSize(11);
+        timelineRow.addView(positionText, new LinearLayout.LayoutParams(dp(48), -2));
+
+        timeBar = new DefaultTimeBar(this, null);
+        timeBar.setFocusable(true);
+        timeBar.setScrubbingEnabled(true);
+        timelineRow.addView(timeBar, new LinearLayout.LayoutParams(0, dp(28), 1));
+
+        durationText = new TextView(this);
+        durationText.setText("--:--");
+        durationText.setTextColor(Color.WHITE);
+        durationText.setTextSize(11);
+        durationText.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        timelineRow.addView(durationText, new LinearLayout.LayoutParams(dp(48), -2));
+
+        timeBar.addListener(new DefaultTimeBar.OnScrubListener() {
+            @Override public void onScrubStart(androidx.media3.ui.TimeBar bar, long position) {}
+            @Override public void onScrubMove(androidx.media3.ui.TimeBar bar, long position) {
+                positionText.setText(formatTime(position));
+            }
+            @Override public void onScrubStop(androidx.media3.ui.TimeBar bar, long position, boolean canceled) {
+                if (player != null && !canceled) player.seekTo(position);
+                updateProgressLabels();
+                showControlsTemporarily();
+            }
+        });
+
         HorizontalScrollView controlsScroll = new HorizontalScrollView(this);
         controlsScroll.setHorizontalScrollBarEnabled(false);
         controlsScroll.setFillViewport(true);
-        controlsScroll.addView(bottomBar, new HorizontalScrollView.LayoutParams(
+        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        bottomBar.addView(controlsScroll, scrollParams);
+        LinearLayout actionButtons = new LinearLayout(this);
+        actionButtons.setGravity(Gravity.CENTER_VERTICAL);
+        actionButtons.setOrientation(LinearLayout.HORIZONTAL);
+        controlsScroll.addView(actionButtons, new HorizontalScrollView.LayoutParams(
             HorizontalScrollView.LayoutParams.WRAP_CONTENT, HorizontalScrollView.LayoutParams.WRAP_CONTENT
         ));
-        root.addView(controlsScroll, bottomParams);
 
         audioButton = makeButton("Ses parçası");
         audioButton.setOnClickListener(v -> showAudioTracks());
-        bottomBar.addView(audioButton);
+        actionButtons.addView(audioButton);
 
         subtitleButton = makeButton("Altyazı");
         subtitleButton.setOnClickListener(v -> showSubtitleTracks());
-        bottomBar.addView(subtitleButton);
+        actionButtons.addView(subtitleButton);
 
         Button volumeButton = makeButton("Ses");
         volumeButton.setOnClickListener(v -> showVolumeDialog());
-        bottomBar.addView(volumeButton);
+        actionButtons.addView(volumeButton);
 
         Button brightnessButton = makeButton("Parlaklık");
         brightnessButton.setOnClickListener(v -> showBrightnessDialog());
-        bottomBar.addView(brightnessButton);
+        actionButtons.addView(brightnessButton);
 
         speedButton = makeButton("1x");
         speedButton.setOnClickListener(v -> showSpeedDialog());
-        bottomBar.addView(speedButton);
+        actionButtons.addView(speedButton);
 
         nextButton = makeButton("Sonraki bölüm ▶");
         nextButton.setOnClickListener(v -> playNextEpisode());
-        bottomBar.addView(nextButton);
+        actionButtons.addView(nextButton);
     }
 
     private Button makeButton(String label) {
@@ -269,6 +324,30 @@ public class NativePlayerActivity extends Activity {
             if (visible) playerView.showController();
             else playerView.hideController();
         }
+    }
+
+    private String formatTime(long timeMs) {
+        if (timeMs < 0 || timeMs == C.TIME_UNSET) return "--:--";
+        long totalSeconds = timeMs / 1000;
+        long seconds = totalSeconds % 60;
+        long minutes = (totalSeconds / 60) % 60;
+        long hours = totalSeconds / 3600;
+        return hours > 0
+            ? String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+            : String.format(Locale.getDefault(), "%02d:%02d", totalSeconds / 60, seconds);
+    }
+
+    private void updateProgressLabels() {
+        if (player == null || timeBar == null) return;
+        long duration = player.getDuration();
+        if (duration == C.TIME_UNSET || duration < 0) duration = 0;
+        long position = Math.max(0, player.getCurrentPosition());
+        long buffered = Math.max(position, player.getBufferedPosition());
+        timeBar.setDuration(duration);
+        timeBar.setPosition(position);
+        timeBar.setBufferedPosition(Math.min(buffered, duration));
+        positionText.setText(formatTime(position));
+        durationText.setText(duration > 0 ? formatTime(duration) : "--:--");
     }
 
     private void showSubtitleTracks() {
@@ -433,6 +512,7 @@ public class NativePlayerActivity extends Activity {
     protected void onStop() {
         super.onStop();
         controlsHandler.removeCallbacks(hideControlsRunnable);
+        controlsHandler.removeCallbacks(progressUpdater);
         if (orientationListener != null) orientationListener.disable();
         if (player != null) {
             player.release();
