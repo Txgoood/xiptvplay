@@ -51,6 +51,8 @@ export interface MediaItem {
   streamId?: string | number;
   containerExtension?: string;
   rawStreamUrl?: string;
+  nextEpisodeUrl?: string;
+  nextEpisodeTitle?: string;
 }
 
 export interface DownloadItem {
