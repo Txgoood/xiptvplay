@@ -349,7 +349,7 @@ export default function App() {
   };
 
   // Series Episode Play Handler
-  const handlePlayEpisode = (episode: SeriesEpisode, seriesItem: MediaItem) => {
+  const handlePlayEpisode = (episode: SeriesEpisode, seriesItem: MediaItem, nextEpisode?: SeriesEpisode) => {
     const seasonStr = String(episode.seasonNum).padStart(2, '0');
     const epStr = String(episode.episodeNum).padStart(2, '0');
 
@@ -391,6 +391,24 @@ export default function App() {
       containerExtension: episode.containerExtension || 'mp4',
       streamId: episode.id,
     };
+    if (nextEpisode) {
+      let nextDirectUrl = nextEpisode.rawStreamUrl || nextEpisode.streamUrl;
+      if (
+        activePlaylist &&
+        activePlaylist.type === 'xtream' &&
+        activePlaylist.serverUrl &&
+        activePlaylist.username &&
+        activePlaylist.password
+      ) {
+        const serverUrl = XtreamClientService.normalizeServerUrl(activePlaylist.serverUrl);
+        const nextExt = nextEpisode.containerExtension || 'mp4';
+        nextDirectUrl = `${serverUrl}/series/${activePlaylist.username}/${activePlaylist.password}/${nextEpisode.id}.${nextExt}`;
+      }
+      const nextSeasonStr = String(nextEpisode.seasonNum).padStart(2, '0');
+      const nextEpStr = String(nextEpisode.episodeNum).padStart(2, '0');
+      episodeMedia.nextEpisodeUrl = nextDirectUrl || undefined;
+      episodeMedia.nextEpisodeTitle = `${seriesItem.title} - S${nextSeasonStr}E${nextEpStr}: ${nextEpisode.title}`;
+    }
     setActivePlayerMedia(episodeMedia);
   };
 
