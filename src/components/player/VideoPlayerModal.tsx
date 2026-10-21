@@ -533,38 +533,12 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     resetControlsTimeout();
   };
 
-  const getResumeStorageKey = (item: MediaItem | DownloadItem) => `xiptvplay_resume_v1_${item.id}`;
-
-  const handleLoadedMetadata = () => {
-    const video = videoRef.current;
-    if (!video || !media || ('type' in media && media.type === 'live')) return;
-    try {
-      const saved = Number(localStorage.getItem(getResumeStorageKey(media)) || 0);
-      if (saved > 10 && Number.isFinite(video.duration) && video.duration > 0 && saved < video.duration - 30) {
-        video.currentTime = saved;
-        setCurrentTime(saved);
-        triggerNotice('Kaldığın yerden devam ediliyor');
-      }
-    } catch { /* Resume is optional; playback must work without storage. */ }
-  };
-
   const handleTimeUpdate = () => {
     if (videoRef.current) {
-      const video = videoRef.current;
-      setCurrentTime(video.currentTime);
-      if (video.duration && !isNaN(video.duration)) {
-        setDuration(video.duration);
-        if (media && !('type' in media && media.type === 'live') && video.currentTime > 10 && video.duration - video.currentTime > 30) {
-          try { localStorage.setItem(getResumeStorageKey(media), String(Math.floor(video.currentTime))); } catch { /* Optional feature. */ }
-        }
+      setCurrentTime(videoRef.current.currentTime);
+      if (videoRef.current.duration && !isNaN(videoRef.current.duration)) {
+        setDuration(videoRef.current.duration);
       }
-    }
-  };
-
-  const handlePlaybackEnded = () => {
-    setIsPlaying(false);
-    if (media) {
-      try { localStorage.removeItem(getResumeStorageKey(media)); } catch { /* Optional feature. */ }
     }
   };
 
@@ -775,9 +749,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           ref={videoRef}
           key={`${media.id}-${fallbackStage}`}
           poster={media.poster}
-          onLoadedMetadata={handleLoadedMetadata}
           onTimeUpdate={handleTimeUpdate}
-          onEnded={handlePlaybackEnded}
+          onEnded={() => setIsPlaying(false)}
           onError={(e) => {
             if (hlsRef.current || !e.currentTarget.currentSrc) return;
             const code = e.currentTarget.error?.code;
