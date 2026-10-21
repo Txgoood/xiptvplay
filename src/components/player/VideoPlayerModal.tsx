@@ -38,7 +38,7 @@ interface VideoPlayerModalProps {
 const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 
 const NativeMediaPlayer = registerPlugin<{
-  play(options: { url: string; title: string; nextUrl?: string; nextTitle?: string }): Promise<{ started: boolean }>;
+  play(options: { url: string; title: string; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string }): Promise<{ started: boolean }>;
 }>('NativeMediaPlayer');
 
 // 4 Kademeli Otomatik Kurtarma (Auto-Fallback) Seviyeleri:
@@ -333,12 +333,16 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     const nextEpisode = mediaData.nextEpisode || mediaData.nextEpisodeItem || null;
     const nextEpisodeUrl = mediaData.nextEpisodeUrl || nextEpisode?.streamUrl || nextEpisode?.url || null;
     const nextEpisodeTitle = mediaData.nextEpisodeTitle || nextEpisode?.title || nextEpisode?.name || null;
+    const nextNextEpisodeUrl = mediaData.nextNextEpisodeUrl || null;
+    const nextNextEpisodeTitle = mediaData.nextNextEpisodeTitle || null;
 
     NativeMediaPlayer.play({
       url: effectiveUrl,
       title: media.title || 'XIPTV Play',
       ...(nextEpisodeUrl ? { nextUrl: nextEpisodeUrl } : {}),
       ...(nextEpisodeTitle ? { nextTitle: nextEpisodeTitle } : {}),
+      ...(nextNextEpisodeUrl ? { nextNextUrl: nextNextEpisodeUrl } : {}),
+      ...(nextNextEpisodeTitle ? { nextNextTitle: nextNextEpisodeTitle } : {}),
     })
       .then(() => onClose())
       .catch((error) => {
