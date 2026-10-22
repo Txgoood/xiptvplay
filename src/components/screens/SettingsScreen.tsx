@@ -18,9 +18,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     const settings = StorageService.getSettings();
     return settings.hardwareDecoder || 'HEVC/H.265 Donanım Hızlandırıcı (MediaCodec)';
   });
-  const [bufferSeconds, setBufferSeconds] = useState(15);
+  const [bufferSeconds, setBufferSeconds] = useState(() => { const s = StorageService.getSettings(); return Number.isFinite(Number(s.bufferSeconds)) ? Math.max(3, Math.min(45, Number(s.bufferSeconds))) : 15; });
   const [wifiOnly, setWifiOnly] = useState(stats.wifiOnly);
-  const [concurrency, setConcurrency] = useState(8);
+  const [concurrency, setConcurrency] = useState(() => { const s = StorageService.getSettings(); return Number.isFinite(Number(s.downloadConcurrency)) ? Math.max(2, Math.min(16, Number(s.downloadConcurrency))) : 8; });
   const [defaultAudio, setDefaultAudio] = useState('Türkçe (Dublaj / Orijinal)');
   const [defaultSubtitle, setDefaultSubtitle] = useState('Türkçe (Kapalı)');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -103,7 +103,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             max="45"
             step="1"
             value={bufferSeconds}
-            onChange={(e) => setBufferSeconds(Number(e.target.value))}
+            onChange={(e) => { const value = Number(e.target.value); setBufferSeconds(value); const settings = StorageService.getSettings(); if (!StorageService.saveSettings({ ...settings, bufferSeconds: value })) showToast('Tampon ayarı kaydedilemedi'); }}
             className="w-full h-1.5 bg-[#2a2a2c] rounded-lg appearance-none cursor-pointer"
           />
           <span className="text-[10px] text-[#849495]">Düşük gecikme için 5-10s, dalgalı internette 15-30s önerilir.</span>
@@ -153,7 +153,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             max="16"
             step="2"
             value={concurrency}
-            onChange={(e) => setConcurrency(Number(e.target.value))}
+            onChange={(e) => { const value = Number(e.target.value); setConcurrency(value); const settings = StorageService.getSettings(); if (!StorageService.saveSettings({ ...settings, downloadConcurrency: value })) showToast('İndirme ayarı kaydedilemedi'); }}
             className="w-full h-1.5 bg-[#2a2a2c] rounded-lg appearance-none cursor-pointer"
           />
         </div>
