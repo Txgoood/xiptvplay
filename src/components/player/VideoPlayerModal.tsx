@@ -4,6 +4,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { MediaItem, DownloadItem } from '../../types';
 import { isNative } from '../../services/net';
 import { XtreamClientService } from '../../services/xtreamClient';
+import { StorageService } from '../../services/storage';
 import {
   Play,
   Pause,
@@ -38,7 +39,7 @@ interface VideoPlayerModalProps {
 const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 
 const NativeMediaPlayer = registerPlugin<{
-  play(options: { url: string; title: string; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string }): Promise<{ started: boolean }>;
+  play(options: { url: string; title: string; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string }): Promise<{ started: boolean }>;
   stop(): Promise<void>;
 }>('NativeMediaPlayer');
 
@@ -350,6 +351,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     NativeMediaPlayer.play({
       url: effectiveUrl,
       title: media.title || 'XIPTV Play',
+      bufferSeconds: Math.max(3, Math.min(45, Number(StorageService.getSettings().bufferSeconds) || 15)),
       ...(nextEpisodeUrl ? { nextUrl: nextEpisodeUrl } : {}),
       ...(nextEpisodeTitle ? { nextTitle: nextEpisodeTitle } : {}),
       ...(nextNextEpisodeUrl ? { nextNextUrl: nextNextEpisodeUrl } : {}),
