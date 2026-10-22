@@ -42,6 +42,7 @@ export default function App() {
   const [addModalType, setAddModalType] = useState<'xtream' | 'm3u'>('xtream');
   const [activePlayerMedia, setActivePlayerMedia] = useState<MediaItem | DownloadItem | null>(null);
   const [selectedSeriesItem, setSelectedSeriesItem] = useState<MediaItem | null>(null);
+  const [catalogTargetSeason, setCatalogTargetSeason] = useState<number | undefined>(undefined);
 
   // Cast, Search & Profile Modals
   const [isCastOpen, setIsCastOpen] = useState(false);
@@ -310,6 +311,7 @@ export default function App() {
     const newDownload: DownloadItem = {
       id: `dl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       mediaId: item.id,
+      playlistId: item.playlistId,
       title: item.title,
       subtitle: `${item.category} • ${item.resolution} • ${item.fileSizeGb && item.fileSizeGb > 0 ? `${item.fileSizeGb.toFixed(2)} GB` : 'Boyut bekleniyor'}`, 
       type: item.type === 'movie' ? 'movie' : 'series',
@@ -389,6 +391,31 @@ export default function App() {
     });
     
     setCurrentScreen('downloads');
+  };
+
+  // İndirme küçük resminden ilgili katalog konumuna dön.
+  const handleOpenCatalogFromDownload = (item: DownloadItem) => {
+    const playlist = playlists.find((p) => p.id === item.playlistId) || activePlaylist || playlists[0];
+    if (!playlist) {
+      showToast('Kataloğu açmak için önce ilgili playlist eklenmeli.');
+      setCurrentScreen('playlists');
+      return;
+    }
+    setActivePlaylist(playlist);
+    setCatalogItems(StorageService.getPlaylistItems(playlist.id));
+    setCurrentScreen('catalog');
+    if (item.type === 'series') {
+      const seriesTitle = item.seriesTitle || item.title.replace(/\\s*-\\s*S\\d{1,2}E\\d{1,2}:.*$/i, '').trim();
+      const series = StorageService.getPlaylistItems(playlist.id).find((entry) => entry.type === 'series' && entry.title.toLocaleLowerCase('tr') === seriesTitle.toLocaleLowerCase('tr'));
+      if (series) {
+        setCatalogTargetSeason(item.seasonNumber || 1);
+        setSelectedSeriesItem(series);
+      } else {
+        showToast('Dizi katalogda bulunamadı; playlist önbelleğini yenilemeyi deneyin.');
+      }
+    } else {
+      showToast('İlgili playlist kataloğu açıldı.');
+    }
   };
 
   // Series Episode Play Handler
@@ -755,6 +782,7 @@ export default function App() {
                 stats={stats}
                 onPlayMedia={handlePlayDownloadedItem}
                 onOpenDownloadedFile={handleOpenDownloadedFile}
+                onOpenCatalog={handleOpenCatalogFromDownload}
                 onPauseAll={handlePauseAll}
                 onResumeAll={handleResumeAll}
                 onClearCompleted={handleClearCompleted}
@@ -819,6 +847,7 @@ export default function App() {
         onClose={() => setSelectedSeriesItem(null)}
         onPlayEpisode={handlePlayEpisode}
         onDownloadEpisode={handleDownloadEpisode}
+        initialSeason={catalogTargetSeason}
       />
 
       {/* Real Video Player Modal */}
