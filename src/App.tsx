@@ -336,7 +336,32 @@ export default function App() {
                 setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, progressPercent: progress, downloadedGb, speedMbps, eta } : d));
             },
             (localUrl, relativePath, fileUri) => {
-                setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, status: 'completed', statusLabel: 'Tamamlandı', localUrl, offlinePath: relativePath, fileUri, progressPercent: 100, eta: 'Tamamlandı' } : d));
+                (async () => {
+                  let actualSizeGb = 0;
+                  try {
+                    if (relativePath) {
+                      const info = await Filesystem.stat({ path: relativePath, directory: Directory.Data });
+                      actualSizeGb = Number(info.size || 0) / 1_000_000_000;
+                    }
+                  } catch (sizeError) {
+                    console.warn('[Downloads] Gerçek dosya boyutu okunamadı.', sizeError);
+                  }
+                  setDownloads(prev => prev.map(d => d.id === newDownload.id ? {
+                    ...d,
+                    status: 'completed',
+                    statusLabel: 'Tamamlandı',
+                    localUrl,
+                    offlinePath: relativePath,
+                    fileUri,
+                    ...(actualSizeGb > 0 ? {
+                      totalSizeGb: actualSizeGb,
+                      downloadedGb: actualSizeGb,
+                      subtitle: d.subtitle.replace(/\\d+(?:\\.\\d+)? GB/, `${actualSizeGb.toFixed(2)} GB`)
+                    } : {}),
+                    progressPercent: 100,
+                    eta: 'Tamamlandı'
+                  } : d));
+                })();
                 showToast(`"${item.title}" indirildi.`);
             },
             (error) => {
@@ -474,11 +499,26 @@ export default function App() {
     const relativePath = item.offlinePath;
     if (relativePath) {
       try {
-        await Filesystem.stat({ path: relativePath, directory: Directory.Documents });
-        const uriResult = await Filesystem.getUri({ path: relativePath, directory: Directory.Documents });
+        // Önce yeni indirmelerin uygulama özelindeki güvenli klasörünü kontrol et.
+        let directory = Directory.Data;
+        try {
+          await Filesystem.stat({ path: relativePath, directory: Directory.Data });
+        } catch {
+          // Eski sürümde Documents klasörüne kaydedilmiş dosyalarla geriye dönük uyumluluk.
+          directory = Directory.Documents;
+          await Filesystem.stat({ path: relativePath, directory });
+        }
+        const uriResult = await Filesystem.getUri({ path: relativePath, directory });
         const localFileUri = uriResult.uri;
         const localUrl = Capacitor.convertFileSrc(localFileUri);
-        setActivePlayerMedia({ ...item, fileUri: localFileUri, localUrl });
+        const fileInfo = await Filesystem.stat({ path: relativePath, directory });
+        const actualSizeGb = Number(fileInfo.size || 0) / 1_000_000_000;
+        setActivePlayerMedia({
+          ...item,
+          fileUri: localFileUri,
+          localUrl,
+          ...(actualSizeGb > 0 ? { totalSizeGb: actualSizeGb, downloadedGb: actualSizeGb } : {}),
+        });
         showToast('İndirilen dosya telefondan açılıyor; internetten yeniden indirilmeyecek.');
         return;
       } catch (err) {
