@@ -87,10 +87,10 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-[#131315] border border-white/10 rounded-3xl shadow-2xl my-auto text-[#e5e1e4] flex flex-col max-h-[92vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto landscape:overflow-hidden">
+      <div className="relative w-full max-w-2xl landscape:max-w-6xl bg-[#131315] border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl my-auto text-[#e5e1e4] flex flex-col landscape:flex-row max-h-[94dvh] landscape:max-h-[96dvh] overflow-hidden">
         {/* Banner with Poster and Meta */}
-        <div className="relative h-60 sm:h-72 w-full overflow-hidden shrink-0 bg-[#1c1b1d]">
+        <div className="relative h-48 sm:h-60 landscape:h-auto landscape:w-[36%] landscape:min-w-[250px] landscape:max-w-[380px] w-full overflow-hidden shrink-0 bg-[#1c1b1d]">
           {/* Backdrop Image */}
           <img
             src={seriesDetail?.backdrop || seriesDetail?.cover || seriesItem.poster}
@@ -112,9 +112,9 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
           </button>
 
           {/* Header Content Overlay */}
-          <div className="absolute bottom-4 left-4 right-4 flex gap-4 items-end z-10">
+          <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 flex gap-3 sm:gap-4 items-end z-10">
             {/* Poster Card */}
-            <div className="w-24 sm:w-28 aspect-[2/3] rounded-2xl overflow-hidden shrink-0 shadow-2xl border border-white/15 bg-[#201f21]">
+            <div className="w-16 sm:w-24 landscape:w-20 aspect-[2/3] rounded-xl sm:rounded-2xl overflow-hidden shrink-0 shadow-2xl border border-white/15 bg-[#201f21]">
               <img
                 src={seriesDetail?.cover || seriesItem.poster}
                 alt={seriesItem.title}
@@ -172,7 +172,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
         )}
 
         {/* Modal Body / Episodes Section */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 no-scrollbar">
+        <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain p-3 sm:p-5 landscape:p-3 flex flex-col gap-3 sm:gap-4 no-scrollbar">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
               <Loader2 className="w-8 h-8 text-[#00f0ff] animate-spin" />
