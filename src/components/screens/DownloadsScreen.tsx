@@ -26,6 +26,7 @@ interface DownloadsScreenProps {
   stats: SystemStats;
   onPlayMedia: (download: DownloadItem) => void;
   onOpenDownloadedFile: (download: DownloadItem) => void;
+  onOpenCatalog: (download: DownloadItem) => void;
   onPauseAll: () => void;
   onResumeAll: () => void;
   onClearCompleted: () => void;
@@ -39,6 +40,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
   stats,
   onPlayMedia,
   onOpenDownloadedFile,
+  onOpenCatalog,
   onPauseAll,
   onResumeAll,
   onClearCompleted,
@@ -120,7 +122,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                 >
                   <div className="absolute left-0 inset-y-0 w-1 bg-[#4edea3]"></div>
                   <div className="flex gap-3 items-start pl-1">
-                    <div className="relative w-16 h-16 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 shadow border border-white/5">
+                    <div className="relative w-16 h-16 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 shadow border border-white/5 cursor-pointer" onClick={() => onOpenCatalog(item)} title="Katalogdaki konumunu aç">
                       <img
                         className="w-full h-full object-cover"
                         alt={item.title}
@@ -187,7 +189,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                   className="w-full bg-[#1c1b1d] rounded-2xl p-3 flex flex-col gap-2 shadow-md opacity-90 hover:opacity-100 transition-opacity border border-white/5"
                 >
                   <div className="flex gap-3 items-center">
-                    <div className="relative w-14 h-20 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 shadow border border-white/5">
+                    <div className="relative w-14 h-20 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 shadow border border-white/5 cursor-pointer" onClick={() => onOpenCatalog(item)} title="Katalogdaki konumunu aç">
                       <img
                         className="w-full h-full object-cover grayscale-[30%]"
                         alt={item.title}
@@ -238,7 +240,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-[#00f0ff]/5 via-transparent to-transparent pointer-events-none"></div>
                 <div className="flex gap-3 items-start relative z-10">
-                  <div className="relative w-16 h-24 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 shadow-md border border-white/5">
+                  <div className="relative w-16 h-24 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 shadow-md border border-white/5 cursor-pointer" onClick={() => onOpenCatalog(item)} title="Katalogdaki konumunu aç">
                     <img
                       className="w-full h-full object-cover"
                       alt={item.title}
