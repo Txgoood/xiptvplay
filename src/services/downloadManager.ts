@@ -35,7 +35,7 @@ function formatEta(totalSeconds: number): string {
   return `${sec} sn`;
 }
 
-export async function startDownload(
+async function runSingleDownload(
   item: DownloadItem | MediaItem,
   onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string, totalSizeGb?: number) => void,
   onDone: (localUrl: string, relativePath?: string, fileUri?: string) => void,
@@ -148,5 +148,45 @@ export async function startDownload(
     a.click();
     document.body.removeChild(a);
     onDone(''); // Web'de localUrl yok
+  }
+}
+
+
+// Capacitor Filesystem'in progress olayı platform genelinde yayıldığından
+// indirmeleri tek tek yürütüp ilerleme olaylarının karışmasını önler.
+type DownloadTask = {
+  item: DownloadItem | MediaItem;
+  onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string, totalSizeGb?: number) => void;
+  onDone: (localUrl: string, relativePath?: string, fileUri?: string) => void;
+  onError: (error: string) => void;
+};
+const downloadQueue: DownloadTask[] = [];
+let queueRunning = false;
+
+export function startDownload(
+  item: DownloadItem | MediaItem,
+  onProgress: DownloadTask['onProgress'],
+  onDone: DownloadTask['onDone'],
+  onError: DownloadTask['onError']
+): void {
+  downloadQueue.push({ item, onProgress, onDone, onError });
+  void processDownloadQueue();
+}
+
+async function processDownloadQueue(): Promise<void> {
+  if (queueRunning) return;
+  queueRunning = true;
+  try {
+    while (downloadQueue.length) {
+      const task = downloadQueue.shift()!;
+      try {
+        await runSingleDownload(task.item, task.onProgress, task.onDone, task.onError);
+      } catch (error: any) {
+        task.onError(error?.message || String(error) || 'İndirme başarısız');
+      }
+    }
+  } finally {
+    queueRunning = false;
+    if (downloadQueue.length) void processDownloadQueue();
   }
 }
