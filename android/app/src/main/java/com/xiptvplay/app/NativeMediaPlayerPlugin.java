@@ -1,6 +1,8 @@
 package com.xiptvplay.app;
 
+import android.app.Activity;
 import android.content.Intent;
+import com.getcapacitor.ActivityResult;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -25,10 +27,7 @@ public class NativeMediaPlayerPlugin extends Plugin {
         intent.putExtra("nextNextUrl", call.getString("nextNextUrl"));
         intent.putExtra("nextNextTitle", call.getString("nextNextTitle"));
         try {
-            getActivity().startActivity(intent);
-            JSObject result = new JSObject();
-            result.put("started", true);
-            call.resolve(result);
+            startActivityForResult(call, intent, "handlePlayerResult");
         } catch (Exception error) {
             call.reject("Yerel oynatıcı başlatılamadı: " + error.getMessage(), error);
         }
