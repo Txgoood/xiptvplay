@@ -356,7 +356,7 @@ export default function App() {
                     ...(actualSizeGb > 0 ? {
                       totalSizeGb: actualSizeGb,
                       downloadedGb: actualSizeGb,
-                      subtitle: d.subtitle.replace(/\\d+(?:\\.\\d+)? GB/, `${actualSizeGb.toFixed(2)} GB`)
+                      subtitle: d.subtitle.replace(/\d+(?:\.\d+)? GB/, `${actualSizeGb.toFixed(2)} GB`)
                     } : {}),
                     progressPercent: 100,
                     eta: 'Tamamlandı'
