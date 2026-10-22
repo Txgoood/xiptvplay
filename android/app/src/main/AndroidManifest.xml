@@ -12,6 +12,8 @@
 
         <activity
             android:name=".NativePlayerActivity"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
             android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize"
             android:exported="false"
             android:screenOrientation="unspecified"
