@@ -55,6 +55,10 @@ export interface MediaItem {
   nextEpisodeTitle?: string;
   nextNextEpisodeUrl?: string;
   nextNextEpisodeTitle?: string;
+  seriesTitle?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  episodeTitle?: string;
 }
 
 export interface DownloadItem {
@@ -81,6 +85,10 @@ export interface DownloadItem {
   localUrl?: string;
   fileUri?: string;
   errorMessage?: string;
+  seriesTitle?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  episodeTitle?: string;
 }
 
 export interface SystemStats {
