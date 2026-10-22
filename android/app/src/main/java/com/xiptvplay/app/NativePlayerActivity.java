@@ -97,6 +97,8 @@ public class NativePlayerActivity extends Activity {
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.CENTER
         );
         root.addView(videoContainer, videoParams);
+        // İlk açılışta da dikey küçük oynatıcı boyutunu uygula; yön değişimini beklemesin.
+        root.setFitsSystemWindows(true);
 
         playerView = new PlayerView(this);
         playerView.setUseController(true);
@@ -109,6 +111,15 @@ public class NativePlayerActivity extends Activity {
 
         buildCustomControls();
         setContentView(root);
+        root.post(() -> {
+            if (!fullscreen && root != null && videoContainer != null) {
+                int initialWidth = root.getWidth();
+                if (initialWidth <= 0) initialWidth = getResources().getDisplayMetrics().widthPixels;
+                videoContainer.setLayoutParams(new FrameLayout.LayoutParams(
+                    initialWidth, Math.round(initialWidth * 9f / 16f), Gravity.CENTER
+                ));
+            }
+        });
         controlsHandler.post(progressUpdater);
         playerView.setOnClickListener(v -> {
             if (controlsVisible) setControlsVisible(false);
@@ -197,7 +208,10 @@ public class NativePlayerActivity extends Activity {
         topBar = new LinearLayout(this);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
-        topBar.setPadding(dp(10), dp(8), dp(10), dp(8));
+        int statusBarHeight = 0;
+        int statusBarResource = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (statusBarResource > 0) statusBarHeight = getResources().getDimensionPixelSize(statusBarResource);
+        topBar.setPadding(dp(10), dp(8) + statusBarHeight, dp(10), dp(8));
         topBar.setBackgroundColor(0x99000000);
         FrameLayout.LayoutParams topParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP
