@@ -42,6 +42,7 @@ public class NativePlayerActivity extends Activity {
     private ExoPlayer player;
     private PlayerView playerView;
     private FrameLayout root;
+    private FrameLayout videoContainer;
     private LinearLayout topBar;
     private LinearLayout bottomBar;
     private Button fullscreenButton;
@@ -83,12 +84,18 @@ public class NativePlayerActivity extends Activity {
 
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
+        videoContainer = new FrameLayout(this);
+        FrameLayout.LayoutParams videoParams = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.CENTER
+        );
+        root.addView(videoContainer, videoParams);
+
         playerView = new PlayerView(this);
         playerView.setUseController(true);
         playerView.setControllerAutoShow(true);
         playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS);
         playerView.setKeepContentOnPlayerReset(true);
-        root.addView(playerView, new FrameLayout.LayoutParams(
+        videoContainer.addView(playerView, new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
         ));
 
@@ -174,7 +181,7 @@ public class NativePlayerActivity extends Activity {
         FrameLayout.LayoutParams topParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP
         );
-        root.addView(topBar, topParams);
+        videoContainer.addView(topBar, topParams);
 
         TextView title = new TextView(this);
         title.setText(getIntent().getStringExtra("title") == null ? "XIPTV Play" : getIntent().getStringExtra("title"));
@@ -184,10 +191,7 @@ public class NativePlayerActivity extends Activity {
         topBar.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1));
 
         fullscreenButton = makeButton("⛶ Tam ekran");
-        fullscreenButton.setOnClickListener(v -> {
-            if (fullscreen) returnToInlinePlayer();
-            else setFullscreen(true);
-        });
+        fullscreenButton.setOnClickListener(v -> setFullscreen(!fullscreen));
         topBar.addView(fullscreenButton);
 
         bottomBar = new LinearLayout(this);
@@ -198,7 +202,7 @@ public class NativePlayerActivity extends Activity {
         FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM
         );
-        root.addView(bottomBar, bottomParams);
+        videoContainer.addView(bottomBar, bottomParams);
 
         LinearLayout timelineRow = new LinearLayout(this);
         timelineRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -293,17 +297,13 @@ public class NativePlayerActivity extends Activity {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private void returnToInlinePlayer() {
-        Intent result = new Intent();
-        result.putExtra("returnedToInline", true);
-        result.putExtra("positionMs", player == null ? 0L : Math.max(0L, player.getCurrentPosition()));
-        setResult(RESULT_OK, result);
-        finish();
-    }
-
     @Override
     public void onBackPressed() {
-        returnToInlinePlayer();
+        if (fullscreen) {
+            setFullscreen(false);
+        } else {
+            super.onBackPressed();
+        }
     }
 
     private void setFullscreen(boolean enabled) {
@@ -314,13 +314,25 @@ public class NativePlayerActivity extends Activity {
             : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         fullscreenButton.setText(enabled ? "↙ Ekrandan çık" : "⛶ Tam ekran");
-        // Portreye dönerken sensörün eski yatay konumu tekrar tam ekranı açmasın.
+        // Tam ekranda video tüm ekranı kaplar; çıkışta aynı ExoPlayer dikey ekranda 16:9 kart olur.
         int flags = enabled
             ? View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             : View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
         getWindow().getDecorView().setSystemUiVisibility(flags);
+        FrameLayout.LayoutParams videoParams;
+        if (enabled) {
+            videoParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.CENTER
+            );
+        } else {
+            int width = root.getWidth();
+            if (width <= 0) width = getResources().getDisplayMetrics().widthPixels;
+            int height = Math.round(width * 9f / 16f);
+            videoParams = new FrameLayout.LayoutParams(width, height, Gravity.CENTER);
+        }
+        videoContainer.setLayoutParams(videoParams);
         root.postDelayed(() -> changingOrientation = false, 1800);
         showControlsTemporarily();
     }
