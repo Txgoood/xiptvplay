@@ -2,7 +2,7 @@ package com.xiptvplay.app;
 
 import android.app.Activity;
 import android.content.Intent;
-import com.getcapacitor.ActivityResult;
+import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
