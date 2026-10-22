@@ -64,6 +64,7 @@ export interface MediaItem {
 export interface DownloadItem {
   id: string;
   mediaId: string;
+  playlistId?: string;
   title: string;
   subtitle: string;
   type: 'movie' | 'series' | 'catchup';
