@@ -28,6 +28,7 @@ public class NativeMediaPlayerPlugin extends Plugin {
         Intent intent = new Intent(getContext(), NativePlayerActivity.class);
         intent.putExtra("url", url);
         intent.putExtra("title", call.getString("title", "XIPTV Play"));
+        intent.putExtra("bufferSeconds", Math.max(3, Math.min(45, call.getInt("bufferSeconds", 15))));
         intent.putExtra("nextUrl", call.getString("nextUrl"));
         intent.putExtra("nextTitle", call.getString("nextTitle"));
         intent.putExtra("nextNextUrl", call.getString("nextNextUrl"));
