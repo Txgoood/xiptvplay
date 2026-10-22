@@ -12,6 +12,12 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "NativeMediaPlayer")
 public class NativeMediaPlayerPlugin extends Plugin {
     @PluginMethod
+    public void stop(PluginCall call) {
+        NativePlayerActivity.closeActivePlayer();
+        call.resolve();
+    }
+
+    @PluginMethod
     public void play(PluginCall call) {
         String url = call.getString("url");
         if (url == null || url.trim().isEmpty()) {
