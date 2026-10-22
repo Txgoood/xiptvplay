@@ -119,8 +119,19 @@ export async function startDownload(
 
       if (progressListener) { try { await progressListener.remove(); } catch {} }
 
-      const savedPath = result.path || fullPath;
+      // Use the requested relative path, not result.path: on some Capacitor versions
+      // result.path can be an absolute native path that Filesystem.stat/getUri cannot
+      // resolve relative to Directory.Data.
+      const savedPath = fullPath;
+      const fileInfo = await Filesystem.stat({ path: savedPath, directory: Directory.Data });
+      const actualBytes = Number(fileInfo.size || 0);
+      if (!Number.isFinite(actualBytes) || actualBytes <= 0) {
+        throw new Error('İndirilen dosya boş görünüyor; dosya doğrulanamadı.');
+      }
       const uri = await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
+      if (!uri.uri || !uri.uri.startsWith('file://')) {
+        throw new Error('Yerel dosya adresi doğrulanamadı.');
+      }
       const localUrl = Capacitor.convertFileSrc(uri.uri);
       onDone(localUrl, savedPath, uri.uri);
     } catch (err: any) {
