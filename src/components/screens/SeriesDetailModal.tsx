@@ -24,6 +24,7 @@ interface SeriesDetailModalProps {
   onClose: () => void;
   onPlayEpisode: (episode: SeriesEpisode, seriesItem: MediaItem, nextEpisode?: SeriesEpisode, nextNextEpisode?: SeriesEpisode) => void;
   onDownloadEpisode: (episode: SeriesEpisode, seriesItem: MediaItem) => void;
+  initialSeason?: number;
 }
 
 export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
@@ -33,6 +34,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   onClose,
   onPlayEpisode,
   onDownloadEpisode,
+  initialSeason,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +59,8 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
       if (res.success && res.seriesDetail) {
         setSeriesDetail(res.seriesDetail);
         if (res.seriesDetail.seasons.length > 0) {
-          setSelectedSeason(res.seriesDetail.seasons[0].seasonNumber);
+          const requestedSeason = res.seriesDetail.seasons.find((season) => season.seasonNumber === initialSeason);
+          setSelectedSeason(requestedSeason?.seasonNumber ?? res.seriesDetail.seasons[0].seasonNumber);
         } else {
           setSelectedSeason(1);
         }
@@ -68,7 +71,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
     };
 
     loadSeriesInfo();
-  }, [isOpen, seriesItem, activePlaylist]);
+  }, [isOpen, seriesItem, activePlaylist, initialSeason]);
 
   if (!isOpen || !seriesItem) return null;
 
