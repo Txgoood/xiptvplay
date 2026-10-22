@@ -39,7 +39,7 @@ interface VideoPlayerModalProps {
 const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 
 const NativeMediaPlayer = registerPlugin<{
-  play(options: { url: string; title: string; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string }): Promise<{ started: boolean }>;
+  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string }): Promise<{ started: boolean }>;
   stop(): Promise<void>;
 }>('NativeMediaPlayer');
 
@@ -352,8 +352,14 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     const nextNextEpisodeUrl = mediaData.nextNextEpisodeUrl || null;
     const nextNextEpisodeTitle = mediaData.nextNextEpisodeTitle || null;
 
+    const localFileUri = typeof mediaData.fileUri === 'string' && mediaData.fileUri.startsWith('file://')
+      ? mediaData.fileUri
+      : null;
+    // Never let the fallback/proxy URL replace a verified offline file URI.
+    const playbackUrl = localFileUri || effectiveUrl;
     NativeMediaPlayer.play({
-      url: effectiveUrl,
+      url: playbackUrl,
+      isLocalFile: !!localFileUri,
       title: media.title || 'XIPTV Play',
       bufferSeconds: Math.max(3, Math.min(45, Number(StorageService.getSettings().bufferSeconds) || 15)),
       ...(nextEpisodeUrl ? { nextUrl: nextEpisodeUrl } : {}),
