@@ -68,7 +68,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
 
   // Eski kayıtlar için başlıktaki S01E02 biçimini de okuyarak gruplamayı geriye dönük uyumlu tut.
   const getEpisodeGrouping = (item: DownloadItem) => {
-    const match = item.title.match(/^(.*?)\\s*-\\s*S(\\d{1,2})E(\\d{1,2}):\\s*(.*)$/i);
+    const match = item.title.match(/^(.*?)\s*-\s*S(\d{1,2})E(\d{1,2}):\s*(.*)$/i);
     const seriesTitle = item.seriesTitle || (match ? match[1].trim() : undefined);
     const seasonNumber = typeof item.seasonNumber === 'number' ? item.seasonNumber : (match ? Number(match[2]) : undefined);
     const episodeNumber = typeof item.episodeNumber === 'number' ? item.episodeNumber : (match ? Number(match[3]) : undefined);
