@@ -330,7 +330,7 @@ export default function App() {
       ...(item.episodeTitle ? { episodeTitle: item.episodeTitle } : {}),
     };
 
-    setDownloads([newDownload, ...downloads]);
+    setDownloads((prev) => [newDownload, ...prev]);
     showToast(`"${item.title}" indirme başlatılıyor...`);
     
     import('./services/downloadManager').then(dm => {
