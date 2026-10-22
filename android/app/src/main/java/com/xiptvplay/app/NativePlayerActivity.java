@@ -333,7 +333,17 @@ public class NativePlayerActivity extends Activity {
             videoParams = new FrameLayout.LayoutParams(width, height, Gravity.CENTER);
         }
         videoContainer.setLayoutParams(videoParams);
-        root.postDelayed(() -> changingOrientation = false, 1800);
+        // Ekran yönü değişince root genişliği yeni ölçüsüne oturduktan sonra kart boyutunu tekrar hesapla.
+        root.postDelayed(() -> {
+            if (!fullscreen && root != null && videoContainer != null) {
+                int portraitWidth = root.getWidth();
+                if (portraitWidth <= 0) portraitWidth = getResources().getDisplayMetrics().widthPixels;
+                videoContainer.setLayoutParams(new FrameLayout.LayoutParams(
+                    portraitWidth, Math.round(portraitWidth * 9f / 16f), Gravity.CENTER
+                ));
+            }
+            changingOrientation = false;
+        }, 700);
         showControlsTemporarily();
     }
 
