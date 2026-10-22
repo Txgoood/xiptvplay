@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -46,6 +47,7 @@ public class NativePlayerActivity extends Activity {
     private LinearLayout topBar;
     private LinearLayout bottomBar;
     private Button fullscreenButton;
+    private Button closeButton;
     private Button speedButton;
     private Button subtitleButton;
     private Button audioButton;
@@ -185,14 +187,19 @@ public class NativePlayerActivity extends Activity {
 
         TextView title = new TextView(this);
         title.setText(getIntent().getStringExtra("title") == null ? "XIPTV Play" : getIntent().getStringExtra("title"));
-        title.setTextColor(Color.WHITE);        title.setTextSize(15);
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(15);
+        title.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
         title.setMaxLines(1);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         topBar.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1));
 
-        fullscreenButton = makeButton("⛶ Tam ekran");
-        fullscreenButton.setOnClickListener(v -> setFullscreen(!fullscreen));
-        topBar.addView(fullscreenButton);
+        closeButton = makeButton("✕");
+        closeButton.setTextSize(18);
+        closeButton.setContentDescription("Videoyu kapat");
+        closeButton.setMinWidth(dp(40));
+        closeButton.setOnClickListener(v -> finish());
+        topBar.addView(closeButton);
 
         bottomBar = new LinearLayout(this);
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
@@ -203,6 +210,16 @@ public class NativePlayerActivity extends Activity {
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM
         );
         videoContainer.addView(bottomBar, bottomParams);
+
+        fullscreenButton = makeButton("⛶");
+        fullscreenButton.setTextSize(20);
+        fullscreenButton.setContentDescription("Tam ekran / küçük ekran");
+        fullscreenButton.setMinWidth(dp(42));
+        fullscreenButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xCC111827));
+        FrameLayout.LayoutParams fullscreenParams = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.BOTTOM | Gravity.RIGHT);
+        fullscreenParams.setMargins(0, 0, dp(10), dp(92));
+        videoContainer.addView(fullscreenButton, fullscreenParams);
+        fullscreenButton.setOnClickListener(v -> setFullscreen(!fullscreen));
 
         LinearLayout timelineRow = new LinearLayout(this);
         timelineRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -239,58 +256,68 @@ public class NativePlayerActivity extends Activity {
             }
         });
 
-        HorizontalScrollView controlsScroll = new HorizontalScrollView(this);
-        controlsScroll.setHorizontalScrollBarEnabled(false);
-        controlsScroll.setFillViewport(true);
-        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        bottomBar.addView(controlsScroll, scrollParams);
         LinearLayout actionButtons = new LinearLayout(this);
-        actionButtons.setGravity(Gravity.CENTER_VERTICAL);
+        actionButtons.setGravity(Gravity.CENTER);
         actionButtons.setOrientation(LinearLayout.HORIZONTAL);
-        controlsScroll.addView(actionButtons, new HorizontalScrollView.LayoutParams(
-            HorizontalScrollView.LayoutParams.WRAP_CONTENT, HorizontalScrollView.LayoutParams.WRAP_CONTENT
+        bottomBar.addView(actionButtons, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
         ));
 
-        audioButton = makeButton("Ses parçası");
+        audioButton = makeButton("♫");
+        audioButton.setContentDescription("Ses parçası");
         audioButton.setOnClickListener(v -> showAudioTracks());
-        actionButtons.addView(audioButton);
+        addCompactButton(actionButtons, audioButton);
 
-        subtitleButton = makeButton("Altyazı");
+        subtitleButton = makeButton("CC");
+        subtitleButton.setContentDescription("Altyazı");
         subtitleButton.setOnClickListener(v -> showSubtitleTracks());
-        actionButtons.addView(subtitleButton);
+        addCompactButton(actionButtons, subtitleButton);
 
-        Button volumeButton = makeButton("Ses");
+        Button volumeButton = makeButton("🔊");
+        volumeButton.setContentDescription("Ses seviyesi");
         volumeButton.setOnClickListener(v -> showVolumeDialog());
-        actionButtons.addView(volumeButton);
+        addCompactButton(actionButtons, volumeButton);
 
-        Button brightnessButton = makeButton("Parlaklık");
+        Button brightnessButton = makeButton("☼");
+        brightnessButton.setContentDescription("Parlaklık");
         brightnessButton.setOnClickListener(v -> showBrightnessDialog());
-        actionButtons.addView(brightnessButton);
+        addCompactButton(actionButtons, brightnessButton);
 
-        speedButton = makeButton("1x");
+        speedButton = makeButton("1×");
+        speedButton.setContentDescription("Oynatma hızı");
         speedButton.setOnClickListener(v -> showSpeedDialog());
-        actionButtons.addView(speedButton);
+        addCompactButton(actionButtons, speedButton);
 
-        nextButton = makeButton("Sonraki bölüm ▶");
+        nextButton = makeButton("▶|");
+        nextButton.setContentDescription("Sonraki bölüm");
         nextButton.setOnClickListener(v -> playNextEpisode());
-        actionButtons.addView(nextButton);
+        addCompactButton(actionButtons, nextButton);
     }
 
     private Button makeButton(String label) {
         Button button = new Button(this);
         button.setText(label);
-        button.setTextSize(11);
+        button.setTextSize(14);
+        button.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
         button.setAllCaps(false);
+        button.setSingleLine(true);
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        button.setPadding(dp(4), 0, dp(4), 0);
         button.setTextColor(Color.WHITE);
-        button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF292929));
+        button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF202938));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT, dp(42)
+            LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)
         );
-        params.setMargins(dp(3), 0, dp(3), 0);
+        params.setMargins(dp(2), 0, dp(2), 0);
         button.setLayoutParams(params);
         return button;
+    }
+
+    private void addCompactButton(LinearLayout row, Button button) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(38), 1f);
+        params.setMargins(dp(2), 0, dp(2), 0);
+        row.addView(button, params);
     }
 
     private int dp(float value) {
@@ -313,7 +340,8 @@ public class NativePlayerActivity extends Activity {
             ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
-        fullscreenButton.setText(enabled ? "↙ Ekrandan çık" : "⛶ Tam ekran");
+        fullscreenButton.setText(enabled ? "⛶" : "⛶");
+        fullscreenButton.setContentDescription(enabled ? "Küçük ekrana dön" : "Tam ekran");
         // Tam ekranda video tüm ekranı kaplar; çıkışta aynı ExoPlayer dikey ekranda 16:9 kart olur.
         int flags = enabled
             ? View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -332,7 +360,12 @@ public class NativePlayerActivity extends Activity {
             int height = Math.round(width * 9f / 16f);
             videoParams = new FrameLayout.LayoutParams(width, height, Gravity.CENTER);
         }
+        videoContainer.animate().cancel();
+        videoContainer.setAlpha(0.92f);
+        videoContainer.setScaleX(enabled ? 0.985f : 0.97f);
+        videoContainer.setScaleY(enabled ? 0.985f : 0.97f);
         videoContainer.setLayoutParams(videoParams);
+        videoContainer.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(180).start();
         // Ekran yönü değişince root genişliği yeni ölçüsüne oturduktan sonra kart boyutunu tekrar hesapla.
         root.postDelayed(() -> {
             if (!fullscreen && root != null && videoContainer != null) {
