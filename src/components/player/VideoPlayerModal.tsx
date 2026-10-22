@@ -171,7 +171,11 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const getEffectiveVideoUrl = useCallback(() => {
     if (!media) return sampleFallbackUrl;
     
-    // İndirilen yerel dosya her zaman canlı yayın/proxy yolundan önce gelir.
+    // Android Media3/ExoPlayer dosyanın gerçek file:// URI'sini doğrudan açmalı.
+    // Web oynatıcı ise Capacitor'ın dönüştürdüğü localUrl adresini kullanır.
+    if (Capacitor.getPlatform() === 'android' && 'fileUri' in media && media.fileUri) {
+      return media.fileUri;
+    }
     if ('localUrl' in media && media.localUrl) return media.localUrl;
     if ('fileUri' in media && media.fileUri) return Capacitor.convertFileSrc(media.fileUri);
     
