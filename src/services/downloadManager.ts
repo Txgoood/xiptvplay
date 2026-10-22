@@ -37,7 +37,7 @@ function formatEta(totalSeconds: number): string {
 
 export async function startDownload(
   item: DownloadItem | MediaItem,
-  onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string) => void,
+  onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string, totalSizeGb?: number) => void,
   onDone: (localUrl: string, relativePath?: string, fileUri?: string) => void,
   onError: (error: string) => void
 ) {
@@ -88,7 +88,7 @@ export async function startDownload(
       const etaSec = smoothedBytesPerSecond > 0 && remainingBytes > 0 ? remainingBytes / smoothedBytesPerSecond : 0;
       const eta = contentLength <= 0 ? 'Boyut bekleniyor' : (etaSec > 0 ? formatEta(etaSec) : (percent >= 100 ? 'Tamamlanıyor' : 'Hesaplanıyor'));
 
-      onProgress(Math.min(percent, 100), downloadedGb, Math.round(speedMbps * 10) / 10, eta);
+      onProgress(Math.min(percent, 100), downloadedGb, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1_000_000_000 : undefined);
     };
 
     let progressListener: any = null;
