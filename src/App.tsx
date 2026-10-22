@@ -18,6 +18,7 @@ import { VideoPlayerModal } from './components/player/VideoPlayerModal';
 import { PrdHub } from './components/prd/PrdHub';
 import { Info, Cast as CastIcon, Tv as TvIcon, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
 
 export default function App() {
   const [appMode, setAppMode] = useState<AppMode>('app');
@@ -476,7 +477,7 @@ export default function App() {
         await Filesystem.stat({ path: relativePath, directory: Directory.Documents });
         const uriResult = await Filesystem.getUri({ path: relativePath, directory: Directory.Documents });
         const localFileUri = uriResult.uri;
-        const localUrl = Filesystem ? (await import('@capacitor/core')).Capacitor.convertFileSrc(localFileUri) : localFileUri;
+        const localUrl = Capacitor.convertFileSrc(localFileUri);
         setActivePlayerMedia({ ...item, fileUri: localFileUri, localUrl });
         showToast('İndirilen dosya telefondan açılıyor; internetten yeniden indirilmeyecek.');
         return;
