@@ -1,15 +1,18 @@
 package com.xiptvplay.app;
 
 import android.app.Activity;
+import android.app.PictureInPictureParams;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Rational;
 import android.view.Gravity;
 import android.view.OrientationEventListener;
 import android.view.View;
@@ -48,6 +51,8 @@ public class NativePlayerActivity extends Activity {
     private LinearLayout bottomBar;
     private Button fullscreenButton;
     private Button closeButton;
+    private String currentUrl;
+    private String progressPreferenceKey;
     private Button speedButton;
     private Button subtitleButton;
     private Button audioButton;
@@ -58,7 +63,8 @@ public class NativePlayerActivity extends Activity {
     private final Runnable progressUpdater = new Runnable() {
         @Override public void run() {
             updateProgressLabels();
-            if (player != null) controlsHandler.postDelayed(this, 500);
+            savePlaybackPosition();
+            if (player != null) controlsHandler.postDelayed(this, 1000);
         }
     };
     private OrientationEventListener orientationListener;
@@ -116,6 +122,8 @@ public class NativePlayerActivity extends Activity {
             finish();
             return;
         }
+        currentUrl = url;
+        progressPreferenceKey = "native_player_position_" + Integer.toHexString(url.hashCode());
         nextUrl = getIntent().getStringExtra("nextUrl");
         nextTitle = getIntent().getStringExtra("nextTitle");
         nextNextUrl = getIntent().getStringExtra("nextNextUrl");
@@ -157,6 +165,9 @@ public class NativePlayerActivity extends Activity {
             .setMediaId(title == null ? "XIPTV Play" : title)
             .build();
         player.setMediaItem(item);
+        long savedPosition = getSharedPreferences("playback_progress", MODE_PRIVATE)
+            .getLong(progressPreferenceKey, 0L);
+        if (savedPosition > 0L) player.seekTo(savedPosition);
         player.prepare();
         player.play();
 
@@ -212,13 +223,10 @@ public class NativePlayerActivity extends Activity {
         videoContainer.addView(bottomBar, bottomParams);
 
         fullscreenButton = makeButton("⛶");
-        fullscreenButton.setTextSize(20);
+        fullscreenButton.setTextSize(19);
         fullscreenButton.setContentDescription("Tam ekran / küçük ekran");
-        fullscreenButton.setMinWidth(dp(42));
+        fullscreenButton.setMinWidth(0);
         fullscreenButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xCC111827));
-        FrameLayout.LayoutParams fullscreenParams = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.BOTTOM | Gravity.RIGHT);
-        fullscreenParams.setMargins(0, 0, dp(10), dp(92));
-        videoContainer.addView(fullscreenButton, fullscreenParams);
         fullscreenButton.setOnClickListener(v -> setFullscreen(!fullscreen));
 
         LinearLayout timelineRow = new LinearLayout(this);
@@ -292,6 +300,7 @@ public class NativePlayerActivity extends Activity {
         nextButton.setContentDescription("Sonraki bölüm");
         nextButton.setOnClickListener(v -> playNextEpisode());
         addCompactButton(actionButtons, nextButton);
+        addCompactButton(actionButtons, fullscreenButton);
     }
 
     private Button makeButton(String label) {
@@ -322,6 +331,52 @@ public class NativePlayerActivity extends Activity {
 
     private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private void savePlaybackPosition() {
+        if (player == null || progressPreferenceKey == null) return;
+        long position = Math.max(0L, player.getCurrentPosition());
+        getSharedPreferences("playback_progress", MODE_PRIVATE).edit()
+            .putLong(progressPreferenceKey, position).apply();
+    }
+
+    @Override
+    protected void onPause() {
+        savePlaybackPosition();
+        super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        savePlaybackPosition();
+        super.onStop();
+    }
+
+    @Override
+    public void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
+                && player != null && player.isPlaying()) {
+            try {
+                PictureInPictureParams params = new PictureInPictureParams.Builder()
+                    .setAspectRatio(new Rational(16, 9))
+                    .build();
+                enterPictureInPictureMode(params);
+            } catch (Exception ignored) {
+                // PiP cihaz tarafından desteklenmiyorsa normal arka plan davranışı sürer.
+            }
+        }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        if (isInPictureInPictureMode) {
+            if (topBar != null) topBar.setVisibility(View.GONE);
+            if (bottomBar != null) bottomBar.setVisibility(View.GONE);
+        } else if (topBar != null && bottomBar != null) {
+            showControlsTemporarily();
+        }
     }
 
     @Override
