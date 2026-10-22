@@ -48,8 +48,24 @@ public class NativePlayerActivity extends Activity {
     public static void closeActivePlayer() {
         NativePlayerActivity activity = activeInstance;
         if (activity != null) {
-            activity.runOnUiThread(activity::finish);
+            activity.runOnUiThread(activity::closePlayerAndFinish);
         }
+    }
+
+    private void closePlayerAndFinish() {
+        // PiP penceresi kapandığında yalnızca Activity'yi bitirmek bazı cihazlarda
+        // ses akışını bırakabildiğinden önce oynatmayı kesin olarak durdur.
+        if (player != null) {
+            try {
+                player.pause();
+                player.stop();
+                player.clearMediaItems();
+                player.release();
+            } catch (Exception ignored) {
+            }
+            player = null;
+        }
+        finishAndRemoveTask();
     }
 
     private ExoPlayer player;
@@ -246,7 +262,7 @@ public class NativePlayerActivity extends Activity {
         closeButton.setPadding(0, 0, 0, 0);
         closeButton.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(42)));
         closeButton.setElevation(dp(6));
-        closeButton.setOnClickListener(v -> finish());
+        closeButton.setOnClickListener(v -> closePlayerAndFinish());
         topBar.addView(closeButton);
 
         bottomBar = new LinearLayout(this);
@@ -676,9 +692,26 @@ public class NativePlayerActivity extends Activity {
         controlsHandler.removeCallbacks(hideControlsRunnable);
         controlsHandler.removeCallbacks(progressUpdater);
         if (orientationListener != null) orientationListener.disable();
+        releasePlayer();
+    }
+
+    private void releasePlayer() {
         if (player != null) {
-            player.release();
+            try {
+                player.pause();
+                player.stop();
+                player.clearMediaItems();
+                player.release();
+            } catch (Exception ignored) {
+            }
             player = null;
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        releasePlayer();
+        if (activeInstance == this) activeInstance = null;
+        super.onDestroy();
     }
 }
