@@ -324,6 +324,10 @@ export default function App() {
       poster: item.poster,
       streamUrl: item.streamUrl,
       rawStreamUrl: item.rawStreamUrl || item.streamUrl,
+      ...(item.seriesTitle ? { seriesTitle: item.seriesTitle } : {}),
+      ...(typeof item.seasonNumber === 'number' ? { seasonNumber: item.seasonNumber } : {}),
+      ...(typeof item.episodeNumber === 'number' ? { episodeNumber: item.episodeNumber } : {}),
+      ...(item.episodeTitle ? { episodeTitle: item.episodeTitle } : {}),
     };
 
     setDownloads([newDownload, ...downloads]);
@@ -502,6 +506,10 @@ export default function App() {
       subtitles: ['Türkçe', 'English', 'Off'],
       containerExtension: episode.containerExtension || 'mp4',
       streamId: episode.id,
+      seriesTitle: seriesItem.title,
+      seasonNumber: episode.seasonNum,
+      episodeNumber: episode.episodeNum,
+      episodeTitle: episode.title,
     };
     handleDownloadMedia(episodeMedia);
   };
