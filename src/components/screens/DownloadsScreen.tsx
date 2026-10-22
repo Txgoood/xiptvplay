@@ -18,6 +18,7 @@ import {
   X,
   ArrowDown,
   Pause,
+  ChevronDown,
 } from 'lucide-react';
 
 interface DownloadsScreenProps {
@@ -64,6 +65,57 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
 
   const totalDownloadedGb = downloads.reduce((acc, curr) => acc + (curr.downloadedGb || 0), 0);
   const totalArchiveGb = parseFloat(totalDownloadedGb.toFixed(1));
+
+  // Eski kayıtlar için başlıktaki S01E02 biçimini de okuyarak gruplamayı geriye dönük uyumlu tut.
+  const getEpisodeGrouping = (item: DownloadItem) => {
+    const match = item.title.match(/^(.*?)\\s*-\\s*S(\\d{1,2})E(\\d{1,2}):\\s*(.*)$/i);
+    const seriesTitle = item.seriesTitle || (match ? match[1].trim() : undefined);
+    const seasonNumber = typeof item.seasonNumber === 'number' ? item.seasonNumber : (match ? Number(match[2]) : undefined);
+    const episodeNumber = typeof item.episodeNumber === 'number' ? item.episodeNumber : (match ? Number(match[3]) : undefined);
+    const episodeTitle = item.episodeTitle || (match ? match[4].trim() : item.title);
+    return { seriesTitle, seasonNumber, episodeNumber, episodeTitle };
+  };
+
+  const groupedDownloads = (() => {
+    const groups = new Map<string, { key: string; label: string; kind: 'series' | 'movies' | 'other'; seriesTitle?: string; seasonNumber?: number; items: DownloadItem[] }>();
+    downloads.forEach((item) => {
+      if (item.type === 'movie') {
+        const key = '__movies__';
+        if (!groups.has(key)) groups.set(key, { key, label: 'Filmler', kind: 'movies', items: [] });
+        groups.get(key)!.items.push(item);
+        return;
+      }
+      const episode = item.type === 'series' ? getEpisodeGrouping(item) : null;
+      if (episode?.seriesTitle) {
+        const season = episode.seasonNumber ?? 0;
+        const key = `series:${episode.seriesTitle.toLocaleLowerCase('tr')}:${season}`;
+        const label = season > 0 ? `Sezon ${season}` : 'Sezon bilgisi yok';
+        if (!groups.has(key)) groups.set(key, { key, label, kind: 'series', seriesTitle: episode.seriesTitle, seasonNumber: season, items: [] });
+        groups.get(key)!.items.push(item);
+      } else {
+        const key = '__other__';
+        if (!groups.has(key)) groups.set(key, { key, label: 'Diğer indirmeler', kind: 'other', items: [] });
+        groups.get(key)!.items.push(item);
+      }
+    });
+    return Array.from(groups.values())
+      .sort((a, b) => {
+        const order = (g: typeof a) => g.kind === 'series' ? 0 : g.kind === 'movies' ? 1 : 2;
+        const kindDiff = order(a) - order(b);
+        if (kindDiff !== 0) return kindDiff;
+        const seriesDiff = (a.seriesTitle || '').localeCompare(b.seriesTitle || '', 'tr');
+        if (seriesDiff !== 0) return seriesDiff;
+        return (a.seasonNumber || 0) - (b.seasonNumber || 0);
+      })
+      .map((group) => ({
+        ...group,
+        items: group.items.sort((a, b) => {
+          const ea = getEpisodeGrouping(a);
+          const eb = getEpisodeGrouping(b);
+          return (ea.episodeNumber ?? 0) - (eb.episodeNumber ?? 0);
+        }),
+      }));
+  })();
 
   return (
     <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-2 pb-28 gap-4 select-none">
@@ -262,7 +314,21 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
             </div>
           </div>
         ) : (
-          downloads.map((item) => {
+          groupedDownloads.map((group) => (
+            <details key={group.key} open className="rounded-2xl border border-white/5 bg-[#171719] overflow-hidden">
+              <summary className="list-none cursor-pointer flex items-center justify-between gap-3 px-3.5 py-3 bg-[#201f21] hover:bg-[#252426]">
+                <div className="flex flex-col min-w-0">
+                  {group.kind === 'series' && <span className="text-[10px] text-[#00dbe9] font-semibold uppercase tracking-wider">Dizi</span>}
+                  <span className="font-headline text-[13px] font-bold text-[#e5e1e4] truncate">{group.kind === 'series' ? group.seriesTitle : group.label}</span>
+                  {group.kind === 'series' && <span className="text-[11px] text-[#b9cacb]">{group.label}</span>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="px-2 py-1 rounded-full bg-[#0566d9]/20 text-[#adc6ff] text-[10px] font-bold">{group.items.length} bölüm/öğe</span>
+                  <ChevronDown className="w-4 h-4 text-[#b9cacb]" />
+                </div>
+              </summary>
+              <div className="flex flex-col gap-3 p-2.5">
+              {group.items.map((item) => {
             const isCompleted = item.status === 'completed';
             const isQueued = item.status === 'queued';
             const isPaused = item.status === 'paused';
@@ -469,7 +535,10 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                 </div>
               </div>
             );
-          })
+          })}
+              </div>
+            </details>
+          ))
         )}
       </div>
     </div>
