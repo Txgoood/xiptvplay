@@ -577,7 +577,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       if (singleTapTimeoutRef.current) clearTimeout(singleTapTimeoutRef.current);
       if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     };
-  }, [isOpen, media?.id, fallbackStage, effectiveUrl, triggerNextFallback, resetControlsTimeout]);
+  }, [isOpen, media?.id, fallbackStage, effectiveUrl, triggerNextFallback, resetControlsTimeout, nativePlayerUnavailable]);
 
   // Clean up subtitle blob url on unmount
   useEffect(() => {
