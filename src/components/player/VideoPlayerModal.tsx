@@ -39,6 +39,7 @@ const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 
 const NativeMediaPlayer = registerPlugin<{
   play(options: { url: string; title: string; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string }): Promise<{ started: boolean }>;
+  stop(): Promise<void>;
 }>('NativeMediaPlayer');
 
 // 4 Kademeli Otomatik Kurtarma (Auto-Fallback) Seviyeleri:
@@ -60,6 +61,16 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const hlsRef = useRef<Hls | null>(null);
   const nativeLaunchKeyRef = useRef<string | null>(null);
   const nativeResumePositionRef = useRef(0);
+
+  const handleClosePlayer = () => {
+    if (Capacitor.getPlatform() === 'android') {
+      NativeMediaPlayer.stop().catch((error) => {
+        console.warn('[NativeMediaPlayer] Could not stop native playback:', error);
+      }).finally(() => onClose());
+      return;
+    }
+    onClose();
+  };
 
   // Playback Auto-Fallback Stage: Always defaults to 'proxy-hls' on open
   const [fallbackStage, setFallbackStage] = useState<FallbackStage>('proxy-hls');
@@ -1034,7 +1045,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
             {/* Close Button */}
             <button
-              onClick={onClose}
+              onClick={handleClosePlayer}
               className="w-9 h-9 rounded-full bg-black/60 hover:bg-[#93000a]/60 text-white flex items-center justify-center transition-all cursor-pointer border border-white/10"
               title="Kapat"
             >
