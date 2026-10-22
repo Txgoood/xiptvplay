@@ -114,6 +114,14 @@ public class NativePlayerActivity extends Activity {
             if (controlsVisible) setControlsVisible(false);
             else showControlsTemporarily();
         });
+        // Görüntünün boş alanına dokunmak da kontrolleri tekrar açabilsin.
+        videoContainer.setOnClickListener(v -> {
+            if (!controlsVisible) showControlsTemporarily();
+            else {
+                controlsHandler.removeCallbacks(hideControlsRunnable);
+                controlsHandler.postDelayed(hideControlsRunnable, 3500);
+            }
+        });
         showControlsTemporarily();
 
         String url = getIntent().getStringExtra("url");
@@ -203,12 +211,17 @@ public class NativePlayerActivity extends Activity {
         title.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
         title.setMaxLines(1);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        title.setPadding(0, 0, dp(8), 0);
         topBar.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1));
 
         closeButton = makeButton("✕");
         closeButton.setTextSize(18);
         closeButton.setContentDescription("Videoyu kapat");
-        closeButton.setMinWidth(dp(40));
+        closeButton.setMinWidth(dp(44));
+        closeButton.setMinimumWidth(dp(44));
+        closeButton.setPadding(0, 0, 0, 0);
+        closeButton.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(42)));
+        closeButton.setElevation(dp(6));
         closeButton.setOnClickListener(v -> finish());
         topBar.addView(closeButton);
 
@@ -368,7 +381,7 @@ public class NativePlayerActivity extends Activity {
         if (isInPictureInPictureMode) {
             if (topBar != null) topBar.setVisibility(View.GONE);
             if (bottomBar != null) bottomBar.setVisibility(View.GONE);
-        } else if (topBar != null && bottomBar != null) {
+        } else {
             showControlsTemporarily();
         }
     }
