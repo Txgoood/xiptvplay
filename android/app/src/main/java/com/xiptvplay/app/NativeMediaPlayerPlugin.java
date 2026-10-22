@@ -32,4 +32,23 @@ public class NativeMediaPlayerPlugin extends Plugin {
             call.reject("Yerel oynatıcı başlatılamadı: " + error.getMessage(), error);
         }
     }
+
+    @com.getcapacitor.annotation.ActivityCallback
+    private void handlePlayerResult(PluginCall call, ActivityResult activityResult) {
+        if (call == null) {
+            return;
+        }
+
+        JSObject result = new JSObject();
+        Intent data = activityResult == null ? null : activityResult.getData();
+        boolean returnedToInline = activityResult != null
+                && activityResult.getResultCode() == Activity.RESULT_OK
+                && data != null
+                && data.getBooleanExtra("returnedToInline", false);
+
+        result.put("started", true);
+        result.put("returnedToInline", returnedToInline);
+        result.put("positionMs", returnedToInline ? data.getLongExtra("positionMs", 0L) : 0L);
+        call.resolve(result);
+    }
 }
