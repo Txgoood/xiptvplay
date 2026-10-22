@@ -59,6 +59,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const nativeLaunchKeyRef = useRef<string | null>(null);
+  const nativeResumePositionRef = useRef(0);
 
   // Playback Auto-Fallback Stage: Always defaults to 'proxy-hls' on open
   const [fallbackStage, setFallbackStage] = useState<FallbackStage>('proxy-hls');
@@ -178,7 +179,6 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     // Default: 'proxy-hls' or 'proxy-native' -> Route through /api/iptv/proxy
     return getProxyUrl(targetRaw);
   }, [media, fallbackStage, rawUrl, getProxyUrl, sampleFallbackUrl, isHttpsEnvironment, isHttpUrl]);
-
   const effectiveUrl = getEffectiveVideoUrl();
 
   // Reset auto-hide timer for overlay controls
@@ -344,7 +344,15 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       ...(nextNextEpisodeUrl ? { nextNextUrl: nextNextEpisodeUrl } : {}),
       ...(nextNextEpisodeTitle ? { nextNextTitle: nextNextEpisodeTitle } : {}),
     })
-      .then(() => onClose())
+      .then((result) => {
+        if (result?.returnedToInline) {
+          nativeResumePositionRef.current = Math.max(0, Number(result.positionMs || 0) / 1000);
+          setNativePlayerUnavailable(true);
+          triggerNotice('Uygulama içi oynatıcıya dönüldü.');
+        } else {
+          onClose();
+        }
+      })
       .catch((error) => {
         nativeLaunchKeyRef.current = null;
         setNativePlayerUnavailable(true);
@@ -357,8 +365,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   useEffect(() => {
     if (Capacitor.getPlatform() === 'android' && isOpen && media && !nativePlayerUnavailable) return;
     if (!isOpen || !media || !videoRef.current) {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
+      if (hlsRef.current) {        hlsRef.current.destroy();
         hlsRef.current = null;
       }
       setIsHlsActive(false);
@@ -433,6 +440,10 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             setHlsLevels(lvls);
           }
           videoElement.playbackRate = playbackSpeed;
+          if (nativeResumePositionRef.current > 0 && Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
+            videoElement.currentTime = Math.min(nativeResumePositionRef.current, Math.max(0, videoElement.duration - 1));
+            nativeResumePositionRef.current = 0;
+          }
           videoElement
             .play()
             .then(() => setIsPlaying(true))
@@ -524,6 +535,15 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       // Native HTML5 Video (206 Range MP4/MKV partial content streams)
       videoElement.src = currentUrl;
       videoElement.playbackRate = playbackSpeed;
+      if (nativeResumePositionRef.current > 0) {
+        const restorePosition = () => {
+          if (Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
+            videoElement.currentTime = Math.min(nativeResumePositionRef.current, Math.max(0, videoElement.duration - 1));
+            nativeResumePositionRef.current = 0;
+          }
+        };
+        videoElement.addEventListener('loadedmetadata', restorePosition, { once: true });
+      }
       videoElement.load();
       videoElement
         .play()
@@ -537,8 +557,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           } else {
             console.warn('[VideoPlayer] Native play rejection:', err);
             triggerNextFallback('native_play_error');
-          }
-        });
+          }        });
       setIsHlsActive(false);
     }
 
@@ -717,8 +736,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       } else {
         // Adjust Volume (0.0 to 1.0)
         const step = deltaY > 0 ? 0.02 : -0.02;
-        setVolume((prev) => {
-          const next = Math.max(0, Math.min(1.0, parseFloat((prev + step).toFixed(2))));
+        setVolume((prev) => {          const next = Math.max(0, Math.min(1.0, parseFloat((prev + step).toFixed(2))));
           if (videoRef.current) {
             videoRef.current.volume = next;
             videoRef.current.muted = next === 0;
@@ -897,8 +915,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                   networkRetryCountRef.current = 0;
                   mediaRetryCountRef.current = 0;
                   setFallbackStage('proxy-hls');
-                  setPlaybackError(null);
-                  triggerNotice('Proxy + HLS.js motoruyla yeniden deneniyor...');
+                  setPlaybackError(null);                  triggerNotice('Proxy + HLS.js motoruyla yeniden deneniyor...');
                 }}
                 className="px-3 py-1.5 rounded-full bg-[#00f0ff] text-[#00363a] font-headline font-bold hover:brightness-110 text-xs cursor-pointer flex items-center gap-1.5 shadow-md"
               >
@@ -1077,8 +1094,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                     setPlaybackError(null);
                     triggerNotice('Proxy + HTML5 Native (206 Range) motoru etkinleştirildi.');
                   }}
-                  className={`py-2 px-1.5 rounded-xl text-[10px] font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-center ${
-                    fallbackStage === 'proxy-native'
+                  className={`py-2 px-1.5 rounded-xl text-[10px] font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-center ${                    fallbackStage === 'proxy-native'
                       ? 'bg-[#00f0ff] text-[#00363a] shadow-[0_0_10px_rgba(0,240,255,0.4)]'
                       : 'bg-[#201f21] hover:bg-[#2a2a2c] text-[#b9cacb]'
                   }`}
@@ -1257,8 +1273,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               </div>
             </div>
 
-            {/* Audio Track */}
-            <div className="flex flex-col gap-1 pt-1 border-t border-white/5">
+            {/* Audio Track */}            <div className="flex flex-col gap-1 pt-1 border-t border-white/5">
               <span className="text-[10px] text-[#b9cacb] uppercase font-bold">Ses İzi</span>
               <div className="flex flex-col gap-1">
                 {['Türkçe (5.1 Dolby)', 'English (Original Atmos)', 'Yayın Varsayılanı'].map((a) => (
@@ -1437,8 +1452,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 <span>{fallbackStage === 'direct' ? 'Ham URL' : 'Proxy'}</span>
               </button>
 
-              {/* Speed Button */}
-              <button
+              {/* Speed Button */}              <button
                 onClick={cycleSpeed}
                 className="px-2 py-0.5 rounded-full bg-[#201f21] hover:bg-[#2a2a2c] text-[#00f0ff] font-mono text-xs font-bold border border-white/5 cursor-pointer"
                 title="Hızı Değiştir"
