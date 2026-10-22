@@ -53,19 +53,10 @@ public class NativePlayerActivity extends Activity {
     }
 
     private void closePlayerAndFinish() {
-        // PiP penceresi kapandığında yalnızca Activity'yi bitirmek bazı cihazlarda
-        // ses akışını bırakabildiğinden önce oynatmayı kesin olarak durdur.
-        if (player != null) {
-            try {
-                player.pause();
-                player.stop();
-                player.clearMediaItems();
-                player.release();
-            } catch (Exception ignored) {
-            }
-            player = null;
+        releasePlayer();
+        if (!isFinishing()) {
+            finishAndRemoveTask();
         }
-        finishAndRemoveTask();
     }
 
     private ExoPlayer player;
@@ -682,23 +673,36 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onStop() {
         savePlaybackPosition();
-        super.onStop();
+        // PiP penceresi sistem tarafından X ile kapatıldığında sesi önce sustur,
+        // PlayerView bağlantısını kes ve ardından ExoPlayer'ı serbest bırak.
+        releasePlayer();
         controlsHandler.removeCallbacks(hideControlsRunnable);
         controlsHandler.removeCallbacks(progressUpdater);
         if (orientationListener != null) orientationListener.disable();
-        releasePlayer();
+        super.onStop();
     }
 
     private void releasePlayer() {
-        if (player != null) {
+        ExoPlayer oldPlayer = player;
+        player = null;
+        if (playerView != null) {
             try {
-                player.pause();
-                player.stop();
-                player.clearMediaItems();
-                player.release();
+                playerView.setPlayer(null);
             } catch (Exception ignored) {
             }
-            player = null;
+        }
+        if (oldPlayer != null) {
+            try {
+                oldPlayer.setVolume(0f);
+                oldPlayer.pause();
+                oldPlayer.stop();
+                oldPlayer.clearMediaItems();
+            } catch (Exception ignored) {
+            }
+            try {
+                oldPlayer.release();
+            } catch (Exception ignored) {
+            }
         }
     }
 
