@@ -39,6 +39,7 @@ import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.ui.PlayerView;
 import androidx.media3.ui.TrackSelectionDialogBuilder;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -158,6 +159,23 @@ public class NativePlayerActivity extends Activity {
             Toast.makeText(this, "Video adresi bulunamadı.", Toast.LENGTH_LONG).show();
             finish();
             return;
+        }
+        boolean isLocalFile = getIntent().getBooleanExtra("isLocalFile", false);
+        if (isLocalFile) {
+            Uri localUri = Uri.parse(url);
+            if (!"file".equalsIgnoreCase(localUri.getScheme()) || localUri.getPath() == null) {
+                Toast.makeText(this, "Çevrimdışı dosya adresi geçersiz.", Toast.LENGTH_LONG).show();
+                finish();
+                return;
+            }
+            File localFile = new File(localUri.getPath());
+            if (!localFile.isFile() || !localFile.canRead() || localFile.length() <= 0L) {
+                Toast.makeText(this, "İndirilen video dosyası telefonda bulunamadı veya okunamıyor.", Toast.LENGTH_LONG).show();
+                finish();
+                return;
+            }
+            // Canonical file URI ensures Media3 receives a local file URI, never an HTTP stream.
+            url = Uri.fromFile(localFile).toString();
         }
         currentUrl = url;
         progressPreferenceKey = "native_player_position_" + Integer.toHexString(url.hashCode());
