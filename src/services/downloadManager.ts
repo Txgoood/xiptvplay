@@ -96,7 +96,7 @@ export async function startDownload(
       // ENOENT önlemek için hedef klasörü indirmeden önce oluştur.
       await Filesystem.mkdir({
         path: 'downloads',
-        directory: Directory.Documents,
+        directory: Directory.Data,
         recursive: true,
       }).catch(async (mkdirError: any) => {
         // Bazı sürümlerde klasör zaten varsa mkdir hata verebilir; varlığını kontrol et.
