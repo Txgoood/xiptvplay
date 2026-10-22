@@ -43,6 +43,15 @@ import java.util.List;
 import java.util.Locale;
 
 public class NativePlayerActivity extends Activity {
+    private static volatile NativePlayerActivity activeInstance;
+
+    public static void closeActivePlayer() {
+        NativePlayerActivity activity = activeInstance;
+        if (activity != null) {
+            activity.runOnUiThread(activity::finish);
+        }
+    }
+
     private ExoPlayer player;
     private PlayerView playerView;
     private FrameLayout root;
@@ -83,6 +92,7 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        activeInstance = this;
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
@@ -651,6 +661,12 @@ public class NativePlayerActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (player != null) player.play();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (activeInstance == this) activeInstance = null;
+        super.onDestroy();
     }
 
     @Override
