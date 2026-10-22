@@ -101,7 +101,7 @@ export async function startDownload(
       }).catch(async (mkdirError: any) => {
         // Bazı sürümlerde klasör zaten varsa mkdir hata verebilir; varlığını kontrol et.
         try {
-          await Filesystem.stat({ path: 'downloads', directory: Directory.Documents });
+          await Filesystem.stat({ path: 'downloads', directory: Directory.Data });
         } catch {
           throw mkdirError;
         }
@@ -112,7 +112,7 @@ export async function startDownload(
       const result = await Filesystem.downloadFile({
         url: rawUrl,
         path: fullPath,
-        directory: Directory.Documents,
+        directory: Directory.Data,
         recursive: true,
         progress: true,
       });
@@ -120,7 +120,7 @@ export async function startDownload(
       if (progressListener) { try { await progressListener.remove(); } catch {} }
 
       const savedPath = result.path || fullPath;
-      const uri = await Filesystem.getUri({ path: savedPath, directory: Directory.Documents });
+      const uri = await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
       const localUrl = Capacitor.convertFileSrc(uri.uri);
       onDone(localUrl, savedPath, uri.uri);
     } catch (err: any) {
