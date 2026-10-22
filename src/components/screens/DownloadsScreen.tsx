@@ -57,6 +57,11 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
   };
 
   const activeCount = downloads.filter((d) => d.status === 'downloading' || d.status === 'queued').length;
+  const formatFileSize = (sizeGb: number) => {
+    const sizeMb = Math.round((Number(sizeGb) || 0) * 1000);
+    return sizeMb < 1000 ? `${sizeMb} MB` : `${(sizeMb / 1000).toFixed(2)} GB`;
+  };
+
   const totalDownloadedGb = downloads.reduce((acc, curr) => acc + (curr.downloadedGb || 0), 0);
   const totalArchiveGb = parseFloat(totalDownloadedGb.toFixed(1));
 
@@ -284,7 +289,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span className="px-1.5 py-0.5 rounded-full bg-[#65f2b5]/20 text-[#4edea3] font-headline text-[10px] font-bold flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3 text-[#4edea3]" />
-                          Tamamlandı ({item.totalSizeGb.toFixed(1)} GB)
+                          Tamamlandı ({formatFileSize(item.totalSizeGb)})
                         </span>
                         <span className="text-[11px] text-[#b9cacb] truncate">Çevrimdışı Hazır</span>
                       </div>
