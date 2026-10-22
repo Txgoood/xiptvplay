@@ -645,8 +645,10 @@ export default function App() {
   };
 
   const handleCancelItem = (id: string) => {
+    // Ekrandaki kaydı silmenin yanında indirme motorundaki bekleyen işi de iptal et.
+    void import('./services/downloadManager').then((dm) => dm.cancelDownload(id));
     setDownloads((prev) => prev.filter((d) => d.id !== id));
-    showToast('İndirme iptal edildi.');
+    showToast('İndirme iptal edildi; kuyruktaki görev kaldırıldı.');
   };
 
   const handlePromoteItem = (id: string) => {
