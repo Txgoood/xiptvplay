@@ -155,12 +155,14 @@ async function runSingleDownload(
 // Capacitor Filesystem'in progress olayı platform genelinde yayıldığından
 // indirmeleri tek tek yürütüp ilerleme olaylarının karışmasını önler.
 type DownloadTask = {
+  id: string;
   item: DownloadItem | MediaItem;
   onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string, totalSizeGb?: number) => void;
   onDone: (localUrl: string, relativePath?: string, fileUri?: string) => void;
   onError: (error: string) => void;
 };
 const downloadQueue: DownloadTask[] = [];
+const cancelledDownloadIds = new Set<string>();
 let queueRunning = false;
 
 export function startDownload(
@@ -169,8 +171,19 @@ export function startDownload(
   onDone: DownloadTask['onDone'],
   onError: DownloadTask['onError']
 ): void {
-  downloadQueue.push({ item, onProgress, onDone, onError });
+  const id = item.id;
+  // İptal isteği startDownload'dan hemen önce geldiyse görevi hiç kuyruğa alma.
+  if (cancelledDownloadIds.has(id)) return;
+  downloadQueue.push({ id, item, onProgress, onDone, onError });
   void processDownloadQueue();
+}
+
+/** Kuyrukta bekleyen indirmeyi gerçekten kaldırır; henüz başlamamış görev ağ kullanmaz. */
+export function cancelDownload(id: string): void {
+  cancelledDownloadIds.add(id);
+  for (let i = downloadQueue.length - 1; i >= 0; i--) {
+    if (downloadQueue[i].id === id) downloadQueue.splice(i, 1);
+  }
 }
 
 async function processDownloadQueue(): Promise<void> {
@@ -179,10 +192,16 @@ async function processDownloadQueue(): Promise<void> {
   try {
     while (downloadQueue.length) {
       const task = downloadQueue.shift()!;
+      if (cancelledDownloadIds.has(task.id)) continue;
       try {
-        await runSingleDownload(task.item, task.onProgress, task.onDone, task.onError);
+        await runSingleDownload(
+          task.item,
+          (...args) => { if (!cancelledDownloadIds.has(task.id)) task.onProgress(...args); },
+          (...args) => { if (!cancelledDownloadIds.has(task.id)) task.onDone(...args); },
+          (error) => { if (!cancelledDownloadIds.has(task.id)) task.onError(error); }
+        );
       } catch (error: any) {
-        task.onError(error?.message || String(error) || 'İndirme başarısız');
+        if (!cancelledDownloadIds.has(task.id)) task.onError(error?.message || String(error) || 'İndirme başarısız');
       }
     }
   } finally {
