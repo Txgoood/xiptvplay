@@ -35,6 +35,7 @@ import androidx.media3.common.Player;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.Tracks;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.ui.PlayerView;
 import androidx.media3.ui.TrackSelectionDialogBuilder;
 
@@ -166,7 +167,13 @@ public class NativePlayerActivity extends Activity {
         nextNextTitle = getIntent().getStringExtra("nextNextTitle");
         nextButton.setVisibility(nextUrl == null || nextUrl.trim().isEmpty() ? View.GONE : View.VISIBLE);
 
-        player = new ExoPlayer.Builder(this).build();
+        int bufferSeconds = Math.max(3, Math.min(45, getIntent().getIntExtra("bufferSeconds", 15)));
+        int minBufferMs = bufferSeconds * 1000;
+        int maxBufferMs = Math.min(90000, Math.max(minBufferMs * 2, 15000));
+        DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
+            .setBufferDurationsMs(minBufferMs, maxBufferMs, Math.min(1500, minBufferMs), Math.min(3000, minBufferMs))
+            .build();
+        player = new ExoPlayer.Builder(this).setLoadControl(loadControl).build();
         // Türkçe izi varsa tercih et; yoksa ExoPlayer varsayılan ses izini seçer.
         player.setTrackSelectionParameters(
             player.getTrackSelectionParameters().buildUpon()
