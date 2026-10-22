@@ -467,13 +467,36 @@ export default function App() {
     handleDownloadMedia(episodeMedia);
   };
 
-  // Dosya yolu paylaşım menüsünü açmadan gösterilir. Android'in uygulama özelindeki
-  // data klasörünü dosya yöneticisinde açmak için ayrı bir yerel Android intent gerekir.
+  // İndirilen dosyayı oynatmadan önce gerçek dosyanın hâlâ cihazda olduğunu doğrula.
+  // İndirme servisi dosyaları Documents/downloads altına kaydeder.
+  const handlePlayDownloadedItem = async (item: DownloadItem) => {
+    const relativePath = item.offlinePath;
+    if (relativePath) {
+      try {
+        await Filesystem.stat({ path: relativePath, directory: Directory.Documents });
+        const uriResult = await Filesystem.getUri({ path: relativePath, directory: Directory.Documents });
+        const localFileUri = uriResult.uri;
+        const localUrl = Filesystem ? (await import('@capacitor/core')).Capacitor.convertFileSrc(localFileUri) : localFileUri;
+        setActivePlayerMedia({ ...item, fileUri: localFileUri, localUrl });
+        showToast('İndirilen dosya telefondan açılıyor; internetten yeniden indirilmeyecek.');
+        return;
+      } catch (err) {
+        console.warn('[Downloads] Yerel dosya bulunamadı; çevrimiçi kaynağa geçiliyor.', err);
+      }
+    }
+
+    // Dosya silinmişse, varsa kayıtlı akış adresiyle çevrimiçi oynat.
+    const { localUrl: _localUrl, fileUri: _fileUri, offlinePath: _offlinePath, ...onlineItem } = item;
+    setActivePlayerMedia(onlineItem);
+    showToast('Yerel dosya bulunamadı. İnternet üzerinden oynatılacak.');
+  };
+
+  // Dosyanın konumunu göster; indirme servisi Documents/downloads kullanır.
   const handleOpenDownloadedFile = async (item: DownloadItem) => {
     try {
       let fileUri = item.fileUri;
       if (!fileUri && item.offlinePath) {
-        const result = await Filesystem.getUri({ path: item.offlinePath, directory: Directory.Data });
+        const result = await Filesystem.getUri({ path: item.offlinePath, directory: Directory.Documents });
         fileUri = result.uri;
       }
       const path = item.offlinePath || fileUri;
@@ -663,7 +686,7 @@ export default function App() {
               <DownloadsScreen
                 downloads={downloads}
                 stats={stats}
-                onPlayMedia={(download) => setActivePlayerMedia(download)}
+                onPlayMedia={handlePlayDownloadedItem}
                 onOpenDownloadedFile={handleOpenDownloadedFile}
                 onPauseAll={handlePauseAll}
                 onResumeAll={handleResumeAll}
