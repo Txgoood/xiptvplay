@@ -680,12 +680,6 @@ public class NativePlayerActivity extends Activity {
     }
 
     @Override
-    protected void onDestroy() {
-        if (activeInstance == this) activeInstance = null;
-        super.onDestroy();
-    }
-
-    @Override
     protected void onStop() {
         savePlaybackPosition();
         super.onStop();
