@@ -2,6 +2,7 @@ package com.xiptvplay.app;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.net.Uri;
@@ -177,14 +178,16 @@ public class NativePlayerActivity extends Activity {
 
         TextView title = new TextView(this);
         title.setText(getIntent().getStringExtra("title") == null ? "XIPTV Play" : getIntent().getStringExtra("title"));
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(15);
+        title.setTextColor(Color.WHITE);        title.setTextSize(15);
         title.setMaxLines(1);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         topBar.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1));
 
         fullscreenButton = makeButton("⛶ Tam ekran");
-        fullscreenButton.setOnClickListener(v -> setFullscreen(!fullscreen));
+        fullscreenButton.setOnClickListener(v -> {
+            if (fullscreen) returnToInlinePlayer();
+            else setFullscreen(true);
+        });
         topBar.addView(fullscreenButton);
 
         bottomBar = new LinearLayout(this);
@@ -290,6 +293,19 @@ public class NativePlayerActivity extends Activity {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    private void returnToInlinePlayer() {
+        Intent result = new Intent();
+        result.putExtra("returnedToInline", true);
+        result.putExtra("positionMs", player == null ? 0L : Math.max(0L, player.getCurrentPosition()));
+        setResult(RESULT_OK, result);
+        finish();
+    }
+
+    @Override
+    public void onBackPressed() {
+        returnToInlinePlayer();
+    }
+
     private void setFullscreen(boolean enabled) {
         fullscreen = enabled;
         changingOrientation = true;
@@ -357,8 +373,7 @@ public class NativePlayerActivity extends Activity {
                 hasTextTracks = true;
                 break;
             }
-        }
-        if (!hasTextTracks) {
+        }        if (!hasTextTracks) {
             Toast.makeText(this, "Bu yayında seçilebilir altyazı izi bulunamadı.", Toast.LENGTH_SHORT).show();
             return;
         }
