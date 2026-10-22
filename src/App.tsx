@@ -311,10 +311,10 @@ export default function App() {
       id: `dl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       mediaId: item.id,
       title: item.title,
-      subtitle: `${item.category} • ${item.resolution} • ${item.fileSizeGb || 1.8} GB`,
+      subtitle: `${item.category} • ${item.resolution} • ${item.fileSizeGb && item.fileSizeGb > 0 ? `${item.fileSizeGb.toFixed(2)} GB` : 'Boyut bekleniyor'}`, 
       type: item.type === 'movie' ? 'movie' : 'series',
       resolutionBadge: item.resolution,
-      totalSizeGb: item.fileSizeGb || 1.8,
+      totalSizeGb: item.fileSizeGb && item.fileSizeGb > 0 ? item.fileSizeGb : 0,
       downloadedGb: 0,
       speedMbps: 0,
       eta: '0s',
@@ -332,8 +332,21 @@ export default function App() {
     import('./services/downloadManager').then(dm => {
         dm.startDownload(
             newDownload,
-            (progress, downloadedGb, speedMbps, eta) => {
-                setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, progressPercent: progress, downloadedGb, speedMbps, eta } : d));
+            (progress, downloadedGb, speedMbps, eta, reportedTotalSizeGb) => {
+                setDownloads(prev => prev.map(d => {
+                  if (d.id !== newDownload.id) return d;
+                  const totalSizeGb = reportedTotalSizeGb && reportedTotalSizeGb > 0 ? reportedTotalSizeGb : d.totalSizeGb;
+                  const sizeLabel = totalSizeGb > 0 ? `${totalSizeGb.toFixed(2)} GB` : 'Boyut bekleniyor';
+                  return {
+                    ...d,
+                    progressPercent: progress,
+                    downloadedGb,
+                    speedMbps,
+                    eta,
+                    totalSizeGb,
+                    subtitle: `${item.category} • ${item.resolution} • ${sizeLabel}`,
+                  };
+                }));
             },
             (localUrl, relativePath, fileUri) => {
                 (async () => {
@@ -484,7 +497,7 @@ export default function App() {
       poster: episode.image || seriesItem.poster,
       streamUrl: finalStreamUrl,
       rawStreamUrl: directUrl || episode.rawStreamUrl,
-      fileSizeGb: 1.2,
+      fileSizeGb: 0,
       audioTracks: ['Türkçe Dublaj', 'English (Dolby)'],
       subtitles: ['Türkçe', 'English', 'Off'],
       containerExtension: episode.containerExtension || 'mp4',
