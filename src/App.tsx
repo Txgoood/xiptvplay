@@ -771,7 +771,7 @@ export default function App() {
                 onPlayMedia={(item) => setActivePlayerMedia(item)}
                 onDownloadMedia={handleDownloadMedia}
                 onToggleFavorite={handleToggleFavorite}
-                onOpenSeriesDetail={(item) => setSelectedSeriesItem(item)}
+                onOpenSeriesDetail={(item) => { setCatalogTargetSeason(undefined); setSelectedSeriesItem(item); }}
                 isCatalogLoading={isCatalogLoading}
               />
             )}
@@ -844,7 +844,7 @@ export default function App() {
         seriesItem={selectedSeriesItem}
         activePlaylist={activePlaylist}
         isOpen={!!selectedSeriesItem}
-        onClose={() => setSelectedSeriesItem(null)}
+        onClose={() => { setSelectedSeriesItem(null); setCatalogTargetSeason(undefined); }}
         onPlayEpisode={handlePlayEpisode}
         onDownloadEpisode={handleDownloadEpisode}
         initialSeason={catalogTargetSeason}
