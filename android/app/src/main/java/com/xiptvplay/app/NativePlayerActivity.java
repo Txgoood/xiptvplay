@@ -347,12 +347,6 @@ public class NativePlayerActivity extends Activity {
     }
 
     @Override
-    protected void onStop() {
-        savePlaybackPosition();
-        super.onStop();
-    }
-
-    @Override
     public void onUserLeaveHint() {
         super.onUserLeaveHint();
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
@@ -634,6 +628,7 @@ public class NativePlayerActivity extends Activity {
 
     @Override
     protected void onStop() {
+        savePlaybackPosition();
         super.onStop();
         controlsHandler.removeCallbacks(hideControlsRunnable);
         controlsHandler.removeCallbacks(progressUpdater);
