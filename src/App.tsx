@@ -494,7 +494,7 @@ export default function App() {
   };
 
   // İndirilen dosyayı oynatmadan önce gerçek dosyanın hâlâ cihazda olduğunu doğrula.
-  // İndirme servisi dosyaları Documents/downloads altına kaydeder.
+  // Yeni indirmeler Data/downloads altına kaydedilir; eski Documents kayıtları da desteklenir.
   const handlePlayDownloadedItem = async (item: DownloadItem) => {
     const relativePath = item.offlinePath;
     if (relativePath) {
@@ -537,8 +537,13 @@ export default function App() {
     try {
       let fileUri = item.fileUri;
       if (!fileUri && item.offlinePath) {
-        const result = await Filesystem.getUri({ path: item.offlinePath, directory: Directory.Documents });
-        fileUri = result.uri;
+        try {
+          const result = await Filesystem.getUri({ path: item.offlinePath, directory: Directory.Data });
+          fileUri = result.uri;
+        } catch {
+          const result = await Filesystem.getUri({ path: item.offlinePath, directory: Directory.Documents });
+          fileUri = result.uri;
+        }
       }
       const path = item.offlinePath || fileUri;
       if (!path) {
