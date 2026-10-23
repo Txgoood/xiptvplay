@@ -637,13 +637,12 @@ export default function App() {
   };
 
   const handleCancelItem = (id: string) => {
-    // Bekleyen görev kuyruktan çıkarılır; aktif yerel indirmeyi iptal etme henüz desteklenmiyor.
     const item = downloads.find(d => d.id === id);
     void import('./services/downloadManager').then(dm => dm.cancelDownload(id));
     setDownloads(prev => prev.filter(d => d.id !== id));
     showToast(item?.status === 'queued'
       ? 'Bekleyen indirme kuyruktan kaldırıldı.'
-      : 'İndirme kaydı kaldırıldı. Aktif indirme ağ işlemi bazı cihazlarda arka planda sürebilir.');
+      : 'İndirme iptal ediliyor; ağ bağlantısı kesiliyor.');
   };
 
   const handlePromoteItem = (id: string) => {
