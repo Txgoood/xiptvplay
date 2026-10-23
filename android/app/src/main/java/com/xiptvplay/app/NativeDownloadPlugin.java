@@ -8,6 +8,8 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -47,17 +49,20 @@ public class NativeDownloadPlugin extends Plugin {
                 target = new File(base, safeName);
                 HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
                 connections.put(id, connection);
-                connection.setConnectTimeout(20000);
-                connection.setReadTimeout(20000);
+                connection.setConnectTimeout(30000);
+                // IPTV sunucuları bazen uzun süre veri göndermeden bekletebilir.
+                // 20 saniyelik read timeout büyük dosyalarda indirmeyi gereksiz kesiyordu.
+                connection.setReadTimeout(120000);
                 connection.setInstanceFollowRedirects(true);
                 connection.setRequestProperty("Accept-Encoding", "identity");
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36");
                 connection.connect();
                 int code = connection.getResponseCode();
                 if (code < 200 || code >= 300) throw new Exception("Sunucu HTTP " + code + " yanıtı verdi.");
                 long total = connection.getContentLengthLong();
-                input = connection.getInputStream();
-                output = new FileOutputStream(target, false);
-                byte[] buffer = new byte[64 * 1024];
+                input = new BufferedInputStream(connection.getInputStream(), 256 * 1024);
+                output = new BufferedOutputStream(new FileOutputStream(target, false), 256 * 1024);
+                byte[] buffer = new byte[256 * 1024];
                 long received = 0;
                 long lastEmit = 0;
                 int count;
