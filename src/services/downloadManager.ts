@@ -164,6 +164,7 @@ type DownloadTask = {
 };
 const downloadQueue: DownloadTask[] = [];
 const cancelledDownloadIds = new Set<string>();
+const activeDownloadIds = new Set<string>();
 let queueRunning = false;
 
 export function startDownload(
