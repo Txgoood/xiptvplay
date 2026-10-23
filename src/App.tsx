@@ -321,8 +321,8 @@ export default function App() {
       speedMbps: 0,
       eta: '0s',
       progressPercent: 0,
-      status: 'downloading',
-      statusLabel: 'İniyor',
+      status: 'queued',
+      statusLabel: 'Sırada bekliyor',
       poster: item.poster,
       streamUrl: item.streamUrl,
       rawStreamUrl: item.rawStreamUrl || item.streamUrl,
@@ -386,6 +386,15 @@ export default function App() {
             (error) => {
                 setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, status: 'error', statusLabel: 'Hata', errorMessage: error } : d));
                 showToast(`İndirme hatası: ${error}`);
+            },
+            (status, queueOrder) => {
+              setDownloads(prev => prev.map(d => d.id === newDownload.id ? {
+                ...d,
+                status,
+                statusLabel: status === 'downloading' ? 'İniyor' : 'Sırada bekliyor',
+                queueOrder: status === 'queued' ? queueOrder : undefined,
+                speedMbps: status === 'queued' ? 0 : d.speedMbps,
+              } : d));
             }
         );
     });
@@ -606,21 +615,11 @@ export default function App() {
 
   // Downloads Batch Actions
   const handlePauseAll = () => {
-    setDownloads((prev) =>
-      prev.map((d) => (d.status === 'downloading' ? { ...d, status: 'paused', speedMbps: 0 } : d))
-    );
-    showToast('Tüm aktif indirmeler duraklatıldı.');
+    showToast('Gerçek duraklat/devam özelliği bu indirme altyapısında henüz desteklenmiyor. İndirmeyi iptal edip yeniden başlatabilirsiniz.');
   };
 
   const handleResumeAll = () => {
-    setDownloads((prev) =>
-      prev.map((d) =>
-        d.status === 'paused'
-          ? { ...d, status: 'downloading', speedMbps: parseFloat((Math.random() * 5 + 6).toFixed(1)) }
-          : d
-      )
-    );
-    showToast('İndirmeler kaldığı bayt noktasından devam ediyor.');
+    showToast('Gerçek kaldığı yerden devam özelliği henüz desteklenmiyor; yanıltıcı durum göstermek yerine indirmeyi yeniden başlatın.');
   };
 
   const handleClearCompleted = () => {
@@ -629,44 +628,45 @@ export default function App() {
   };
 
   const handleTogglePauseItem = (id: string) => {
-    setDownloads((prev) =>
-      prev.map((d) => {
-        if (d.id === id) {
-          if (d.status === 'downloading') {
-            return { ...d, status: 'paused', speedMbps: 0 };
-          }
-          if (d.status === 'paused') {
-            return { ...d, status: 'downloading', speedMbps: 8.2 };
-          }
-        }
-        return d;
-      })
-    );
+    const item = downloads.find(d => d.id === id);
+    if (item?.status === 'queued') {
+      handleCancelItem(id);
+      return;
+    }
+    showToast('Gerçek duraklat/devam özelliği henüz desteklenmiyor. Aktif indirme için bu düğme indirmeyi durdurmaz.');
   };
 
   const handleCancelItem = (id: string) => {
-    // Ekrandaki kaydı silmenin yanında indirme motorundaki bekleyen işi de iptal et.
-    void import('./services/downloadManager').then((dm) => dm.cancelDownload(id));
-    setDownloads((prev) => prev.filter((d) => d.id !== id));
-    showToast('İndirme iptal edildi; kuyruktaki görev kaldırıldı.');
+    // Bekleyen görev kuyruktan çıkarılır; aktif yerel indirmeyi iptal etme henüz desteklenmiyor.
+    const item = downloads.find(d => d.id === id);
+    void import('./services/downloadManager').then(dm => dm.cancelDownload(id));
+    setDownloads(prev => prev.filter(d => d.id !== id));
+    showToast(item?.status === 'queued'
+      ? 'Bekleyen indirme kuyruktan kaldırıldı.'
+      : 'İndirme kaydı kaldırıldı. Aktif indirme ağ işlemi bazı cihazlarda arka planda sürebilir.');
   };
 
   const handlePromoteItem = (id: string) => {
-    setDownloads((prev) =>
-      prev.map((d) => {
-        if (d.id === id && d.status === 'queued') {
-          return {
-            ...d,
-            status: 'downloading',
-            speedMbps: 8.5,
-            queueOrder: undefined,
-            eta: '3d 40s',
-          };
-        }
-        return d;
-      })
-    );
-    showToast('İndirme sırası en öne alındı!');
+    void import('./services/downloadManager').then(dm => {
+      const promoted = dm.promoteDownload(id);
+      if (promoted) {
+        setDownloads(prev => {
+          const target = prev.find(d => d.id === id);
+          if (!target || target.status !== 'queued') return prev;
+          const queued = prev.filter(d => d.status === 'queued' && d.id !== id);
+          const others = prev.filter(d => d.status !== 'queued');
+          return [
+            ...others.filter(d => d.status === 'downloading'),
+            { ...target, queueOrder: 1 },
+            ...queued.map((d, index) => ({ ...d, queueOrder: index + 2 })),
+            ...others.filter(d => d.status !== 'downloading'),
+          ];
+        });
+        showToast('Bekleyen indirme kuyruğun başına alındı; mevcut indirme bitince başlayacak.');
+      } else {
+        showToast('Bu içerik artık kuyrukta beklemiyor.');
+      }
+    });
   };
 
   // Clear Storage and Reset
