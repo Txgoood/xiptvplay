@@ -160,6 +160,7 @@ type DownloadTask = {
   onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string, totalSizeGb?: number) => void;
   onDone: (localUrl: string, relativePath?: string, fileUri?: string) => void;
   onError: (error: string) => void;
+  onState?: (status: 'queued' | 'downloading', queueOrder?: number) => void;
 };
 const downloadQueue: DownloadTask[] = [];
 const cancelledDownloadIds = new Set<string>();
