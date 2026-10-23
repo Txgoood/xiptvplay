@@ -109,13 +109,32 @@ async function runSingleDownload(
 
       progressListener = await Filesystem.addListener('progress', progressHandler);
 
-      const result = await Filesystem.downloadFile({
-        url: rawUrl,
-        path: fullPath,
-        directory: Directory.Data,
-        recursive: true,
-        progress: true,
-      });
+      // Keep the previously working Capacitor downloader. Retry once only for
+      // transient connection resets; clear a partial file before retrying.
+      let result: any;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          result = await Filesystem.downloadFile({
+            url: rawUrl,
+            path: fullPath,
+            directory: Directory.Data,
+            recursive: true,
+            progress: true,
+          });
+          break;
+        } catch (downloadError: any) {
+          const message = String(downloadError?.message || downloadError || '');
+          const transient = /connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end/i.test(message);
+          if (attempt > 0 || !transient) throw downloadError;
+          try {
+            await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data });
+          } catch {
+            // The first attempt may have failed before creating a file.
+          }
+          console.warn('[DownloadManager] Temporary network error; retrying once:', message);
+        }
+      }
+      if (!result) throw new Error('İndirme tamamlanamadı; bağlantı hatası sonrası tekrar denendi.');
 
       if (progressListener) { try { await progressListener.remove(); } catch {} }
 
