@@ -12,6 +12,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,7 +40,7 @@ public class NativeDownloadPlugin extends Plugin {
         final AtomicBoolean cancelled = new AtomicBoolean(false);
         cancellations.put(id, cancelled);
         executor.execute(() -> {
-            FileOutputStream output = null;
+            OutputStream output = null;
             InputStream input = null;
             File target = null;
             try {
