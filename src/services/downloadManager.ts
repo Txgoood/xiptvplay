@@ -169,13 +169,32 @@ export function startDownload(
   item: DownloadItem | MediaItem,
   onProgress: DownloadTask['onProgress'],
   onDone: DownloadTask['onDone'],
-  onError: DownloadTask['onError']
+  onError: DownloadTask['onError'],
+  onState?: DownloadTask['onState']
 ): void {
   const id = item.id;
   // İptal isteği startDownload'dan hemen önce geldiyse görevi hiç kuyruğa alma.
   if (cancelledDownloadIds.has(id)) return;
-  downloadQueue.push({ id, item, onProgress, onDone, onError });
+  const task: DownloadTask = { id, item, onProgress, onDone, onError, onState };
+  downloadQueue.push(task);
+  onState?.('queued', downloadQueue.length + (queueRunning ? 1 : 0));
+  refreshQueuePositions();
   void processDownloadQueue();
+}
+
+/** Kuyruk sırasını ekrandaki sırayla senkron tutar. */
+function refreshQueuePositions(): void {
+  downloadQueue.forEach((task, index) => task.onState?.('queued', index + 1));
+}
+
+/** Bekleyen görevi kuyruğun başına alır; aktif indirme kesilmez. */
+export function promoteDownload(id: string): boolean {
+  const index = downloadQueue.findIndex((task) => task.id === id);
+  if (index < 0) return false;
+  const [task] = downloadQueue.splice(index, 1);
+  downloadQueue.unshift(task);
+  refreshQueuePositions();
+  return true;
 }
 
 /** Kuyrukta bekleyen indirmeyi gerçekten kaldırır; henüz başlamamış görev ağ kullanmaz. */
@@ -184,6 +203,7 @@ export function cancelDownload(id: string): void {
   for (let i = downloadQueue.length - 1; i >= 0; i--) {
     if (downloadQueue[i].id === id) downloadQueue.splice(i, 1);
   }
+  refreshQueuePositions();
 }
 
 async function processDownloadQueue(): Promise<void> {
@@ -193,6 +213,8 @@ async function processDownloadQueue(): Promise<void> {
     while (downloadQueue.length) {
       const task = downloadQueue.shift()!;
       if (cancelledDownloadIds.has(task.id)) continue;
+      task.onState?.('downloading');
+      refreshQueuePositions();
       try {
         await runSingleDownload(
           task.item,
