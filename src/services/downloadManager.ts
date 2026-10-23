@@ -101,7 +101,10 @@ async function runSingleDownload(
       });
 
       // Kullanıcı, klasör hazırlanırken iptal etmiş olabilir.
-      if (cancelledDownloadIds.has(item.id)) return;
+      if (cancelledDownloadIds.has(item.id)) {
+        if (progressListener) { try { await progressListener.remove(); } catch {} progressListener = null; }
+        return;
+      }
       const result = await NativeDownload.downloadFile({ id: item.id, url: rawUrl, path: fullPath });
       if (progressListener) { try { await progressListener.remove(); } catch {} progressListener = null; }
       const savedPath = result.path || fullPath;
