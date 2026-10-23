@@ -140,6 +140,7 @@ type DownloadTask = {
 };
 const downloadQueue: DownloadTask[] = [];
 const cancelledDownloadIds = new Set<string>();
+const activeDownloadIds = new Set<string>();
 let queueRunning = false;
 
 export function startDownload(
@@ -150,8 +151,8 @@ export function startDownload(
   onState?: DownloadTask['onState']
 ): void {
   const id = item.id;
-  // İptal isteği startDownload'dan hemen önce geldiyse görevi hiç kuyruğa alma.
-  if (cancelledDownloadIds.has(id)) return;
+  // Aynı içerik için eski bir iptal işareti kalmışsa yeni indirmeyi engelleme.
+  cancelledDownloadIds.delete(id);
   const task: DownloadTask = { id, item, onProgress, onDone, onError, onState };
   downloadQueue.push(task);
   onState?.('queued', downloadQueue.length + (queueRunning ? 1 : 0));
@@ -174,11 +175,20 @@ export function promoteDownload(id: string): boolean {
   return true;
 }
 
-/** Kuyrukta bekleyen indirmeyi gerçekten kaldırır; henüz başlamamış görev ağ kullanmaz. */
+/** Bekleyen görevi kuyruktan kaldırır; aktif yerel indirme için native bağlantıyı da keser. */
 export function cancelDownload(id: string): void {
-  cancelledDownloadIds.add(id);
+  let removedFromQueue = false;
   for (let i = downloadQueue.length - 1; i >= 0; i--) {
-    if (downloadQueue[i].id === id) downloadQueue.splice(i, 1);
+    if (downloadQueue[i].id === id) {
+      downloadQueue.splice(i, 1);
+      removedFromQueue = true;
+    }
+  }
+  if (activeDownloadIds.has(id)) {
+    cancelledDownloadIds.add(id);
+    void NativeDownload.cancelDownload({ id }).catch(() => {});
+  } else if (removedFromQueue) {
+    cancelledDownloadIds.delete(id);
   }
   refreshQueuePositions();
 }
@@ -191,6 +201,7 @@ async function processDownloadQueue(): Promise<void> {
       const task = downloadQueue.shift()!;
       if (cancelledDownloadIds.has(task.id)) continue;
       task.onState?.('downloading');
+      activeDownloadIds.add(task.id);
       refreshQueuePositions();
       try {
         await runSingleDownload(
@@ -201,6 +212,9 @@ async function processDownloadQueue(): Promise<void> {
         );
       } catch (error: any) {
         if (!cancelledDownloadIds.has(task.id)) task.onError(error?.message || String(error) || 'İndirme başarısız');
+      } finally {
+        activeDownloadIds.delete(task.id);
+        cancelledDownloadIds.delete(task.id);
       }
     }
   } finally {
