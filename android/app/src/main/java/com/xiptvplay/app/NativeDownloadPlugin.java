@@ -51,12 +51,12 @@ public class NativeDownloadPlugin extends Plugin {
                 HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
                 connections.put(id, connection);
                 connection.setConnectTimeout(30000);
-                // IPTV sunucuları bazen uzun süre veri göndermeden bekletebilir.
-                // 20 saniyelik read timeout büyük dosyalarda indirmeyi gereksiz kesiyordu.
-                connection.setReadTimeout(120000);
+                // Veri akışı durduğunda 2 dakika boyunca ekranda donmuş gibi kalmasın.
+                // Uzun sessizlikleri daha erken yakalamak için okuma zaman aşımı 30 saniye.
+                connection.setReadTimeout(30000);
                 connection.setInstanceFollowRedirects(true);
                 connection.setRequestProperty("Accept-Encoding", "identity");
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36");
+
                 connection.connect();
                 int code = connection.getResponseCode();
                 if (code < 200 || code >= 300) throw new Exception("Sunucu HTTP " + code + " yanıtı verdi.");
