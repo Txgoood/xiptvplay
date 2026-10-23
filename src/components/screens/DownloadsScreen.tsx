@@ -281,14 +281,27 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                       <span>{isPaused ? 'Beklemede' : item.status === 'error' ? (item.errorMessage || 'İndirme başarısız') : `Kalan: ${item.eta}`}</span>
                     </div>
 
-                    <div className="w-full h-2 rounded-full bg-[#2a2a2c] mt-2 overflow-hidden relative border border-white/5">
+                    <div className="flex items-center justify-between mt-2 mb-1">
+                      <span className="text-[10px] text-[#849495]">İndirme ilerlemesi</span>
+                      <span className={`text-[11px] font-bold tabular-nums ${isPaused ? 'text-[#849495]' : 'text-[#7df4ff]'}`}>
+                        {Math.max(0, Math.min(100, Math.round(item.progressPercent || 0)))}%
+                      </span>
+                    </div>
+                    <div
+                      className="w-full h-1.5 rounded-full bg-[#2a2a2c] overflow-hidden relative border border-white/5"
+                      role="progressbar"
+                      aria-label={`İndirme ilerlemesi: ${item.title}`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.max(0, Math.min(100, Math.round(item.progressPercent || 0)))}
+                    >
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${
+                        className={`h-full rounded-full transition-all duration-300 ${
                           isPaused
                             ? 'bg-[#849495]'
-                            : 'bg-gradient-to-r from-[#0566d9] via-[#00f0ff] to-[#7df4ff] shadow-[0_0_10px_rgba(0,240,255,0.7)]'
+                            : 'bg-gradient-to-r from-[#0566d9] via-[#00f0ff] to-[#7df4ff] shadow-[0_0_8px_rgba(0,240,255,0.6)]'
                         }`}
-                        style={{ width: `${item.progressPercent}%` }}
+                        style={{ width: `${Math.max(0, Math.min(100, item.progressPercent || 0))}%` }}
                       ></div>
                     </div>
                   </div>
