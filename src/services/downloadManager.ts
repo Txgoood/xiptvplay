@@ -1,6 +1,16 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { registerPlugin } from '@capacitor/core';
 import { DownloadItem, MediaItem } from '../types';
+
+type NativeDownloadProgress = { id: string; bytes: number; contentLength: number };
+type NativeDownloadResult = { path: string; fileUri: string; bytes: number };
+type NativeDownloadPluginType = {
+  downloadFile(options: { id: string; url: string; path: string }): Promise<NativeDownloadResult>;
+  cancelDownload(options: { id: string }): Promise<void>;
+  addListener(eventName: 'downloadProgress', listenerFunc: (event: NativeDownloadProgress) => void): Promise<{ remove: () => Promise<void> }>;
+};
+const NativeDownload = registerPlugin<NativeDownloadPluginType>('NativeDownload');
 
 export const isNative = (): boolean => {
   try {
@@ -65,80 +75,46 @@ async function runSingleDownload(
     let lastBytes = 0;
     let lastTime = Date.now();
     let smoothedBytesPerSecond = 0;
-
-    const progressHandler = (progress: any) => {
-      const bytes = Number(progress.bytes ?? progress.receivedBytes ?? 0);
-      const contentLength = Number(progress.contentLength ?? progress.totalBytes ?? 0);
-      const percent = contentLength > 0 ? Math.round((bytes / contentLength) * 100) : 0;
-      const downloadedGb = bytes / 1e9;
-
-      const now = Date.now();
-      const dt = (now - lastTime) / 1000;
-      const deltaBytes = Math.max(0, bytes - lastBytes);
-      const instantaneousBps = dt > 0 ? deltaBytes / dt : 0;
-      // ETA tek bir yavaş/hızlı ölçümle zıplamasın diye son ölçümleri yumuşat.
-      smoothedBytesPerSecond = smoothedBytesPerSecond === 0
-        ? instantaneousBps
-        : (smoothedBytesPerSecond * 0.72) + (instantaneousBps * 0.28);
-      const speedMbps = (smoothedBytesPerSecond * 8) / 1e6;
-      lastBytes = Math.max(lastBytes, bytes);
-      lastTime = now;
-
-      const remainingBytes = contentLength > 0 ? Math.max(0, contentLength - bytes) : 0;
-      const etaSec = smoothedBytesPerSecond > 0 && remainingBytes > 0 ? remainingBytes / smoothedBytesPerSecond : 0;
-      const eta = contentLength <= 0 ? 'Boyut bekleniyor' : (etaSec > 0 ? formatEta(etaSec) : (percent >= 100 ? 'Tamamlanıyor' : 'Hesaplanıyor'));
-
-      onProgress(Math.min(percent, 100), downloadedGb, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1_000_000_000 : undefined);
-    };
-
-    let progressListener: any = null;
+    let progressListener: { remove: () => Promise<void> } | null = null;
     try {
-      // ENOENT önlemek için hedef klasörü indirmeden önce oluştur.
-      await Filesystem.mkdir({
-        path: 'downloads',
-        directory: Directory.Data,
-        recursive: true,
-      }).catch(async (mkdirError: any) => {
-        // Bazı sürümlerde klasör zaten varsa mkdir hata verebilir; varlığını kontrol et.
-        try {
-          await Filesystem.stat({ path: 'downloads', directory: Directory.Data });
-        } catch {
-          throw mkdirError;
-        }
+      const baseDir = 'downloads';
+      await Filesystem.mkdir({ path: baseDir, directory: Directory.Data, recursive: true }).catch(async (mkdirError: any) => {
+        try { await Filesystem.stat({ path: baseDir, directory: Directory.Data }); } catch { throw mkdirError; }
       });
 
-      progressListener = await Filesystem.addListener('progress', progressHandler);
-
-      const result = await Filesystem.downloadFile({
-        url: rawUrl,
-        path: fullPath,
-        directory: Directory.Data,
-        recursive: true,
-        progress: true,
+      progressListener = await NativeDownload.addListener('downloadProgress', (event) => {
+        if (event.id !== item.id) return;
+        const bytes = Math.max(0, Number(event.bytes || 0));
+        const contentLength = Math.max(0, Number(event.contentLength || 0));
+        const percent = contentLength > 0 ? Math.min(100, Math.round((bytes / contentLength) * 100)) : 0;
+        const now = Date.now();
+        const dt = Math.max(0.001, (now - lastTime) / 1000);
+        const instantaneousBps = Math.max(0, bytes - lastBytes) / dt;
+        smoothedBytesPerSecond = smoothedBytesPerSecond === 0 ? instantaneousBps : smoothedBytesPerSecond * 0.72 + instantaneousBps * 0.28;
+        const speedMbps = smoothedBytesPerSecond / 1e6;
+        const remainingBytes = contentLength > 0 ? Math.max(0, contentLength - bytes) : 0;
+        const etaSec = smoothedBytesPerSecond > 0 && remainingBytes > 0 ? remainingBytes / smoothedBytesPerSecond : 0;
+        const eta = contentLength <= 0 ? 'Boyut bekleniyor' : etaSec > 0 ? formatEta(etaSec) : percent >= 100 ? 'Tamamlanıyor' : 'Hesaplanıyor';
+        lastBytes = bytes;
+        lastTime = now;
+        onProgress(percent, bytes / 1e9, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1e9 : undefined);
       });
 
-      if (progressListener) { try { await progressListener.remove(); } catch {} }
-
-      // Use the requested relative path, not result.path: on some Capacitor versions
-      // result.path can be an absolute native path that Filesystem.stat/getUri cannot
-      // resolve relative to Directory.Data.
-      const savedPath = fullPath;
-      const fileInfo = await Filesystem.stat({ path: savedPath, directory: Directory.Data });
-      const actualBytes = Number(fileInfo.size || 0);
-      if (!Number.isFinite(actualBytes) || actualBytes <= 0) {
-        throw new Error('İndirilen dosya boş görünüyor; dosya doğrulanamadı.');
+      const result = await NativeDownload.downloadFile({ id: item.id, url: rawUrl, path: fullPath });
+      if (progressListener) { try { await progressListener.remove(); } catch {} progressListener = null; }
+      const savedPath = result.path || fullPath;
+      const fileUri = result.fileUri;
+      if (!fileUri || !fileUri.startsWith('file://') || !result.bytes || result.bytes <= 0) {
+        throw new Error('İndirilen dosya doğrulanamadı.');
       }
-      const uri = await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
-      if (!uri.uri || !uri.uri.startsWith('file://')) {
-        throw new Error('Yerel dosya adresi doğrulanamadı.');
-      }
-      const localUrl = Capacitor.convertFileSrc(uri.uri);
-      onDone(localUrl, savedPath, uri.uri);
+      onProgress(100, result.bytes / 1e9, 0, 'Tamamlandı', result.bytes / 1e9);
+      onDone(Capacitor.convertFileSrc(fileUri), savedPath, fileUri);
     } catch (err: any) {
       if (progressListener) { try { await progressListener.remove(); } catch {} }
       const message = err?.message || String(err) || 'İndirme başarısız';
-      onError(`İndirme başarısız: ${message}`);
+      onError(message);
     }
+
   } else {
     // WEB (localhost): tarayıcı indirmesi, proxy üzerinden
     const a = document.createElement('a');
