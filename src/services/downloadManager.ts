@@ -100,6 +100,8 @@ async function runSingleDownload(
         onProgress(percent, bytes / 1e9, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1e9 : undefined);
       });
 
+      // Kullanıcı, klasör hazırlanırken iptal etmiş olabilir.
+      if (cancelledDownloadIds.has(item.id)) return;
       const result = await NativeDownload.downloadFile({ id: item.id, url: rawUrl, path: fullPath });
       if (progressListener) { try { await progressListener.remove(); } catch {} progressListener = null; }
       const savedPath = result.path || fullPath;
