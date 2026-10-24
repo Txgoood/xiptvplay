@@ -88,7 +88,7 @@ async function runSingleDownload(
         };
         try {
           listener = await NativeDownload.addListener('backgroundDownloadEvent', async (event: any) => {
-            if (!event || event.id !== item.id) return;
+            if (!event || (event.type !== 'cancelAll' && event.id !== item.id)) return;
             if (event.type === 'progress') {
               const bytes = Number(event.bytes || 0);
               const contentLength = Number(event.contentLength || 0);
@@ -189,13 +189,24 @@ export function promoteDownload(id: string): boolean {
   return true;
 }
 
+/** Bildirim panelinden tüm indirmeler iptal edildiğinde JS kuyruğunu da temizler. */
+export function cancelAllDownloads(): void {
+  downloadQueue.splice(0, downloadQueue.length);
+  for (const id of activeDownloadIds) cancelledDownloadIds.add(id);
+  if (isNative()) void NativeDownload.cancelAll().catch(() => {});
+  refreshQueuePositions();
+}
+
 /** Bekleyen görevi kuyruktan kaldırır; aktif Filesystem indirmesinde callback'ler bastırılır. */
 export function cancelDownload(id: string): void {
   let removedFromQueue = false;
   for (let i = downloadQueue.length - 1; i >= 0; i--) {
     if (downloadQueue[i].id === id) { downloadQueue.splice(i, 1); removedFromQueue = true; }
   }
-  if (activeDownloadIds.has(id)) cancelledDownloadIds.add(id);
+  if (activeDownloadIds.has(id)) {
+    cancelledDownloadIds.add(id);
+    if (isNative()) void NativeDownload.cancel({ id }).catch(() => {});
+  }
   else if (removedFromQueue) cancelledDownloadIds.delete(id);
   refreshQueuePositions();
 }
