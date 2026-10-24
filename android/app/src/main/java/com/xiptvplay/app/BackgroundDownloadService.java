@@ -95,8 +95,10 @@ public class BackgroundDownloadService extends Service {
                 Task task;
                 synchronized (queue) { task=queue.poll(); }
                 if (task == null) break;
-                activeTask=task;
+                // Reset cancellation before publishing the active task so a cancel action
+                // cannot be overwritten by a late reset.
                 cancelCurrent.set(false);
+                activeTask=task;
                 download(task);
                 activeTask=null;
                 cancelCurrent.set(false);
