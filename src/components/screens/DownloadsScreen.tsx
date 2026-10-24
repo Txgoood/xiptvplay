@@ -32,6 +32,7 @@ interface DownloadsScreenProps {
   onClearCompleted: () => void;
   onTogglePauseItem: (id: string) => void;
   onCancelItem: (id: string) => void;
+  onDeleteItem: (id: string) => void;
   onPromoteItem: (id: string) => void;
 }
 
@@ -46,6 +47,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
   onClearCompleted,
   onTogglePauseItem,
   onCancelItem,
+  onDeleteItem,
   onPromoteItem,
 }) => {
   const isAnyDownloading = downloads.some((d) => d.status === 'downloading');
@@ -65,6 +67,11 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
     return sizeMb < 1000 ? `${sizeMb} MB` : `${(sizeMb / 1000).toFixed(2)} GB`;
   };
 
+  const activeDownload = downloads.find((item) => item.status === 'downloading');
+  const queuedDownloads = downloads
+    .filter((item) => item.status === 'queued')
+    .sort((a, b) => (a.queueOrder ?? Number.MAX_SAFE_INTEGER) - (b.queueOrder ?? Number.MAX_SAFE_INTEGER));
+
   const totalDownloadedGb = downloads.reduce((acc, curr) => acc + (curr.downloadedGb || 0), 0);
   const totalArchiveGb = parseFloat(totalDownloadedGb.toFixed(1));
 
@@ -83,6 +90,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
     const movies: DownloadItem[] = [];
     const other: DownloadItem[] = [];
     downloads.forEach((item) => {
+      if (item.status === 'queued' || item.status === 'downloading') return;
       if (item.type === 'movie') { movies.push(item); return; }
       const episode = item.type === 'series' ? getEpisodeGrouping(item) : null;
       if (!episode?.seriesTitle) { other.push(item); return; }
@@ -121,7 +129,8 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                   className="w-full bg-[#1c1b1d] rounded-2xl p-3.5 flex flex-col gap-2.5 shadow-md relative overflow-hidden border border-white/5"
                 >
                   <div className="absolute left-0 inset-y-0 w-1 bg-[#4edea3]"></div>
-                  <div className="flex gap-3 items-start pl-1">
+                  <button onClick={() => onDeleteItem(item.id)} className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/60 hover:bg-[#93000a] text-white flex items-center justify-center border border-white/10" title="İndirilen dosyayı sil" aria-label="İndirilen dosyayı sil"><X className="w-4 h-4" /></button>
+                  <div className="flex gap-3 items-start pl-1 pr-7">
                     <div className="relative w-16 h-16 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 shadow border border-white/5 cursor-pointer" onClick={() => onOpenCatalog(item)} title="Katalogdaki konumunu aç">
                       <img
                         className="w-full h-full object-cover"
@@ -140,7 +149,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                         </span>
                         <span className="text-[11px] text-[#b9cacb] truncate">Çevrimdışı Hazır</span>
                       </div>
-                      <h4 className="font-headline text-[14px] font-bold text-[#e5e1e4] mt-1 truncate">
+                      <h4 className="font-headline text-[14px] font-bold text-[#e5e1e4] mt-1 truncate select-text active:whitespace-normal active:overflow-visible active:text-clip" title={item.title}>
                         {item.title}
                       </h4>
                       <span className="text-[11px] text-[#849495] truncate">{item.subtitle}</span>
@@ -206,7 +215,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                         </span>
                         <span className="text-[11px] text-[#849495]">Bekliyor</span>
                       </div>
-                      <h4 className="font-headline text-[14px] font-bold text-[#e5e1e4] truncate">
+                      <h4 className="font-headline text-[14px] font-bold text-[#e5e1e4] truncate select-text active:whitespace-normal active:overflow-visible active:text-clip" title={item.title}>
                         {item.title}
                       </h4>
                       <span className="text-[11px] text-[#b9cacb] truncate">{item.subtitle}</span>
@@ -529,6 +538,18 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
           </div>
         ) : (
           <>
+            {activeDownload && (
+              <div className="flex flex-col gap-2">
+                <div className="px-3 py-2 rounded-xl bg-[#00f0ff]/10 border border-[#00f0ff]/20 text-xs font-semibold text-[#7df4ff]">Şu an indiriliyor</div>
+                {renderDownloadItem(activeDownload)}
+              </div>
+            )}
+            {queuedDownloads.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <div className="px-3 py-2 rounded-xl bg-[#0566d9]/15 border border-[#0566d9]/25 text-xs font-semibold text-[#adc6ff]">Sıradaki indirmeler</div>
+                {queuedDownloads.map(renderDownloadItem)}
+              </div>
+            )}
             {groupedDownloads.series.map((series) => (
               <details key={series.key} className="rounded-2xl border border-white/5 bg-[#171719] overflow-hidden">
                 <summary className="list-none cursor-pointer flex items-center justify-between gap-3 px-3.5 py-3 bg-[#201f21]">
