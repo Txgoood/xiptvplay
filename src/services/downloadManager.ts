@@ -1,6 +1,8 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { DownloadItem, MediaItem } from '../types';
+
+const NativeDownload = registerPlugin<any>('NativeDownload');
 
 export const isNative = (): boolean => {
   try {
@@ -62,101 +64,70 @@ async function runSingleDownload(
   const fullPath = `downloads/${fileName}.${safeExtension}`;
 
   if (isNative()) {
-    let lastBytes = 0;
-    let lastTime = Date.now();
-    let smoothedBytesPerSecond = 0;
-
-    const progressHandler = (progress: any) => {
-      const bytes = Number(progress.bytes ?? progress.receivedBytes ?? 0);
-      const contentLength = Number(progress.contentLength ?? progress.totalBytes ?? 0);
-      const percent = contentLength > 0 ? Math.round((bytes / contentLength) * 100) : 0;
-      const downloadedGb = bytes / 1e9;
-
-      const now = Date.now();
-      const dt = (now - lastTime) / 1000;
-      const deltaBytes = Math.max(0, bytes - lastBytes);
-      const instantaneousBps = dt > 0 ? deltaBytes / dt : 0;
-      // ETA tek bir yavaş/hızlı ölçümle zıplamasın diye son ölçümleri yumuşat.
-      smoothedBytesPerSecond = smoothedBytesPerSecond === 0
-        ? instantaneousBps
-        : (smoothedBytesPerSecond * 0.72) + (instantaneousBps * 0.28);
-      const speedMbps = (smoothedBytesPerSecond * 8) / 1e6;
-      lastBytes = Math.max(lastBytes, bytes);
-      lastTime = now;
-
-      const remainingBytes = contentLength > 0 ? Math.max(0, contentLength - bytes) : 0;
-      const etaSec = smoothedBytesPerSecond > 0 && remainingBytes > 0 ? remainingBytes / smoothedBytesPerSecond : 0;
-      const eta = contentLength <= 0 ? 'Boyut bekleniyor' : (etaSec > 0 ? formatEta(etaSec) : (percent >= 100 ? 'Tamamlanıyor' : 'Hesaplanıyor'));
-
-      onProgress(Math.min(percent, 100), downloadedGb, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1_000_000_000 : undefined);
-    };
-
-    let progressListener: any = null;
     try {
-      // ENOENT önlemek için hedef klasörü indirmeden önce oluştur.
       await Filesystem.mkdir({
         path: 'downloads',
         directory: Directory.Data,
         recursive: true,
       }).catch(async (mkdirError: any) => {
-        // Bazı sürümlerde klasör zaten varsa mkdir hata verebilir; varlığını kontrol et.
-        try {
-          await Filesystem.stat({ path: 'downloads', directory: Directory.Data });
-        } catch {
-          throw mkdirError;
-        }
+        try { await Filesystem.stat({ path: 'downloads', directory: Directory.Data }); }
+        catch { throw mkdirError; }
       });
 
-      progressListener = await Filesystem.addListener('progress', progressHandler);
-
-      // Keep the previously working Capacitor downloader. Retry once only for
-      // transient connection resets; clear a partial file before retrying.
-      let result: any;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      await new Promise<void>(async (resolve, reject) => {
+        let lastBytes = 0;
+        let lastTime = Date.now();
+        let smoothedBytesPerSecond = 0;
+        let settled = false;
+        let listener: any;
+        const finish = async (error?: Error) => {
+          if (settled) return;
+          settled = true;
+          try { await listener?.remove(); } catch {}
+          if (error) reject(error); else resolve();
+        };
         try {
-          result = await Filesystem.downloadFile({
-            url: rawUrl,
-            path: fullPath,
-            directory: Directory.Data,
-            recursive: true,
-            progress: true,
+          listener = await NativeDownload.addListener('backgroundDownloadEvent', async (event: any) => {
+            if (!event || event.id !== item.id) return;
+            if (event.type === 'progress') {
+              const bytes = Number(event.bytes || 0);
+              const contentLength = Number(event.contentLength || 0);
+              const percent = contentLength > 0 ? Math.round(bytes / contentLength * 100) : 0;
+              const now = Date.now();
+              const dt = (now - lastTime) / 1000;
+              const delta = Math.max(0, bytes - lastBytes);
+              const instantaneous = dt > 0 ? delta / dt : 0;
+              smoothedBytesPerSecond = smoothedBytesPerSecond === 0 ? instantaneous : smoothedBytesPerSecond * 0.72 + instantaneous * 0.28;
+              lastBytes = Math.max(lastBytes, bytes);
+              lastTime = now;
+              const speedMbps = smoothedBytesPerSecond * 8 / 1e6;
+              const remaining = contentLength > 0 ? Math.max(0, contentLength - bytes) : 0;
+              const etaSeconds = smoothedBytesPerSecond > 0 && remaining > 0 ? remaining / smoothedBytesPerSecond : 0;
+              const eta = contentLength <= 0 ? 'Boyut bekleniyor' : etaSeconds > 0 ? formatEta(etaSeconds) : percent >= 100 ? 'Tamamlanıyor' : 'Hesaplanıyor';
+              onProgress(Math.min(percent, 100), bytes / 1e9, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1e9 : undefined);
+            } else if (event.type === 'done') {
+              try {
+                const savedPath = String(event.path || fullPath);
+                const info = await Filesystem.stat({ path: savedPath, directory: Directory.Data });
+                if (!Number(info.size || 0)) throw new Error('İndirilen dosya boş görünüyor.');
+                const uri = await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
+                if (!uri.uri || !uri.uri.startsWith('file://')) throw new Error('Yerel dosya adresi doğrulanamadı.');
+                onDone(Capacitor.convertFileSrc(uri.uri), savedPath, uri.uri);
+                await finish();
+              } catch (e: any) { await finish(new Error(e?.message || 'İndirilen dosya doğrulanamadı.')); }
+            } else if (event.type === 'error') {
+              await finish(new Error(event.extra || 'İndirme başarısız.'));
+            } else if (event.type === 'cancelAll') {
+              await finish(new Error('İndirme iptal edildi.'));
+            }
           });
-          break;
-        } catch (downloadError: any) {
-          const message = String(downloadError?.message || downloadError || '');
-          const transient = /connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end/i.test(message);
-          if (attempt > 0 || !transient) throw downloadError;
-          try {
-            await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data });
-          } catch {
-            // The first attempt may have failed before creating a file.
-          }
-          console.warn('[DownloadManager] Temporary network error; retrying once:', message);
+          await NativeDownload.enqueue({ id: item.id, url: rawUrl, path: fullPath, title: item.title });
+        } catch (e: any) {
+          await finish(new Error(e?.message || 'Arka plan indirmesi başlatılamadı.'));
         }
-      }
-      if (!result) throw new Error('İndirme tamamlanamadı; bağlantı hatası sonrası tekrar denendi.');
-
-      if (progressListener) { try { await progressListener.remove(); } catch {} }
-
-      // Use the requested relative path, not result.path: on some Capacitor versions
-      // result.path can be an absolute native path that Filesystem.stat/getUri cannot
-      // resolve relative to Directory.Data.
-      const savedPath = fullPath;
-      const fileInfo = await Filesystem.stat({ path: savedPath, directory: Directory.Data });
-      const actualBytes = Number(fileInfo.size || 0);
-      if (!Number.isFinite(actualBytes) || actualBytes <= 0) {
-        throw new Error('İndirilen dosya boş görünüyor; dosya doğrulanamadı.');
-      }
-      const uri = await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
-      if (!uri.uri || !uri.uri.startsWith('file://')) {
-        throw new Error('Yerel dosya adresi doğrulanamadı.');
-      }
-      const localUrl = Capacitor.convertFileSrc(uri.uri);
-      onDone(localUrl, savedPath, uri.uri);
+      });
     } catch (err: any) {
-      if (progressListener) { try { await progressListener.remove(); } catch {} }
-      const message = err?.message || String(err) || 'İndirme başarısız';
-      onError(`İndirme başarısız: ${message}`);
+      onError(`İndirme başarısız: ${err?.message || String(err)}`);
     }
   } else {
     // WEB (localhost): tarayıcı indirmesi, proxy üzerinden
