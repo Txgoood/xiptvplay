@@ -157,6 +157,15 @@ const cancelledDownloadIds = new Set<string>();
 const activeDownloadIds = new Set<string>();
 let queueRunning = false;
 
+// Bildirimdeki "Tüm indirmeleri iptal et" eylemi JS kuyruğunu da boşaltır.
+if (isNative()) {
+  void NativeDownload.addListener('backgroundDownloadEvent', (event: any) => {
+    if (event?.type !== 'cancelAll') return;
+    downloadQueue.splice(0, downloadQueue.length);
+    for (const id of activeDownloadIds) cancelledDownloadIds.add(id);
+  }).catch((error: any) => console.warn('[DownloadManager] Bildirim dinleyicisi kurulamadı.', error));
+}
+
 export function startDownload(
   item: DownloadItem | MediaItem,
   onProgress: DownloadTask['onProgress'],
