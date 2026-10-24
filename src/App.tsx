@@ -18,7 +18,7 @@ import { VideoPlayerModal } from './components/player/VideoPlayerModal';
 import { PrdHub } from './components/prd/PrdHub';
 import { Info, Cast as CastIcon, Tv as TvIcon, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 
 export default function App() {
   const [appMode, setAppMode] = useState<AppMode>('app');
@@ -71,6 +71,26 @@ export default function App() {
   useEffect(() => {
     StorageService.saveDownloads(downloads);
   }, [downloads]);
+
+  // Bildirim panelinden tüm indirmeler iptal edilince tamamlanmamış kayıtları da kaldır.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const NativeDownload = registerPlugin<any>('NativeDownload');
+    let listener: any;
+    let mounted = true;
+    void NativeDownload.addListener('backgroundDownloadEvent', (event: any) => {
+      if (event?.type !== 'cancelAll') return;
+      setDownloads((prev) => prev.filter((item) => item.status === 'completed'));
+      showToast('Aktif ve bekleyen indirmeler iptal edildi.');
+    }).then((handle: any) => {
+      if (mounted) listener = handle;
+      else void handle.remove();
+    }).catch((error: any) => console.warn('[Downloads] İptal bildirimi dinleyicisi kurulamadı.', error));
+    return () => {
+      mounted = false;
+      void listener?.remove();
+    };
+  }, []);
 
   // Sync favorites to persistent storage
   useEffect(() => {
