@@ -636,6 +636,33 @@ export default function App() {
     showToast('Gerçek duraklat/devam özelliği henüz desteklenmiyor. Aktif indirme için bu düğme indirmeyi durdurmaz.');
   };
 
+  const handleDeleteDownload = async (id: string) => {
+    const item = downloads.find((d) => d.id === id);
+    if (!item) return;
+    if (item.status !== 'completed') {
+      showToast('Yalnızca tamamlanmış indirmeler buradan silinebilir.');
+      return;
+    }
+    if (item.offlinePath) {
+      let deleted = false;
+      for (const directory of [Directory.Data, Directory.Documents]) {
+        try {
+          await Filesystem.deleteFile({ path: item.offlinePath, directory });
+          deleted = true;
+          break;
+        } catch {
+          // Dosya diğer uygulama dizininde olabilir; ikinci dizini dene.
+        }
+      }
+      if (!deleted) {
+        showToast('Dosya cihazda bulunamadı veya silinemedi; kayıt korunuyor.');
+        return;
+      }
+    }
+    setDownloads((prev) => prev.filter((d) => d.id !== id));
+    showToast('İndirilen dosya ve kaydı silindi.');
+  };
+
   const handleCancelItem = (id: string) => {
     const item = downloads.find(d => d.id === id);
     void import('./services/downloadManager').then(dm => dm.cancelDownload(id));
@@ -789,6 +816,7 @@ export default function App() {
                 onClearCompleted={handleClearCompleted}
                 onTogglePauseItem={handleTogglePauseItem}
                 onCancelItem={handleCancelItem}
+                onDeleteItem={handleDeleteDownload}
                 onPromoteItem={handlePromoteItem}
               />
             )}
