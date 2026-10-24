@@ -21,7 +21,6 @@ import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.json.JSONObject;
 
 public class BackgroundDownloadService extends Service {
     public static final String ACTION_ENQUEUE = "com.xiptvplay.app.DOWNLOAD_ENQUEUE";
@@ -37,6 +36,7 @@ public class BackgroundDownloadService extends Service {
     private final Queue<Task> queue = new ArrayDeque<>();
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean cancelAll = new AtomicBoolean(false);
+    private final AtomicBoolean cancelCurrent = new AtomicBoolean(false);
     private volatile HttpURLConnection activeConnection;
     private volatile Task activeTask;
     private volatile boolean working = false;
@@ -69,7 +69,7 @@ public class BackgroundDownloadService extends Service {
             synchronized (queue) { queue.removeIf(t -> t.id.equals(id)); }
             Task active = activeTask;
             if (active != null && active.id.equals(id)) {
-                cancelAll.set(true);
+                cancelCurrent.set(true);
                 HttpURLConnection c = activeConnection;
                 if (c != null) c.disconnect();
             }
@@ -80,7 +80,7 @@ public class BackgroundDownloadService extends Service {
             String path=intent.getStringExtra(EXTRA_PATH), title=intent.getStringExtra(EXTRA_TITLE);
             if (id != null && url != null && path != null) {
                 synchronized (queue) { queue.add(new Task(id,url,path,title == null ? "İndiriliyor" : title)); }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForeground(NOTIFICATION_ID, buildNotification("İndirme kuyruğa eklendi", 0, false));
+                startForeground(NOTIFICATION_ID, buildNotification("İndirme kuyruğa eklendi", 0, false));
                 if (!working) {
                     working = true;
                     worker.execute(this::runQueue);
@@ -96,8 +96,10 @@ public class BackgroundDownloadService extends Service {
                 synchronized (queue) { task=queue.poll(); }
                 if (task == null) break;
                 activeTask=task;
+                cancelCurrent.set(false);
                 download(task);
                 activeTask=null;
+                cancelCurrent.set(false);
             }
         } finally {
             working=false;
@@ -130,7 +132,7 @@ public class BackgroundDownloadService extends Service {
             out=new BufferedOutputStream(new FileOutputStream(target,false),256*1024);
             byte[] buffer=new byte[256*1024]; int n;
             while ((n=in.read(buffer)) != -1) {
-                if (cancelAll.get()) throw new InterruptedException("İndirme iptal edildi.");
+                if (cancelAll.get() || cancelCurrent.get()) throw new InterruptedException("İndirme iptal edildi.");
                 out.write(buffer,0,n); received+=n;
                 long now=System.currentTimeMillis();
                 if (now-last >= 500) {
@@ -145,7 +147,7 @@ public class BackgroundDownloadService extends Service {
             emit("done",task.id,"downloads/"+name,target.length(),total,"file://"+target.getAbsolutePath());
         } catch (Exception e) {
             if (target != null && target.exists()) target.delete();
-            if (!cancelAll.get()) emit("error",task.id,null,0,0,e.getMessage() == null ? "İndirme başarısız" : e.getMessage());
+            if (!cancelAll.get() && !cancelCurrent.get()) emit("error",task.id,null,0,0,e.getMessage() == null ? "İndirme başarısız" : e.getMessage());
         } finally {
             try { if (out != null) out.close(); } catch(Exception ignored) {}
             try { if (in != null) in.close(); } catch(Exception ignored) {}
