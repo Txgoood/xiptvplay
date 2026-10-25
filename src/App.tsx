@@ -14,6 +14,7 @@ import { CatalogScreen } from './components/screens/CatalogScreen';
 import { FavoritesScreen } from './components/screens/FavoritesScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { SeriesDetailModal } from './components/screens/SeriesDetailModal';
+import { TmdbInfoModal } from './components/screens/TmdbInfoModal';
 import { VideoPlayerModal } from './components/player/VideoPlayerModal';
 import { PrdHub } from './components/prd/PrdHub';
 import { Info, Cast as CastIcon, Tv as TvIcon, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
@@ -35,6 +36,7 @@ export default function App() {
   // Active Selected Playlist and Its Loaded Items
   const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
   const [catalogItems, setCatalogItems] = useState<MediaItem[]>([]);
+  const [tmdbInfoItem, setTmdbInfoItem] = useState<MediaItem | null>(null);
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const autoRefreshAttemptedRef = useRef<Set<string>>(new Set());
 
@@ -906,6 +908,7 @@ export default function App() {
                 onDownloadMedia={handleDownloadMedia}
                 onToggleFavorite={handleToggleFavorite}
                 onOpenSeriesDetail={(item) => { setCatalogTargetSeason(undefined); setSelectedSeriesItem(item); }}
+                onOpenTmdbInfo={setTmdbInfoItem}
                 isCatalogLoading={isCatalogLoading}
               />
             )}
@@ -972,6 +975,14 @@ export default function App() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddPlaylist={handleAddPlaylist}
+      />
+
+      <TmdbInfoModal
+        media={tmdbInfoItem}
+        onClose={() => setTmdbInfoItem(null)}
+        onPlay={(item) => setActivePlayerMedia(item)}
+        onDownload={handleDownloadMedia}
+        onOpenSeries={(item) => { setCatalogTargetSeason(undefined); setSelectedSeriesItem(item); }}
       />
 
       {/* Series Detail & Episodes Selection Modal */}
