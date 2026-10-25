@@ -176,6 +176,7 @@ type DownloadTask = {
 const downloadQueue: DownloadTask[] = [];
 const cancelledDownloadIds = new Set<string>();
 const activeDownloadIds = new Set<string>();
+const activeTasks = new Map<string, DownloadTask>();
 let queueRunning = false;
 
 export function startDownload(
@@ -216,8 +217,25 @@ export function cancelDownload(id: string): void {
   for (let i = downloadQueue.length - 1; i >= 0; i--) {
     if (downloadQueue[i].id === id) { downloadQueue.splice(i, 1); removedFromQueue = true; }
   }
-  if (activeDownloadIds.has(id)) cancelledDownloadIds.add(id);
-  else if (removedFromQueue) cancelledDownloadIds.delete(id);
+  if (activeDownloadIds.has(id)) {
+    cancelledDownloadIds.add(id);
+    void NativeDownload.cancelDownload({ id }).catch(() => {});
+    const activeTask = activeTasks.get(id);
+    if (activeTask) activeTask.onError('İndirme iptal edildi.');
+  } else if (removedFromQueue) {
+    cancelledDownloadIds.delete(id);
+  }
+  refreshQueuePositions();
+}
+
+/** Bildirim panelindeki toplu iptal: kuyruktakileri kaldırır, aktif yerel indirmeyi durdurur. */
+export function cancelAllDownloads(): void {
+  const queued = downloadQueue.splice(0, downloadQueue.length);
+  queued.forEach((task) => {
+    cancelledDownloadIds.delete(task.id);
+    task.onError('İndirme iptal edildi.');
+  });
+  Array.from(activeDownloadIds).forEach((id) => cancelDownload(id));
   refreshQueuePositions();
 }
 
@@ -230,6 +248,7 @@ async function processDownloadQueue(): Promise<void> {
       if (cancelledDownloadIds.has(task.id)) continue;
       task.onState?.('downloading');
       activeDownloadIds.add(task.id);
+      activeTasks.set(task.id, task);
       refreshQueuePositions();
       try {
         await runSingleDownload(
@@ -242,6 +261,7 @@ async function processDownloadQueue(): Promise<void> {
         if (!cancelledDownloadIds.has(task.id)) task.onError(error?.message || String(error) || 'İndirme başarısız');
       } finally {
         activeDownloadIds.delete(task.id);
+        activeTasks.delete(task.id);
         cancelledDownloadIds.delete(task.id);
       }
       // Küçük bir ara, özellikle aynı Xtream sunucusundan art arda gelen
