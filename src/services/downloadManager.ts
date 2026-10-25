@@ -109,10 +109,10 @@ async function runSingleDownload(
 
       progressListener = await Filesystem.addListener('progress', progressHandler);
 
-      // Keep the previously working Capacitor downloader. Retry once only for
-      // transient connection resets; clear a partial file before retrying.
+      // Sezon indirmelerinde sağlayıcı geçici olarak 429/5xx döndürebilir.
+      // Bu tip geçici hatalarda kısmi dosyayı temizleyip artan beklemeyle tekrar dene.
       let result: any;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           result = await Filesystem.downloadFile({
             url: rawUrl,
@@ -124,14 +124,16 @@ async function runSingleDownload(
           break;
         } catch (downloadError: any) {
           const message = String(downloadError?.message || downloadError || '');
-          const transient = /connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end/i.test(message);
-          if (attempt > 0 || !transient) throw downloadError;
+          const transient = /connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end|HTTP\\s*(?:429|5\\d\\d)|response code\\s*(?:429|5\\d\\d)|server returned\\s*(?:429|5\\d\\d)/i.test(message);
+          if (attempt >= 2 || !transient) throw downloadError;
           try {
             await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data });
           } catch {
-            // The first attempt may have failed before creating a file.
+            // İndirme dosya oluşturmadan hata vermiş olabilir.
           }
-          console.warn('[DownloadManager] Temporary network error; retrying once:', message);
+          const waitMs = 800 * (attempt + 1);
+          console.warn(`[DownloadManager] Temporary network error; retrying in ${waitMs}ms:`, message);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
         }
       }
       if (!result) throw new Error('İndirme tamamlanamadı; bağlantı hatası sonrası tekrar denendi.');
@@ -262,6 +264,11 @@ async function processDownloadQueue(): Promise<void> {
       } finally {
         activeDownloadIds.delete(task.id);
         cancelledDownloadIds.delete(task.id);
+      }
+      // Küçük bir ara, özellikle aynı Xtream sunucusundan art arda gelen
+      // bölüm indirmelerinde bağlantı/ilerleme dinleyicilerinin kapanmasına fırsat verir.
+      if (downloadQueue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
     }
   } finally {
