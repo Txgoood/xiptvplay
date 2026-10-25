@@ -5,6 +5,8 @@ import { DownloadNotifications } from './downloadNotifications';
 type NativeDownloadBridge = {
   downloadFile(options: { id: string; url: string; path: string; title: string }): Promise<{ path: string; fileUri: string; bytes: number }>;
   cancelDownload(options: { id: string }): Promise<void>;
+  pauseDownload(options: { id: string }): Promise<void>;
+  resumeDownload(options: { id: string }): Promise<void>;
   addListener(eventName: 'downloadProgress', listenerFunc: (event: { id: string; bytes: number; contentLength: number }) => void): Promise<{ remove: () => Promise<void> }>;
 };
 const NativeDownload = registerPlugin<NativeDownloadBridge>('NativeDownload');
@@ -174,12 +176,14 @@ type DownloadTask = {
   onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string, totalSizeGb?: number) => void;
   onDone: (localUrl: string, relativePath?: string, fileUri?: string) => void;
   onError: (error: string) => void;
-  onState?: (status: 'queued' | 'downloading', queueOrder?: number) => void;
+  onState?: (status: 'queued' | 'downloading' | 'paused', queueOrder?: number) => void;
 };
 const downloadQueue: DownloadTask[] = [];
 const cancelledDownloadIds = new Set<string>();
 const activeDownloadIds = new Set<string>();
 const activeTasks = new Map<string, DownloadTask>();
+const pausedQueuedTasks = new Map<string, DownloadTask>();
+const pausedActiveIds = new Set<string>();
 let queueRunning = false;
 
 export function startDownload(
@@ -214,8 +218,73 @@ export function promoteDownload(id: string): boolean {
   return true;
 }
 
-/** Bekleyen görevi kuyruktan kaldırır; aktif Filesystem indirmesinde callback'ler bastırılır. */
+/** Transfer pause: keep downloaded bytes and current native stream alive. */
+export async function pauseDownload(id: string): Promise<boolean> {
+  if (pausedActiveIds.has(id) || pausedQueuedTasks.has(id)) return true;
+  const index = downloadQueue.findIndex(task => task.id === id);
+  if (index >= 0) {
+    const [task] = downloadQueue.splice(index, 1);
+    pausedQueuedTasks.set(id, task);
+    task.onState?.('paused');
+    refreshQueuePositions();
+    return true;
+  }
+  const task = activeTasks.get(id);
+  if (!task || !isNative()) return false;
+  try {
+    await NativeDownload.pauseDownload({ id });
+    pausedActiveIds.add(id);
+    task.onState?.('paused');
+    return true;
+  } catch (error) {
+    console.warn('[Downloads] Pause failed:', error);
+    return false;
+  }
+}
+
+export async function resumeDownload(id: string): Promise<boolean> {
+  const queued = pausedQueuedTasks.get(id);
+  if (queued) {
+    pausedQueuedTasks.delete(id);
+    downloadQueue.unshift(queued);
+    queued.onState?.('queued', 1);
+    refreshQueuePositions();
+    void processDownloadQueue();
+    return true;
+  }
+  const task = activeTasks.get(id);
+  if (!task || !pausedActiveIds.has(id)) return false;
+  try {
+    await NativeDownload.resumeDownload({ id });
+    pausedActiveIds.delete(id);
+    task.onState?.('downloading');
+    return true;
+  } catch (error) {
+    console.warn('[Downloads] Resume failed:', error);
+    return false;
+  }
+}
+
+export async function pauseAllDownloads(): Promise<void> {
+  for (const id of [...downloadQueue.map(task => task.id), ...activeDownloadIds]) {
+    await pauseDownload(id);
+  }
+}
+
+export async function resumeAllDownloads(): Promise<void> {
+  for (const id of [...pausedQueuedTasks.keys(), ...pausedActiveIds]) {
+    await resumeDownload(id);
+  }
+}
+
+/** Bekleyen görevi kuyruktan kaldırır; aktif indirmeyi durdurur. */
 export function cancelDownload(id: string): void {
+  const pausedQueued = pausedQueuedTasks.get(id);
+  if (pausedQueued) {
+    pausedQueuedTasks.delete(id);
+    pausedQueued.onError('İndirme iptal edildi.');
+  }
+  pausedActiveIds.delete(id);
   let removedFromQueue = false;
   for (let i = downloadQueue.length - 1; i >= 0; i--) {
     if (downloadQueue[i].id === id) { downloadQueue.splice(i, 1); removedFromQueue = true; }
@@ -234,6 +303,8 @@ export function cancelDownload(id: string): void {
 /** Bildirim panelindeki toplu iptal: kuyruktakileri kaldırır, aktif yerel indirmeyi durdurur. */
 export function cancelAllDownloads(): void {
   const queued = downloadQueue.splice(0, downloadQueue.length);
+  queued.push(...pausedQueuedTasks.values());
+  pausedQueuedTasks.clear();
   queued.forEach((task) => {
     cancelledDownloadIds.delete(task.id);
     task.onError('İndirme iptal edildi.');
@@ -265,6 +336,7 @@ async function processDownloadQueue(): Promise<void> {
       } finally {
         activeDownloadIds.delete(task.id);
         activeTasks.delete(task.id);
+        pausedActiveIds.delete(task.id);
         cancelledDownloadIds.delete(task.id);
       }
       // Küçük bir ara, özellikle aynı Xtream sunucusundan art arda gelen
