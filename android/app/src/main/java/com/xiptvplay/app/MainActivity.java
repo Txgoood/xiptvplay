@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(NativeMediaPlayerPlugin.class);
         registerPlugin(NativeDownloadPlugin.class);
+        registerPlugin(NativeNotificationsPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

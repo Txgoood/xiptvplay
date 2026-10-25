@@ -281,9 +281,9 @@ async function startServer() {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       ];
 
-      let response: Response | null = null;
+      let response: any = null;
       let finalUrl = targetUrl;
-      let lastErrorResponse: Response | null = null;
+      let lastErrorResponse: any = null;
 
       for (const ua of USER_AGENTS) {
         headers['User-Agent'] = ua;
@@ -419,14 +419,14 @@ async function startServer() {
 
         const rewritten = text
           .split('\n')
-          .map((line) => {
+          .map((line: string) => {
             const trimmed = line.trim();
             if (!trimmed) return line;
 
             // Handle HLS tags with URIs (like #EXT-X-KEY, #EXT-X-MEDIA, #EXT-X-MAP)
             if (trimmed.startsWith('#')) {
               if (trimmed.includes('URI=')) {
-                return trimmed.replace(/URI=(["'])(.*?)\1/g, (match, quote, uri) => {
+                return trimmed.replace(/URI=(["'])(.*?)\1/g, (match: string, quote: string, uri: string) => {
                   try {
                     const abs = new URL(uri, effectiveBaseUrl).toString();
                     return `URI="${quote ? '' : ''}/api/iptv/proxy?url=${encodeURIComponent(abs)}"`;

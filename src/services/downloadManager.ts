@@ -1,6 +1,43 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { DownloadItem, MediaItem } from '../types';
+
+export interface NativeDownloadPluginInterface {
+  downloadFile(options: {
+    id: string;
+    url: string;
+    path: string;
+    title: string;
+    totalBytes?: number;
+  }): Promise<{ path: string; fileUri: string; bytes: number }>;
+  cancelDownload(options: { id: string }): Promise<void>;
+}
+
+export const NativeDownload = registerPlugin<NativeDownloadPluginInterface>('NativeDownload');
+
+export interface NativeNotificationsPluginInterface {
+  checkPermissions(): Promise<{ display: string }>;
+  requestPermissions(): Promise<{ display: string }>;
+}
+
+export const NativeNotifications = registerPlugin<NativeNotificationsPluginInterface>('NativeNotifications');
+
+export async function checkOrRequestNotificationPermission(): Promise<boolean> {
+  if (!isNative()) return true;
+  try {
+    if (Capacitor.isPluginAvailable('NativeNotifications')) {
+      const status = await NativeNotifications.checkPermissions();
+      if (status?.display !== 'granted') {
+        const req = await NativeNotifications.requestPermissions();
+        return req?.display === 'granted';
+      }
+      return true;
+    }
+  } catch {
+    // ignore
+  }
+  return true;
+}
 
 export const isNative = (): boolean => {
   try {
@@ -91,26 +128,66 @@ async function runSingleDownload(
       onProgress(Math.min(percent, 100), downloadedGb, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1_000_000_000 : undefined);
     };
 
-    let progressListener: any = null;
+    // ENOENT önlemek için hedef klasörü indirmeden önce oluştur.
     try {
-      // ENOENT önlemek için hedef klasörü indirmeden önce oluştur.
       await Filesystem.mkdir({
         path: 'downloads',
         directory: Directory.Data,
         recursive: true,
-      }).catch(async (mkdirError: any) => {
-        // Bazı sürümlerde klasör zaten varsa mkdir hata verebilir; varlığını kontrol et.
-        try {
-          await Filesystem.stat({ path: 'downloads', directory: Directory.Data });
-        } catch {
-          throw mkdirError;
-        }
       });
+    } catch (mkdirError: any) {
+      try {
+        await Filesystem.stat({ path: 'downloads', directory: Directory.Data });
+      } catch {
+        // İlerlemeyi durdurma, indirme servisi de klasörü dener
+      }
+    }
 
+    // 1. ÖNCELİKLİ YÖNTEM: Android Native Foreground Service & NativeDownloadPlugin
+    // Tek kaynaklı bildirim, Android bildirim hızı/yüzdesi gecikmesi yok, arka planda kapanmaz, gruplama destekli
+    if (Capacitor.isPluginAvailable('NativeDownload')) {
+      let nativeListener: any = null;
+      try {
+        nativeListener = await (NativeDownload as any).addListener('downloadProgress', (data: any) => {
+          if (data && data.id === item.id) {
+            progressHandler(data);
+          }
+        });
+
+        const result = await NativeDownload.downloadFile({
+          id: item.id,
+          url: rawUrl,
+          path: fullPath,
+          title: item.title,
+        });
+
+        if (nativeListener) {
+          try { await nativeListener.remove(); } catch {}
+          nativeListener = null;
+        }
+
+        const localUrl = Capacitor.convertFileSrc(result.fileUri);
+        onDone(localUrl, result.path, result.fileUri);
+        return;
+      } catch (nativeErr: any) {
+        if (nativeListener) {
+          try { await nativeListener.remove(); } catch {}
+          nativeListener = null;
+        }
+        const message = String(nativeErr?.message || nativeErr || '');
+        if (message.includes('iptal') || message.includes('cancelled') || cancelledDownloadIds.has(item.id)) {
+          onError('İndirme kullanıcı tarafından iptal edildi.');
+          return;
+        }
+        console.warn('[DownloadManager] NativeDownload başarısız, Filesystem yedeği deneniyor:', message);
+      }
+    }
+
+    // 2. YEDEK YÖNTEM: Capacitor Filesystem.downloadFile
+    let progressListener: any = null;
+    try {
       progressListener = await Filesystem.addListener('progress', progressHandler);
 
-      // Keep the previously working Capacitor downloader. Retry once only for
-      // transient connection resets; clear a partial file before retrying.
       let result: any;
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -138,9 +215,6 @@ async function runSingleDownload(
 
       if (progressListener) { try { await progressListener.remove(); } catch {} }
 
-      // Use the requested relative path, not result.path: on some Capacitor versions
-      // result.path can be an absolute native path that Filesystem.stat/getUri cannot
-      // resolve relative to Directory.Data.
       const savedPath = fullPath;
       const fileInfo = await Filesystem.stat({ path: savedPath, directory: Directory.Data });
       const actualBytes = Number(fileInfo.size || 0);
@@ -170,9 +244,7 @@ async function runSingleDownload(
   }
 }
 
-
-// Capacitor Filesystem'in progress olayı platform genelinde yayıldığından
-// indirmeleri tek tek yürütüp ilerleme olaylarının karışmasını önler.
+// Kuyruk yönetimi: sıralı ve kontrollü indirme
 type DownloadTask = {
   id: string;
   item: DownloadItem | MediaItem;
@@ -194,8 +266,11 @@ export function startDownload(
   onState?: DownloadTask['onState']
 ): void {
   const id = item.id;
-  // Aynı içerik için eski bir iptal işareti kalmışsa yeni indirmeyi engelleme.
   cancelledDownloadIds.delete(id);
+
+  // Android 13+ bildirim izni kontrolü (arka planda sessizce tetikle)
+  void checkOrRequestNotificationPermission();
+
   const task: DownloadTask = { id, item, onProgress, onDone, onError, onState };
   downloadQueue.push(task);
   onState?.('queued', downloadQueue.length + (queueRunning ? 1 : 0));
@@ -218,14 +293,24 @@ export function promoteDownload(id: string): boolean {
   return true;
 }
 
-/** Bekleyen görevi kuyruktan kaldırır; aktif Filesystem indirmesinde callback'ler bastırılır. */
+/** Bekleyen görevi kuyruktan kaldırır; aktif indirme ağ bağlantısı kesilir. */
 export function cancelDownload(id: string): void {
   let removedFromQueue = false;
   for (let i = downloadQueue.length - 1; i >= 0; i--) {
-    if (downloadQueue[i].id === id) { downloadQueue.splice(i, 1); removedFromQueue = true; }
+    if (downloadQueue[i].id === id) {
+      downloadQueue.splice(i, 1);
+      removedFromQueue = true;
+    }
   }
-  if (activeDownloadIds.has(id)) cancelledDownloadIds.add(id);
-  else if (removedFromQueue) cancelledDownloadIds.delete(id);
+
+  if (activeDownloadIds.has(id)) {
+    cancelledDownloadIds.add(id);
+    if (isNative() && Capacitor.isPluginAvailable('NativeDownload')) {
+      void NativeDownload.cancelDownload({ id }).catch(() => {});
+    }
+  } else if (removedFromQueue) {
+    cancelledDownloadIds.delete(id);
+  }
   refreshQueuePositions();
 }
 

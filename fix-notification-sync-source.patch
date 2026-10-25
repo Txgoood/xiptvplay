@@ -1,0 +1,1306 @@
+diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
+index 126c453..da56ad1 100644
+--- a/android/app/src/main/AndroidManifest.xml
++++ b/android/app/src/main/AndroidManifest.xml
+@@ -10,15 +10,6 @@
+         android:usesCleartextTraffic="true"
+         android:theme="@style/AppTheme">
+ 
+-        <receiver
+-            android:name=".CancelAllDownloadsReceiver"
+-            android:exported="false" />
+-
+-        <service
+-            android:name=".DownloadForegroundService"
+-            android:exported="false"
+-            android:foregroundServiceType="dataSync" />
+-
+         <activity
+             android:name=".NativePlayerActivity"
+             android:supportsPictureInPicture="true"
+@@ -43,6 +34,12 @@
+ 
+         </activity>
+ 
++        <service
++            android:name=".DownloadForegroundService"
++            android:enabled="true"
++            android:exported="false"
++            android:foregroundServiceType="dataSync" />
++
+         <provider
+             android:name="androidx.core.content.FileProvider"
+             android:authorities="${applicationId}.fileprovider"
+@@ -55,10 +52,9 @@
+     </application>
+ 
+     <!-- Permissions -->
+-
+     <uses-permission android:name="android.permission.INTERNET" />
+-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
++    <uses-permission android:name="android.permission.WAKE_LOCK" />
+ </manifest>
+diff --git a/android/app/src/main/java/com/xiptvplay/app/DownloadForegroundService.java b/android/app/src/main/java/com/xiptvplay/app/DownloadForegroundService.java
+index c2916af..e01f595 100644
+--- a/android/app/src/main/java/com/xiptvplay/app/DownloadForegroundService.java
++++ b/android/app/src/main/java/com/xiptvplay/app/DownloadForegroundService.java
+@@ -1,72 +1,379 @@
+ package com.xiptvplay.app;
+ 
+-import android.app.Notification;
++import android.app.NotificationChannel;
++import android.app.NotificationManager;
++import android.app.PendingIntent;
+ import android.app.Service;
++import android.content.Context;
+ import android.content.Intent;
++import android.content.pm.ServiceInfo;
++import android.os.Binder;
+ import android.os.Build;
+ import android.os.IBinder;
+-import android.os.PowerManager;
+ import androidx.core.app.NotificationCompat;
+-import androidx.core.app.ServiceCompat;
+-import android.content.pm.ServiceInfo;
++import androidx.core.app.NotificationManagerCompat;
++import androidx.core.content.ContextCompat;
++import java.util.Locale;
++import java.util.Map;
++import java.util.concurrent.ConcurrentHashMap;
+ 
++/**
++ * Android Foreground Service for download operations and notification management.
++ * 
++ * Solves:
++ * 1. Background killing: Keeps downloads alive when app is backgrounded.
++ * 2. Notification rate-limiting: Throttles NotificationManager updates to ~1s to prevent
++ *    Android SystemServer IPC queue lag.
++ * 3. Monotonic progress: Prevents out-of-order or stale percentage values from clobbering newer values.
++ * 4. Grouping: Automatically groups multiple simultaneous/season episode downloads under a single
++ *    expandable summary notification.
++ * 5. Single source of truth: All download notification updates are handled here, avoiding competing updaters.
++ */
+ public class DownloadForegroundService extends Service {
+-    public static final String ACTION_START = "com.xiptvplay.app.DOWNLOAD_START";
+-    public static final String ACTION_STOP = "com.xiptvplay.app.DOWNLOAD_STOP";
+-    private static final int NOTIFICATION_ID = 7319;
+-    private PowerManager.WakeLock wakeLock;
++    public static final String CHANNEL_ID = "xiptvplay_download_channel";
++    public static final String GROUP_KEY = "com.xiptvplay.DOWNLOAD_GROUP";
++    public static final int SUMMARY_NOTIFICATION_ID = 9001;
++
++    public static final String ACTION_START = "com.xiptvplay.app.ACTION_START_DOWNLOAD";
++    public static final String ACTION_CANCEL = "com.xiptvplay.app.ACTION_CANCEL_DOWNLOAD";
++
++    private final IBinder binder = new LocalBinder();
++    private static final ConcurrentHashMap<String, DownloadState> activeDownloads = new ConcurrentHashMap<>();
++    private static volatile DownloadForegroundService runningInstance = null;
++
++    public static class DownloadState {
++        public final String id;
++        public final String title;
++        public long totalBytes = 0;
++        public long currentBytes = 0;
++        public int lastReportedPercent = 0;
++        public long lastReportedBytes = 0;
++        public long lastNotificationTime = 0;
++        public long lastNotificationBytes = 0;
++        public double smoothedSpeedMBs = 0.0;
++        public boolean completed = false;
++        public boolean failed = false;
++        public String errorMessage = null;
++
++        public DownloadState(String id, String title) {
++            this.id = id;
++            this.title = title == null || title.trim().isEmpty() ? "Medya İndiriliyor" : title;
++        }
++    }
++
++    public class LocalBinder extends Binder {
++        public DownloadForegroundService getService() {
++            return DownloadForegroundService.this;
++        }
++    }
++
++    @Override
++    public IBinder onBind(Intent intent) {
++        return binder;
++    }
++
++    @Override
++    public void onCreate() {
++        super.onCreate();
++        runningInstance = this;
++        createNotificationChannel();
++    }
+ 
+     @Override
+     public int onStartCommand(Intent intent, int flags, int startId) {
+-        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+-            releaseWakeLock();
+-            stopForeground(STOP_FOREGROUND_DETACH); // Grup ozeti tamamlanan dosyalar icin gorunur kalir
+-            stopSelf();
+-            return START_NOT_STICKY;
+-        }
+-        String title = intent == null ? "XIPTV Play" : intent.getStringExtra("title");
+-        if (title == null || title.trim().isEmpty()) title = "XIPTV Play";
+-        acquireWakeLock();
+-        Notification notification = new NotificationCompat.Builder(this, "xiptv_downloads")
+-            .setSmallIcon(android.R.drawable.stat_sys_download)
+-            .setContentTitle("İndirme arka planda sürüyor")
+-            .setContentText(title + " indiriliyor")
+-            .setOngoing(true)
+-            .setOnlyAlertOnce(true)
+-            .setGroup("com.xiptvplay.app.DOWNLOAD_GROUP")
+-            .setGroupSummary(true)
+-            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+-            .setPriority(NotificationCompat.PRIORITY_LOW)
+-            .build();
+-        if (Build.VERSION.SDK_INT >= 29) {
+-            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+-        } else {
+-            startForeground(NOTIFICATION_ID, notification);
++        createNotificationChannel();
++        if (intent != null && ACTION_CANCEL.equals(intent.getAction())) {
++            String cancelId = intent.getStringExtra("id");
++            if (cancelId != null) {
++                cancelDownload(cancelId);
++            }
+         }
++        // Promote to foreground immediately to avoid Android 8+ ANR
++        startAsForegroundService();
+         return START_NOT_STICKY;
+     }
+ 
+-    private void acquireWakeLock() {
++    @Override
++    public void onDestroy() {
++        runningInstance = null;
++        super.onDestroy();
++    }
++
++    public static void start(Context context, String id, String title) {
++        DownloadState state = activeDownloads.get(id);
++        if (state == null) {
++            state = new DownloadState(id, title);
++            activeDownloads.put(id, state);
++        }
++        Intent intent = new Intent(context, DownloadForegroundService.class);
++        intent.setAction(ACTION_START);
++        intent.putExtra("id", id);
++        intent.putExtra("title", title);
++        try {
++            ContextCompat.startForegroundService(context, intent);
++        } catch (Exception ignored) {
++            // Context might be restricted in some states
++        }
++    }
++
++    public static void updateProgress(Context context, String id, long currentBytes, long totalBytes) {
++        DownloadState state = activeDownloads.get(id);
++        if (state == null) {
++            state = new DownloadState(id, "Medya");
++            activeDownloads.put(id, state);
++        }
++        state.totalBytes = totalBytes;
++
++        // Monotonic check: prevent older byte counts from clobbering newer values
++        if (currentBytes < state.lastReportedBytes && state.lastReportedBytes > 0) {
++            return;
++        }
++        state.currentBytes = currentBytes;
++        state.lastReportedBytes = currentBytes;
++
++        int percent = totalBytes > 0 ? (int) Math.min(100, Math.max(0, (currentBytes * 100) / totalBytes)) : 0;
++        // Monotonic percent check
++        if (percent < state.lastReportedPercent) {
++            percent = state.lastReportedPercent;
++        }
++        state.lastReportedPercent = percent;
++
++        long now = System.currentTimeMillis();
++        long elapsed = now - state.lastNotificationTime;
++        boolean isFirst = (state.lastNotificationTime == 0);
++        boolean isDone = (currentBytes >= totalBytes && totalBytes > 0);
++
++        // RATE-LIMIT / THROTTLING RULE:
++        // Android NotificationManager throttles calls faster than ~1 per second.
++        // Update notification at most once every 950ms, unless it's start (0%) or done (100%).
++        if (!isFirst && !isDone && elapsed < 950) {
++            return;
++        }
++
++        // Calculate real-time speed
++        long bytesDelta = currentBytes - state.lastNotificationBytes;
++        double secDelta = elapsed / 1000.0;
++        double instantSpeed = (secDelta > 0 && bytesDelta > 0) ? ((bytesDelta / (1024.0 * 1024.0)) / secDelta) : 0.0;
++        state.smoothedSpeedMBs = state.smoothedSpeedMBs == 0.0
++                ? instantSpeed
++                : (state.smoothedSpeedMBs * 0.70) + (instantSpeed * 0.30);
++
++        state.lastNotificationTime = now;
++        state.lastNotificationBytes = currentBytes;
++
++        DownloadForegroundService svc = runningInstance;
++        if (svc != null) {
++            svc.postNotificationForState(state);
++            svc.updateGroupSummary();
++        }
++    }
++
++    public static void complete(Context context, String id, boolean success, String errorMessage) {
++        DownloadState state = activeDownloads.get(id);
++        if (state != null) {
++            state.completed = success;
++            state.failed = !success;
++            state.errorMessage = errorMessage;
++            if (success) {
++                state.lastReportedPercent = 100;
++            }
++        }
++        DownloadForegroundService svc = runningInstance;
++        if (svc != null) {
++            if (state != null) {
++                svc.postNotificationForState(state);
++            }
++            svc.updateGroupSummary();
++            svc.checkAllDoneAndStop();
++        }
++    }
++
++    public static void cancel(String id) {
++        DownloadState state = activeDownloads.remove(id);
++        DownloadForegroundService svc = runningInstance;
++        if (svc != null) {
++            NotificationManagerCompat.from(svc).cancel(getNotificationId(id));
++            svc.updateGroupSummary();
++            svc.checkAllDoneAndStop();
++        }
++    }
++
++    private void startAsForegroundService() {
++        NotificationCompat.Builder summary = buildGroupSummaryNotification();
+         try {
+-            if (wakeLock != null && wakeLock.isHeld()) return;
+-            PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+-            if (powerManager != null) {
+-                wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "XIPTVPlay:DownloadQueue");
+-                wakeLock.setReferenceCounted(false);
+-                wakeLock.acquire(6 * 60 * 60 * 1000L); // En fazla 6 saat; stop/destroy durumunda daha erken bırakılır.
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
++                startForeground(SUMMARY_NOTIFICATION_ID, summary.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
++            } else {
++                startForeground(SUMMARY_NOTIFICATION_ID, summary.build());
+             }
+-        } catch (Exception ignored) {}
++        } catch (Exception e) {
++            // Fallback for older or restricted environments
++            try {
++                startForeground(SUMMARY_NOTIFICATION_ID, summary.build());
++            } catch (Exception ignored) {}
++        }
+     }
+ 
+-    private void releaseWakeLock() {
+-        try { if (wakeLock != null && wakeLock.isHeld()) wakeLock.release(); } catch (Exception ignored) {}
+-        wakeLock = null;
++    private void postNotificationForState(DownloadState state) {
++        NotificationManagerCompat nm = NotificationManagerCompat.from(this);
++        int notifId = getNotificationId(state.id);
++
++        if (state.completed) {
++            NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
++                    .setSmallIcon(android.R.drawable.stat_sys_download_done)
++                    .setContentTitle(state.title)
++                    .setContentText("İndirme tamamlandı")
++                    .setProgress(0, 0, false)
++                    .setGroup(GROUP_KEY)
++                    .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
++                    .setAutoCancel(true)
++                    .setOngoing(false)
++                    .setPriority(NotificationCompat.PRIORITY_LOW)
++                    .setContentIntent(createOpenAppIntent());
++            nm.notify(notifId, b.build());
++            return;
++        }
++
++        if (state.failed) {
++            String msg = state.errorMessage != null ? state.errorMessage : "İndirme başarısız oldu";
++            NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
++                    .setSmallIcon(android.R.drawable.stat_notify_error)
++                    .setContentTitle(state.title)
++                    .setContentText(msg)
++                    .setGroup(GROUP_KEY)
++                    .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
++                    .setAutoCancel(true)
++                    .setOngoing(false)
++                    .setPriority(NotificationCompat.PRIORITY_LOW)
++                    .setContentIntent(createOpenAppIntent());
++            nm.notify(notifId, b.build());
++            return;
++        }
++
++        // Active download notification
++        String speedStr = String.format(Locale.US, "%.1f MB/s", state.smoothedSpeedMBs);
++        String etaStr = formatEtaSeconds(calculateEtaSeconds(state));
++        String contentText = state.lastReportedPercent + "% • " + speedStr + (etaStr.isEmpty() ? "" : " • " + etaStr);
++
++        NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
++                .setSmallIcon(android.R.drawable.stat_sys_download)
++                .setContentTitle(state.title)
++                .setContentText(contentText)
++                .setProgress(100, state.lastReportedPercent, state.totalBytes <= 0)
++                .setGroup(GROUP_KEY)
++                .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
++                .setOnlyAlertOnce(true)
++                .setOngoing(true)
++                .setPriority(NotificationCompat.PRIORITY_LOW)
++                .setContentIntent(createOpenAppIntent());
++
++        nm.notify(notifId, b.build());
+     }
+ 
+-    @Override public void onDestroy() {
+-        releaseWakeLock();
+-        super.onDestroy();
++    private void updateGroupSummary() {
++        NotificationManagerCompat nm = NotificationManagerCompat.from(this);
++        int activeCount = 0;
++        for (DownloadState s : activeDownloads.values()) {
++            if (!s.completed && !s.failed) activeCount++;
++        }
++        if (activeCount == 0) {
++            nm.cancel(SUMMARY_NOTIFICATION_ID);
++            return;
++        }
++        NotificationCompat.Builder summary = buildGroupSummaryNotification();
++        nm.notify(SUMMARY_NOTIFICATION_ID, summary.build());
+     }
+ 
+-    @Override public IBinder onBind(Intent intent) { return null; }
++    private NotificationCompat.Builder buildGroupSummaryNotification() {
++        int activeCount = 0;
++        NotificationCompat.InboxStyle inboxStyle = new NotificationCompat.InboxStyle();
++        inboxStyle.setBigContentTitle("XIPTV Play İndirmeler");
++
++        for (DownloadState s : activeDownloads.values()) {
++            if (!s.completed && !s.failed) {
++                activeCount++;
++                inboxStyle.addLine(s.title + ": %" + s.lastReportedPercent);
++            }
++        }
++
++        String summaryText = activeCount > 0 ? activeCount + " indirme devam ediyor" : "İndirmeler tamamlandı";
++        inboxStyle.setSummaryText(summaryText);
++
++        return new NotificationCompat.Builder(this, CHANNEL_ID)
++                .setSmallIcon(android.R.drawable.stat_sys_download)
++                .setContentTitle("XIPTV Play İndirmeler")
++                .setContentText(summaryText)
++                .setStyle(inboxStyle)
++                .setGroup(GROUP_KEY)
++                .setGroupSummary(true)
++                .setOnlyAlertOnce(true)
++                .setOngoing(activeCount > 0)
++                .setPriority(NotificationCompat.PRIORITY_LOW)
++                .setContentIntent(createOpenAppIntent());
++    }
++
++    private void checkAllDoneAndStop() {
++        int activeCount = 0;
++        for (DownloadState s : activeDownloads.values()) {
++            if (!s.completed && !s.failed) activeCount++;
++        }
++        if (activeCount == 0) {
++            try {
++                stopForeground(false);
++            } catch (Exception ignored) {}
++            stopSelf();
++        }
++    }
++
++    private PendingIntent createOpenAppIntent() {
++        Intent intent = new Intent(this, MainActivity.class);
++        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
++        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
++            flags |= PendingIntent.FLAG_IMMUTABLE;
++        }
++        return PendingIntent.getActivity(this, 0, intent, flags);
++    }
++
++    private void createNotificationChannel() {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
++            if (nm != null) {
++                NotificationChannel channel = nm.getNotificationChannel(CHANNEL_ID);
++                if (channel == null) {
++                    channel = new NotificationChannel(
++                            CHANNEL_ID,
++                            "İndirmeler",
++                            NotificationManager.IMPORTANCE_LOW
++                    );
++                    channel.setDescription("XIPTV Play indirme ilerleme bildirimleri");
++                    channel.setShowBadge(false);
++                    channel.enableVibration(false);
++                    channel.setSound(null, null);
++                    nm.createNotificationChannel(channel);
++                }
++            }
++        }
++    }
++
++    private static int getNotificationId(String id) {
++        return (id.hashCode() & 0x7FFFFFFF) % 100000 + 1000;
++    }
++
++    private static long calculateEtaSeconds(DownloadState s) {
++        if (s.totalBytes <= 0 || s.smoothedSpeedMBs <= 0.05) return 0;
++        long remainingBytes = Math.max(0, s.totalBytes - s.currentBytes);
++        double bytesPerSec = s.smoothedSpeedMBs * 1024.0 * 1024.0;
++        return (long) (remainingBytes / bytesPerSec);
++    }
++
++    private static String formatEtaSeconds(long seconds) {
++        if (seconds <= 0) return "";
++        long h = seconds / 3600;
++        long m = (seconds % 3600) / 60;
++        long sec = seconds % 60;
++        if (h > 0) return h + " sa " + m + " dk";
++        if (m > 0) return m + " dk " + sec + " sn";
++        return sec + " sn";
++    }
+ }
+diff --git a/android/app/src/main/java/com/xiptvplay/app/NativeDownloadPlugin.java b/android/app/src/main/java/com/xiptvplay/app/NativeDownloadPlugin.java
+index af48240..3d0d6ef 100644
+--- a/android/app/src/main/java/com/xiptvplay/app/NativeDownloadPlugin.java
++++ b/android/app/src/main/java/com/xiptvplay/app/NativeDownloadPlugin.java
+@@ -2,16 +2,14 @@ package com.xiptvplay.app;
+ 
+ import android.os.Handler;
+ import android.os.Looper;
+-import androidx.core.app.NotificationCompat;
+-import androidx.core.app.NotificationManagerCompat;
+ import com.getcapacitor.JSObject;
+ import com.getcapacitor.Plugin;
+ import com.getcapacitor.PluginCall;
+ import com.getcapacitor.PluginMethod;
+ import com.getcapacitor.annotation.CapacitorPlugin;
+-import java.io.File;
+ import java.io.BufferedInputStream;
+ import java.io.BufferedOutputStream;
++import java.io.File;
+ import java.io.FileOutputStream;
+ import java.io.InputStream;
+ import java.io.OutputStream;
+@@ -20,7 +18,6 @@ import java.net.URL;
+ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.concurrent.ExecutorService;
+ import java.util.concurrent.Executors;
+-import java.util.concurrent.Future;
+ import java.util.concurrent.atomic.AtomicBoolean;
+ 
+ @CapacitorPlugin(name = "NativeDownload")
+@@ -35,60 +32,67 @@ public class NativeDownloadPlugin extends Plugin {
+         final String id = call.getString("id");
+         final String url = call.getString("url");
+         final String relativePath = call.getString("path");
+-        final String downloadTitle = call.getString("title", "İndiriliyor");
++        final String title = call.getString("title", "Medya İndiriliyor");
++
+         if (id == null || id.isEmpty() || url == null || url.isEmpty() || relativePath == null || relativePath.isEmpty()) {
+             call.reject("İndirme bilgileri eksik.");
+             return;
+         }
++
+         final AtomicBoolean cancelled = new AtomicBoolean(false);
+         cancellations.put(id, cancelled);
++
++        // Register download with the foreground service for single-source notification management & background persistence
++        DownloadForegroundService.start(getContext(), id, title);
++
+         executor.execute(() -> {
+             OutputStream output = null;
+             InputStream input = null;
+             File target = null;
+             try {
+                 File base = new File(getContext().getFilesDir(), "downloads");
+-                if (!base.exists() && !base.mkdirs()) throw new Exception("İndirme klasörü oluşturulamadı.");
++                if (!base.exists() && !base.mkdirs()) {
++                    throw new Exception("İndirme klasörü oluşturulamadı.");
++                }
+                 String safeName = new File(relativePath).getName();
+                 target = new File(base, safeName);
++
+                 HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+                 connections.put(id, connection);
+                 connection.setConnectTimeout(30000);
+-                // Veri akışı durduğunda 2 dakika boyunca ekranda donmuş gibi kalmasın.
+-                // Uzun sessizlikleri daha erken yakalamak için okuma zaman aşımı 30 saniye.
+                 connection.setReadTimeout(30000);
+                 connection.setInstanceFollowRedirects(true);
+                 connection.setRequestProperty("Accept-Encoding", "identity");
+ 
+                 connection.connect();
+                 int code = connection.getResponseCode();
+-                if (code < 200 || code >= 300) throw new Exception("Sunucu HTTP " + code + " yanıtı verdi.");
++                if (code < 200 || code >= 300) {
++                    throw new Exception("Sunucu HTTP " + code + " yanıtı verdi.");
++                }
++
+                 long total = connection.getContentLengthLong();
+                 input = new BufferedInputStream(connection.getInputStream(), 256 * 1024);
+                 output = new BufferedOutputStream(new FileOutputStream(target, false), 256 * 1024);
+                 byte[] buffer = new byte[256 * 1024];
+                 long received = 0;
+                 long lastEmit = 0;
+-                long lastNotificationBytes = 0;
+-                long lastNotificationTime = 0;
+-                double smoothedBytesPerSecond = 0;
+                 int count;
++
+                 while ((count = input.read(buffer)) != -1) {
+-                    if (cancelled.get()) throw new InterruptedException("İndirme kullanıcı tarafından iptal edildi.");
++                    if (cancelled.get()) {
++                        throw new InterruptedException("İndirme kullanıcı tarafından iptal edildi.");
++                    }
+                     output.write(buffer, 0, count);
+                     received += count;
++
++                    // 1. Update Android Foreground Service notification (throttled to ~1s with monotonic speed)
++                    DownloadForegroundService.updateProgress(getContext(), id, received, total);
++
++                    // 2. Notify in-app JS UI listeners at smooth 250ms intervals
+                     long now = System.currentTimeMillis();
+-                    if (now - lastEmit >= 150) {
+-                        if (lastNotificationTime > 0 && now > lastNotificationTime) {
+-                            double currentBps = (received - lastNotificationBytes) * 1000.0 / (now - lastNotificationTime);
+-                            smoothedBytesPerSecond = smoothedBytesPerSecond <= 0 ? currentBps
+-                                : (smoothedBytesPerSecond * 0.35 + currentBps * 0.65);
+-                        }
+-                        lastNotificationBytes = received;
+-                        lastNotificationTime = now;
++                    if (now - lastEmit >= 250) {
+                         final long current = received;
+                         final long length = total;
+-                        postProgressNotification(id, downloadTitle, current, length, smoothedBytesPerSecond);
+                         JSObject event = new JSObject();
+                         event.put("id", id);
+                         event.put("bytes", current);
+@@ -97,20 +101,50 @@ public class NativeDownloadPlugin extends Plugin {
+                         lastEmit = now;
+                     }
+                 }
++
+                 output.flush();
+-                output.close(); output = null;
+-                input.close(); input = null;
+-                if (cancelled.get()) throw new InterruptedException("İndirme kullanıcı tarafından iptal edildi.");
+-                if (target.length() <= 0) throw new Exception("İndirilen dosya boş.");
++                output.close();
++                output = null;
++                input.close();
++                input = null;
++
++                if (cancelled.get()) {
++                    throw new InterruptedException("İndirme kullanıcı tarafından iptal edildi.");
++                }
++                if (target.length() <= 0) {
++                    throw new Exception("İndirilen dosya boş.");
++                }
++
++                // Final 100% notification & completion
++                DownloadForegroundService.complete(getContext(), id, true, null);
++
++                // Final 100% JS progress event
++                final long finalLen = target.length();
++                JSObject finalEvent = new JSObject();
++                finalEvent.put("id", id);
++                finalEvent.put("bytes", finalLen);
++                finalEvent.put("contentLength", total > 0 ? total : finalLen);
++                mainHandler.post(() -> notifyListeners("downloadProgress", finalEvent));
++
+                 JSObject result = new JSObject();
+                 result.put("path", "downloads/" + safeName);
+                 result.put("fileUri", "file://" + target.getAbsolutePath());
+-                result.put("bytes", target.length());
++                result.put("bytes", finalLen);
+                 call.resolve(result);
++
+             } catch (Exception error) {
+-                if (target != null && target.exists()) target.delete();
+-                if (cancelled.get()) call.reject("İndirme iptal edildi.");
+-                else call.reject("İndirme başarısız: " + (error.getMessage() == null ? error.toString() : error.getMessage()));
++                if (target != null && target.exists()) {
++                    target.delete();
++                }
++                boolean wasCancelled = cancelled.get();
++                DownloadForegroundService.complete(getContext(), id, false, wasCancelled ? "İptal edildi" : error.getMessage());
++
++                if (wasCancelled) {
++                    call.reject("İndirme iptal edildi.");
++                } else {
++                    String msg = error.getMessage() == null ? error.toString() : error.getMessage();
++                    call.reject("İndirme başarısız: " + msg);
++                }
+             } finally {
+                 try { if (output != null) output.close(); } catch (Exception ignored) {}
+                 try { if (input != null) input.close(); } catch (Exception ignored) {}
+@@ -121,33 +155,6 @@ public class NativeDownloadPlugin extends Plugin {
+         });
+     }
+ 
+-    // Bildirimi doğrudan indirme motorundan güncelle: JS ekranı veya listener gecikse bile yüzde ilerler.
+-    private void postProgressNotification(String id, String title, long received, long total, double bytesPerSecond) {
+-        try {
+-            if (!NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) return;
+-            int notificationId = id.hashCode() & 0x7fffffff;
+-            int progress = total > 0 ? (int) Math.min(100, Math.max(0, (received * 100L) / total)) : 0;
+-            String speed = String.format(java.util.Locale.getDefault(), "%.1f MB/sn", bytesPerSecond / 1_000_000.0);
+-            String detail = total > 0
+-                ? progress + "% indirildi • " + speed
+-                : String.format(java.util.Locale.getDefault(), "%.1f MB indirildi • %s", received / 1_000_000.0, speed);
+-            NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), "xiptv_downloads")
+-                .setSmallIcon(android.R.drawable.stat_sys_download)
+-                .setContentTitle(title)
+-                .setContentText(detail)
+-                .setSubText(speed)
+-                .setOnlyAlertOnce(true)
+-                .setOngoing(true)
+-                .setGroup("com.xiptvplay.app.DOWNLOAD_GROUP")
+-                .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+-                .setProgress(100, progress, total <= 0)
+-                .setPriority(NotificationCompat.PRIORITY_LOW);
+-            NotificationManagerCompat.from(getContext()).notify(notificationId, builder.build());
+-        } catch (Exception ignored) {
+-            // Bildirim başarısızlığı indirme akışını durdurmamalı.
+-        }
+-    }
+-
+     @PluginMethod
+     public void cancelDownload(PluginCall call) {
+         String id = call.getString("id");
+@@ -156,6 +163,7 @@ public class NativeDownloadPlugin extends Plugin {
+             if (flag != null) flag.set(true);
+             HttpURLConnection connection = connections.get(id);
+             if (connection != null) connection.disconnect();
++            DownloadForegroundService.cancel(id);
+         }
+         call.resolve();
+     }
+diff --git a/android/app/src/main/java/com/xiptvplay/app/NativeNotificationsPlugin.java b/android/app/src/main/java/com/xiptvplay/app/NativeNotificationsPlugin.java
+index 8b8491c..660467a 100644
+--- a/android/app/src/main/java/com/xiptvplay/app/NativeNotificationsPlugin.java
++++ b/android/app/src/main/java/com/xiptvplay/app/NativeNotificationsPlugin.java
+@@ -1,148 +1,59 @@
+ package com.xiptvplay.app;
+ 
+ import android.Manifest;
+-import android.app.NotificationChannel;
+-import android.app.NotificationManager;
+-import android.content.Context;
+-import android.content.Intent;
+-import android.content.BroadcastReceiver;
+-import android.content.IntentFilter;
+-import android.app.PendingIntent;
++import android.content.pm.PackageManager;
+ import android.os.Build;
+-import androidx.core.app.NotificationCompat;
+ import androidx.core.app.NotificationManagerCompat;
++import androidx.core.content.ContextCompat;
++import com.getcapacitor.JSObject;
+ import com.getcapacitor.Plugin;
+ import com.getcapacitor.PluginCall;
+ import com.getcapacitor.PluginMethod;
+-import com.getcapacitor.PermissionState;
+ import com.getcapacitor.annotation.CapacitorPlugin;
+ import com.getcapacitor.annotation.Permission;
+ import com.getcapacitor.annotation.PermissionCallback;
+ 
+-@CapacitorPlugin(name = "NativeNotifications", permissions = {
+-    @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS })
+-})
++/**
++ * Handles Android 13+ POST_NOTIFICATIONS permission checks and requests.
++ * Download progress notifications are managed exclusively by DownloadForegroundService
++ * to avoid duplicate or competing updaters.
++ */
++@CapacitorPlugin(
++    name = "NativeNotifications",
++    permissions = {
++        @Permission(
++            strings = { Manifest.permission.POST_NOTIFICATIONS },
++            alias = "notifications"
++        )
++    }
++)
+ public class NativeNotificationsPlugin extends Plugin {
+-    private static final String CHANNEL_ID = "xiptv_downloads";
+-    private static final String GROUP_KEY = "com.xiptvplay.app.DOWNLOAD_GROUP";
+-    private static final int SUMMARY_ID = 7319; // Foreground servis bildirimi ayni grup basligi
+-    private final java.util.Map<Integer, String> activeTitles = new java.util.concurrent.ConcurrentHashMap<>();
+-    private BroadcastReceiver cancelReceiver;
+ 
+-    @Override public void load() {
+-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "İndirme bildirimleri", NotificationManager.IMPORTANCE_LOW);
+-            channel.setDescription("XIPTV Play indirmelerinin ilerlemesini gösterir.");
+-            NotificationManager manager = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+-            if (manager != null) manager.createNotificationChannel(channel);
++    @PluginMethod
++    public void checkPermissions(PluginCall call) {
++        JSObject ret = new JSObject();
++        boolean granted = true;
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
++            granted = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS)
++                    == PackageManager.PERMISSION_GRANTED;
++        } else {
++            granted = NotificationManagerCompat.from(getContext()).areNotificationsEnabled();
+         }
+-        cancelReceiver = new BroadcastReceiver() {
+-            @Override public void onReceive(Context context, Intent intent) {
+-                if ("com.xiptvplay.app.CANCEL_ALL_DOWNLOADS".equals(intent.getAction())) {
+-                    notifyListeners("cancelAllRequested", new com.getcapacitor.JSObject());
+-                }
+-            }
+-        };
+-        IntentFilter filter = new IntentFilter("com.xiptvplay.app.CANCEL_ALL_DOWNLOADS");
+-        if (Build.VERSION.SDK_INT >= 33) getContext().registerReceiver(cancelReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+-        else getContext().registerReceiver(cancelReceiver, filter);
++        ret.put("display", granted ? "granted" : "denied");
++        call.resolve(ret);
+     }
+ 
+-    @Override protected void handleOnDestroy() {
+-        if (cancelReceiver != null) {
+-            try { getContext().unregisterReceiver(cancelReceiver); } catch (Exception ignored) {}
+-            cancelReceiver = null;
++    @PluginMethod
++    public void requestPermissions(PluginCall call) {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
++            requestPermissionForAlias("notifications", call, "permissionCallback");
++        } else {
++            checkPermissions(call);
+         }
+-        super.handleOnDestroy();
+     }
+ 
+-    @PluginMethod public void requestPermission(PluginCall call) {
+-        if (Build.VERSION.SDK_INT < 33 || getPermissionState("notifications") == PermissionState.GRANTED) { call.resolve(); return; }
+-        requestPermissionForAlias("notifications", call, "permissionCallback");
+-    }
+-    @PermissionCallback private void permissionCallback(PluginCall call) {
+-        if (getPermissionState("notifications") == PermissionState.GRANTED) call.resolve();
+-        else call.reject("Bildirim izni verilmedi.");
+-    }
+-    @PluginMethod public void startForegroundDownload(PluginCall call) {
+-        Intent intent = new Intent(getContext(), DownloadForegroundService.class);
+-        intent.setAction(DownloadForegroundService.ACTION_START);
+-        intent.putExtra("title", call.getString("title", "Dosya"));
+-        try {
+-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) getContext().startForegroundService(intent);
+-            else getContext().startService(intent);
+-            call.resolve();
+-        } catch (Exception error) {
+-            call.reject("Arka plan indirme servisi başlatılamadı: " + error.getMessage(), error);
+-        }
+-    }
+-
+-    @PluginMethod public void stopForegroundDownload(PluginCall call) {
+-        Intent intent = new Intent(getContext(), DownloadForegroundService.class);
+-        intent.setAction(DownloadForegroundService.ACTION_STOP);
+-        try {
+-            getContext().startService(intent);
+-        } catch (Exception ignored) {
+-            getContext().stopService(new Intent(getContext(), DownloadForegroundService.class));
+-        }
+-        call.resolve();
+-    }
+-
+-    private void postSummary() {
+-        if (!NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) return;
+-        int count = activeTitles.size();
+-        // Tamamlanan bolumler de tek grubun altinda kalsin.
+-        // Foreground bildirimini iptal etmek servisi etkileyebilecegi icin
+-        // ayni bildirim kimligini guncelliyoruz.
+-        Intent cancelIntent = new Intent(getContext(), CancelAllDownloadsReceiver.class);
+-        cancelIntent.setAction("com.xiptvplay.app.CANCEL_ALL_ACTION");
+-        PendingIntent cancelPendingIntent = PendingIntent.getBroadcast(getContext(), 7301, cancelIntent,
+-            PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
+-        NotificationCompat.Builder summary = new NotificationCompat.Builder(getContext(), CHANNEL_ID)
+-            .setSmallIcon(android.R.drawable.stat_sys_download)
+-            .setContentTitle(count > 0 ? "XIPTV Play — " + count + " indirme" : "XIPTV Play — İndirmeler")
+-            .setContentText("İndirmeleri görmek için genişletin")
+-            .setGroup(GROUP_KEY).setGroupSummary(true).setOngoing(count > 0).setAutoCancel(count <= 0)
+-            .setOnlyAlertOnce(true).setPriority(NotificationCompat.PRIORITY_LOW)
+-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Tüm indirmeleri iptal et", cancelPendingIntent);
+-        NotificationManagerCompat.from(getContext()).notify(SUMMARY_ID, summary.build());
+-    }
+-
+-    @PluginMethod public void showProgress(PluginCall call) {
+-        if (!NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) { call.reject("Bildirim izni kapalı."); return; }
+-        String id = call.getString("id", "download");
+-        int notificationId = id.hashCode() & 0x7fffffff;
+-        activeTitles.put(notificationId, call.getString("title", "İndiriliyor"));
+-        int progress = Math.max(0, Math.min(100, call.getInt("progress", 0)));
+-        NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), CHANNEL_ID)
+-            .setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle(call.getString("title", "İndiriliyor"))
+-            .setContentText(call.getString("detail", "İndirme devam ediyor")).setOnlyAlertOnce(true).setOngoing(true)
+-            .setGroup(GROUP_KEY).setCategory(NotificationCompat.CATEGORY_PROGRESS)
+-            .setProgress(100, progress, false).setPriority(NotificationCompat.PRIORITY_LOW);
+-        NotificationManagerCompat.from(getContext()).notify(notificationId, builder.build());
+-        postSummary();
+-        call.resolve();
+-    }
+-    @PluginMethod public void complete(PluginCall call) {
+-        String id = call.getString("id", "download");
+-        int notificationId = id.hashCode() & 0x7fffffff;
+-        activeTitles.remove(notificationId);
+-        if (NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) {
+-            NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), CHANNEL_ID)
+-                .setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle(call.getString("title", "İndirme tamamlandı"))
+-                .setContentText("Dosya başarıyla indirildi.").setAutoCancel(true).setOngoing(false)
+-                .setGroup(GROUP_KEY).setPriority(NotificationCompat.PRIORITY_LOW);
+-            NotificationManagerCompat.from(getContext()).notify(notificationId, builder.build());
+-        }
+-        postSummary();
+-        call.resolve();
+-    }
+-    @PluginMethod public void cancel(PluginCall call) {
+-        String id = call.getString("id", "download");
+-        int notificationId = id.hashCode() & 0x7fffffff;
+-        activeTitles.remove(notificationId);
+-        NotificationManagerCompat.from(getContext()).cancel(notificationId);
+-        postSummary();
+-        call.resolve();
++    @PermissionCallback
++    private void permissionCallback(PluginCall call) {
++        checkPermissions(call);
+     }
+ }
+diff --git a/server.ts b/server.ts
+index f76a7db..a340fe0 100644
+--- a/server.ts
++++ b/server.ts
+@@ -281,9 +281,9 @@ async function startServer() {
+         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+       ];
+ 
+-      let response: Response | null = null;
++      let response: any = null;
+       let finalUrl = targetUrl;
+-      let lastErrorResponse: Response | null = null;
++      let lastErrorResponse: any = null;
+ 
+       for (const ua of USER_AGENTS) {
+         headers['User-Agent'] = ua;
+@@ -419,14 +419,14 @@ async function startServer() {
+ 
+         const rewritten = text
+           .split('\n')
+-          .map((line) => {
++          .map((line: string) => {
+             const trimmed = line.trim();
+             if (!trimmed) return line;
+ 
+             // Handle HLS tags with URIs (like #EXT-X-KEY, #EXT-X-MEDIA, #EXT-X-MAP)
+             if (trimmed.startsWith('#')) {
+               if (trimmed.includes('URI=')) {
+-                return trimmed.replace(/URI=(["'])(.*?)\1/g, (match, quote, uri) => {
++                return trimmed.replace(/URI=(["'])(.*?)\1/g, (match: string, quote: string, uri: string) => {
+                   try {
+                     const abs = new URL(uri, effectiveBaseUrl).toString();
+                     return `URI="${quote ? '' : ''}/api/iptv/proxy?url=${encodeURIComponent(abs)}"`;
+diff --git a/src/App.tsx b/src/App.tsx
+index ef41f6c..934c547 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -19,7 +19,6 @@ import { PrdHub } from './components/prd/PrdHub';
+ import { Info, Cast as CastIcon, Tv as TvIcon, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
+ import { Filesystem, Directory } from '@capacitor/filesystem';
+ import { Capacitor } from '@capacitor/core';
+-import { DownloadNotifications } from './services/downloadNotifications';
+ 
+ export default function App() {
+   const [appMode, setAppMode] = useState<AppMode>('app');
+@@ -59,26 +58,6 @@ export default function App() {
+     setTimeout(() => setToast(null), 3200);
+   };
+ 
+-  // Android bildirim iznini iste; izin reddedilirse uygulama normal çalışmaya devam eder.
+-  useEffect(() => { void DownloadNotifications.requestPermission(); }, []);
+-
+-  // Bildirim panelindeki toplu iptal düğmesi kuyruktaki ve aktif indirmeleri gerçekten durdurur.
+-  useEffect(() => {
+-    let listener: { remove: () => Promise<void> } | null = null;
+-    let mounted = true;
+-    void DownloadNotifications.onCancelAllRequested(async () => {
+-      const dm = await import('./services/downloadManager');
+-      dm.cancelAllDownloads();
+-    }).then((handle) => {
+-      if (mounted) listener = handle;
+-      else if (handle) void handle.remove();
+-    });
+-    return () => {
+-      mounted = false;
+-      if (listener) void listener.remove();
+-    };
+-  }, []);
+-
+   // Sync playlists to persistent storage whenever modified
+   useEffect(() => {
+     StorageService.savePlaylists(playlists);
+@@ -355,14 +334,11 @@ export default function App() {
+ 
+     setDownloads((prev) => [newDownload, ...prev]);
+     showToast(`"${item.title}" indirme başlatılıyor...`);
+-    void DownloadNotifications.progress(newDownload.id, item.title, 0, 'İndirme başlatılıyor');
+     
+     import('./services/downloadManager').then(dm => {
+         dm.startDownload(
+             newDownload,
+             (progress, downloadedGb, speedMbps, eta, reportedTotalSizeGb) => {
+-                 // Native Android indirme motoru bildirimin tek ilerleme kaynagidir.
+-                 // Geciken JS olaylari daha eski yuzdeyle bildirimi ezmemeli.
+                 setDownloads(prev => prev.map(d => {
+                   if (d.id !== newDownload.id) return d;
+                   const totalSizeGb = reportedTotalSizeGb && reportedTotalSizeGb > 0 ? reportedTotalSizeGb : d.totalSizeGb;
+@@ -405,19 +381,9 @@ export default function App() {
+                     eta: 'Tamamlandı'
+                   } : d));
+                 })();
+-                void DownloadNotifications.complete(newDownload.id, item.title);
+                 showToast(`"${item.title}" indirildi.`);
+             },
+             (error) => {
+-                // Bildirim çubuğundaki sistem iptali uygulamanın cancelDownload
+-                // fonksiyonunu çağırmayabilir; iptal hatasını listeden de kaldır.
+-                if (/iptal|cancel(?:led|ed)?|canceled|aborted by user/i.test(error)) {
+-                  void DownloadNotifications.cancel(newDownload.id);
+-                  setDownloads(prev => prev.filter(d => d.id !== newDownload.id));
+-                  showToast(`"${item.title}" indirmesi iptal edildi; yarım kalan dosya temizlendi.`);
+-                  return;
+-                }
+-                void DownloadNotifications.cancel(newDownload.id);
+                 setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, status: 'error', statusLabel: 'Hata', errorMessage: error } : d));
+                 showToast(`İndirme hatası: ${error}`);
+             },
+diff --git a/src/components/player/VideoPlayerModal.tsx b/src/components/player/VideoPlayerModal.tsx
+index 89b28db..b13e7fe 100644
+--- a/src/components/player/VideoPlayerModal.tsx
++++ b/src/components/player/VideoPlayerModal.tsx
+@@ -39,7 +39,7 @@ interface VideoPlayerModalProps {
+ const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
+ 
+ const NativeMediaPlayer = registerPlugin<{
+-  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string }): Promise<{ started: boolean }>;
++  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string }): Promise<{ started: boolean; returnedToInline?: boolean; positionMs?: number }>;
+   stop(): Promise<void>;
+ }>('NativeMediaPlayer');
+ 
+diff --git a/src/services/downloadManager.ts b/src/services/downloadManager.ts
+index 63dce58..2bb74df 100644
+--- a/src/services/downloadManager.ts
++++ b/src/services/downloadManager.ts
+@@ -1,14 +1,43 @@
+ import { Capacitor, registerPlugin } from '@capacitor/core';
+ import { Filesystem, Directory } from '@capacitor/filesystem';
+ import { DownloadItem, MediaItem } from '../types';
+-import { DownloadNotifications } from './downloadNotifications';
+-type NativeDownloadBridge = {
+-  downloadFile(options: { id: string; url: string; path: string; title: string }): Promise<{ path: string; fileUri: string; bytes: number }>;
++
++export interface NativeDownloadPluginInterface {
++  downloadFile(options: {
++    id: string;
++    url: string;
++    path: string;
++    title: string;
++    totalBytes?: number;
++  }): Promise<{ path: string; fileUri: string; bytes: number }>;
+   cancelDownload(options: { id: string }): Promise<void>;
+-  addListener(eventName: 'downloadProgress', listenerFunc: (event: { id: string; bytes: number; contentLength: number }) => void): Promise<{ remove: () => Promise<void> }>;
+-};
+-const NativeDownload = registerPlugin<NativeDownloadBridge>('NativeDownload');
++}
+ 
++export const NativeDownload = registerPlugin<NativeDownloadPluginInterface>('NativeDownload');
++
++export interface NativeNotificationsPluginInterface {
++  checkPermissions(): Promise<{ display: string }>;
++  requestPermissions(): Promise<{ display: string }>;
++}
++
++export const NativeNotifications = registerPlugin<NativeNotificationsPluginInterface>('NativeNotifications');
++
++export async function checkOrRequestNotificationPermission(): Promise<boolean> {
++  if (!isNative()) return true;
++  try {
++    if (Capacitor.isPluginAvailable('NativeNotifications')) {
++      const status = await NativeNotifications.checkPermissions();
++      if (status?.display !== 'granted') {
++        const req = await NativeNotifications.requestPermissions();
++        return req?.display === 'granted';
++      }
++      return true;
++    }
++  } catch {
++    // ignore
++  }
++  return true;
++}
+ 
+ export const isNative = (): boolean => {
+   try {
+@@ -99,55 +128,108 @@ async function runSingleDownload(
+       onProgress(Math.min(percent, 100), downloadedGb, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1_000_000_000 : undefined);
+     };
+ 
+-    let progressListener: any = null;
+-    await DownloadNotifications.startForegroundDownload(item.title);
++    // ENOENT önlemek için hedef klasörü indirmeden önce oluştur.
+     try {
+-      await Filesystem.mkdir({ path: 'downloads', directory: Directory.Data, recursive: true }).catch(async (mkdirError: any) => {
+-        try { await Filesystem.stat({ path: 'downloads', directory: Directory.Data }); }
+-        catch { throw mkdirError; }
++      await Filesystem.mkdir({
++        path: 'downloads',
++        directory: Directory.Data,
++        recursive: true,
+       });
++    } catch (mkdirError: any) {
++      try {
++        await Filesystem.stat({ path: 'downloads', directory: Directory.Data });
++      } catch {
++        // İlerlemeyi durdurma, indirme servisi de klasörü dener
++      }
++    }
+ 
+-      progressListener = await NativeDownload.addListener('downloadProgress', (event) => {
+-        if (event.id !== item.id) return;
+-        progressHandler(event);
+-      });
++    // 1. ÖNCELİKLİ YÖNTEM: Android Native Foreground Service & NativeDownloadPlugin
++    // Tek kaynaklı bildirim, Android bildirim hızı/yüzdesi gecikmesi yok, arka planda kapanmaz, gruplama destekli
++    if (Capacitor.isPluginAvailable('NativeDownload')) {
++      let nativeListener: any = null;
++      try {
++        nativeListener = await (NativeDownload as any).addListener('downloadProgress', (data: any) => {
++          if (data && data.id === item.id) {
++            progressHandler(data);
++          }
++        });
++
++        const result = await NativeDownload.downloadFile({
++          id: item.id,
++          url: rawUrl,
++          path: fullPath,
++          title: item.title,
++        });
++
++        if (nativeListener) {
++          try { await nativeListener.remove(); } catch {}
++          nativeListener = null;
++        }
++
++        const localUrl = Capacitor.convertFileSrc(result.fileUri);
++        onDone(localUrl, result.path, result.fileUri);
++        return;
++      } catch (nativeErr: any) {
++        if (nativeListener) {
++          try { await nativeListener.remove(); } catch {}
++          nativeListener = null;
++        }
++        const message = String(nativeErr?.message || nativeErr || '');
++        if (message.includes('iptal') || message.includes('cancelled') || cancelledDownloadIds.has(item.id)) {
++          onError('İndirme kullanıcı tarafından iptal edildi.');
++          return;
++        }
++        console.warn('[DownloadManager] NativeDownload başarısız, Filesystem yedeği deneniyor:', message);
++      }
++    }
++
++    // 2. YEDEK YÖNTEM: Capacitor Filesystem.downloadFile
++    let progressListener: any = null;
++    try {
++      progressListener = await Filesystem.addListener('progress', progressHandler);
+ 
+       let result: any;
+-      for (let attempt = 0; attempt < 3; attempt++) {
++      for (let attempt = 0; attempt < 2; attempt++) {
+         try {
+-          result = await NativeDownload.downloadFile({ id: item.id, url: rawUrl, path: fullPath, title: item.title });
++          result = await Filesystem.downloadFile({
++            url: rawUrl,
++            path: fullPath,
++            directory: Directory.Data,
++            recursive: true,
++            progress: true,
++          });
+           break;
+         } catch (downloadError: any) {
+           const message = String(downloadError?.message || downloadError || '');
+-          const transient = /unable to resolve host|no address associated with hostname|unknownhostexception|connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end|(?:HTTP\s*|response code\s*|server returned\s*)?(?:429|500|502|503|504)/i.test(message);
+-          if (cancelledDownloadIds.has(item.id) || attempt >= 2 || !transient) throw downloadError;
+-          try { await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data }); } catch {}
+-          const waitMs = 1200 * (attempt + 1);
+-          console.warn(`[DownloadManager] Temporary network error; retrying in ${waitMs}ms: `, message);
+-          await new Promise(resolve => setTimeout(resolve, waitMs));
++          const transient = /connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end/i.test(message);
++          if (attempt > 0 || !transient) throw downloadError;
++          try {
++            await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data });
++          } catch {
++            // The first attempt may have failed before creating a file.
++          }
++          console.warn('[DownloadManager] Temporary network error; retrying once:', message);
+         }
+       }
+-      if (cancelledDownloadIds.has(item.id)) throw new Error('İndirme iptal edildi.');
+       if (!result) throw new Error('İndirme tamamlanamadı; bağlantı hatası sonrası tekrar denendi.');
++
+       if (progressListener) { try { await progressListener.remove(); } catch {} }
+-      const savedPath = result.path || fullPath;
++
++      const savedPath = fullPath;
+       const fileInfo = await Filesystem.stat({ path: savedPath, directory: Directory.Data });
+-      const actualBytes = Number(fileInfo.size || result.bytes || 0);
+-      if (!Number.isFinite(actualBytes) || actualBytes <= 0) throw new Error('İndirilen dosya boş görünüyor; dosya doğrulanamadı.');
+-      const uri = result.fileUri ? { uri: result.fileUri } : await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
+-      if (!uri.uri || !uri.uri.startsWith('file://')) throw new Error('Yerel dosya adresi doğrulanamadı.');
++      const actualBytes = Number(fileInfo.size || 0);
++      if (!Number.isFinite(actualBytes) || actualBytes <= 0) {
++        throw new Error('İndirilen dosya boş görünüyor; dosya doğrulanamadı.');
++      }
++      const uri = await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
++      if (!uri.uri || !uri.uri.startsWith('file://')) {
++        throw new Error('Yerel dosya adresi doğrulanamadı.');
++      }
+       const localUrl = Capacitor.convertFileSrc(uri.uri);
+       onDone(localUrl, savedPath, uri.uri);
+     } catch (err: any) {
+-      try { await NativeDownload.cancelDownload({ id: item.id }); } catch {}
+-      await DownloadNotifications.stopForegroundDownload();
+       if (progressListener) { try { await progressListener.remove(); } catch {} }
+-      const message = String(err?.message || err || 'İndirme başarısız');
+-      if (/cancel(?:led|ed)?|canceled|user.?abort|aborted by user|iptal/i.test(message) || cancelledDownloadIds.has(item.id)) {
+-        try { await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data }); } catch {}
+-        onError('İndirme iptal edildi.');
+-        return;
+-      }
++      const message = err?.message || String(err) || 'İndirme başarısız';
+       onError(`İndirme başarısız: ${message}`);
+     }
+   } else {
+@@ -162,9 +244,7 @@ async function runSingleDownload(
+   }
+ }
+ 
+-
+-// Capacitor Filesystem'in progress olayı platform genelinde yayıldığından
+-// indirmeleri tek tek yürütüp ilerleme olaylarının karışmasını önler.
++// Kuyruk yönetimi: sıralı ve kontrollü indirme
+ type DownloadTask = {
+   id: string;
+   item: DownloadItem | MediaItem;
+@@ -176,7 +256,6 @@ type DownloadTask = {
+ const downloadQueue: DownloadTask[] = [];
+ const cancelledDownloadIds = new Set<string>();
+ const activeDownloadIds = new Set<string>();
+-const activeTasks = new Map<string, DownloadTask>();
+ let queueRunning = false;
+ 
+ export function startDownload(
+@@ -187,8 +266,11 @@ export function startDownload(
+   onState?: DownloadTask['onState']
+ ): void {
+   const id = item.id;
+-  // Aynı içerik için eski bir iptal işareti kalmışsa yeni indirmeyi engelleme.
+   cancelledDownloadIds.delete(id);
++
++  // Android 13+ bildirim izni kontrolü (arka planda sessizce tetikle)
++  void checkOrRequestNotificationPermission();
++
+   const task: DownloadTask = { id, item, onProgress, onDone, onError, onState };
+   downloadQueue.push(task);
+   onState?.('queued', downloadQueue.length + (queueRunning ? 1 : 0));
+@@ -211,34 +293,27 @@ export function promoteDownload(id: string): boolean {
+   return true;
+ }
+ 
+-/** Bekleyen görevi kuyruktan kaldırır; aktif Filesystem indirmesinde callback'ler bastırılır. */
++/** Bekleyen görevi kuyruktan kaldırır; aktif indirme ağ bağlantısı kesilir. */
+ export function cancelDownload(id: string): void {
+   let removedFromQueue = false;
+   for (let i = downloadQueue.length - 1; i >= 0; i--) {
+-    if (downloadQueue[i].id === id) { downloadQueue.splice(i, 1); removedFromQueue = true; }
++    if (downloadQueue[i].id === id) {
++      downloadQueue.splice(i, 1);
++      removedFromQueue = true;
++    }
+   }
++
+   if (activeDownloadIds.has(id)) {
+     cancelledDownloadIds.add(id);
+-    void NativeDownload.cancelDownload({ id }).catch(() => {});
+-    const activeTask = activeTasks.get(id);
+-    if (activeTask) activeTask.onError('İndirme iptal edildi.');
++    if (isNative() && Capacitor.isPluginAvailable('NativeDownload')) {
++      void NativeDownload.cancelDownload({ id }).catch(() => {});
++    }
+   } else if (removedFromQueue) {
+     cancelledDownloadIds.delete(id);
+   }
+   refreshQueuePositions();
+ }
+ 
+-/** Bildirim panelindeki toplu iptal: kuyruktakileri kaldırır, aktif yerel indirmeyi durdurur. */
+-export function cancelAllDownloads(): void {
+-  const queued = downloadQueue.splice(0, downloadQueue.length);
+-  queued.forEach((task) => {
+-    cancelledDownloadIds.delete(task.id);
+-    task.onError('İndirme iptal edildi.');
+-  });
+-  Array.from(activeDownloadIds).forEach((id) => cancelDownload(id));
+-  refreshQueuePositions();
+-}
+-
+ async function processDownloadQueue(): Promise<void> {
+   if (queueRunning) return;
+   queueRunning = true;
+@@ -248,7 +323,6 @@ async function processDownloadQueue(): Promise<void> {
+       if (cancelledDownloadIds.has(task.id)) continue;
+       task.onState?.('downloading');
+       activeDownloadIds.add(task.id);
+-      activeTasks.set(task.id, task);
+       refreshQueuePositions();
+       try {
+         await runSingleDownload(
+@@ -261,23 +335,11 @@ async function processDownloadQueue(): Promise<void> {
+         if (!cancelledDownloadIds.has(task.id)) task.onError(error?.message || String(error) || 'İndirme başarısız');
+       } finally {
+         activeDownloadIds.delete(task.id);
+-        activeTasks.delete(task.id);
+         cancelledDownloadIds.delete(task.id);
+       }
+-      // Küçük bir ara, özellikle aynı Xtream sunucusundan art arda gelen
+-      // bölüm indirmelerinde bağlantı/ilerleme dinleyicilerinin kapanmasına fırsat verir.
+-      if (downloadQueue.length > 0) {
+-        await new Promise(resolve => setTimeout(resolve, 300));
+-      }
+     }
+   } finally {
+     queueRunning = false;
+-    if (downloadQueue.length) {
+-      // Kuyrukta başka dosyalar varsa foreground servisini açık tut; uygulama arka plandayken sıradaki bölüm de başlasın.
+-      void processDownloadQueue();
+-    } else {
+-      // Foreground servisini yalnızca bütün kuyruk bittiğinde kapat.
+-      await DownloadNotifications.stopForegroundDownload();
+-    }
++    if (downloadQueue.length) void processDownloadQueue();
+   }
+ }
