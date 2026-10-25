@@ -17,6 +17,8 @@ import { SeriesDetailModal } from './components/screens/SeriesDetailModal';
 import { TmdbInfoModal } from './components/screens/TmdbInfoModal';
 import { EpgGuideModal } from './components/screens/EpgGuideModal';
 import { WatchHistoryScreen } from './components/screens/WatchHistoryScreen';
+import { ScheduleDownloadModal } from './components/screens/ScheduleDownloadModal';
+import { ScheduleService, ScheduledDownload } from './services/downloadSchedule';
 import { WatchHistoryEntry, WatchHistoryService } from './services/watchHistory';
 import { FamilyProfilesModal } from './components/screens/FamilyProfilesModal';
 import { FamilyConfiguration, FamilyProfile, FamilyProfilesService } from './services/familyProfiles';
@@ -36,6 +38,17 @@ export default function App() {
   const [stats, setStats] = useState(INITIAL_STATS);
   const [playlists, setPlaylists] = useState<Playlist[]>(() => StorageService.getPlaylists());
   const [downloads, setDownloads] = useState<DownloadItem[]>(() => StorageService.getDownloads());
+  const [scheduledDownloads, setScheduledDownloads] = useState<ScheduledDownload[]>([]);
+  const [scheduleSelection, setScheduleSelection] = useState<MediaItem[]>([]);
+  const refreshScheduled = async () => { setScheduledDownloads(await ScheduleService.list()); };
+  useEffect(() => {
+    void refreshScheduled();
+    const id = setInterval(() => void refreshScheduled(), 30000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void refreshScheduled(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
+  }, []);
+
   const [favoriteItems, setFavoriteItems] = useState<MediaItem[]>(() => StorageService.getFavoriteItems());
 
   // Active Selected Playlist and Its Loaded Items
@@ -415,6 +428,28 @@ export default function App() {
   };
 
   // Download Media Handler
+  const handleScheduleEpisodes = (episodes: SeriesEpisode[], seriesItem: MediaItem) => {
+    if (isChildProfile) return;
+    const media = episodes.map(ep => {
+      const ext = ep.containerExtension || 'mp4';
+      const server = activePlaylist?.serverUrl;
+      const directUrl = activePlaylist?.type === 'xtream' && server && activePlaylist.username && activePlaylist.password
+        ? `${XtreamClientService.normalizeServerUrl(server)}/series/${activePlaylist.username}/${activePlaylist.password}/${ep.id}.${ext}`
+        : ep.rawStreamUrl || ep.streamUrl;
+      const season = String(ep.seasonNum).padStart(2, '0'), part = String(ep.episodeNum).padStart(2, '0');
+      return {
+        ...seriesItem,
+        id: `ep-${seriesItem.id}-${ep.id}`,
+        parentSeriesId: seriesItem.id,
+        title: `${seriesItem.title} - S${season}E${part}: ${ep.title}`,
+        streamUrl: directUrl, rawStreamUrl: directUrl, streamId: ep.id,
+        seasonNumber: ep.seasonNum, episodeNumber: ep.episodeNum,
+        seriesTitle: seriesItem.title, episodeTitle: ep.title,
+      } as MediaItem;
+    });
+    setScheduleSelection(media);
+  };
+
   const handleDownloadMedia = (item: MediaItem) => {
     if (isChildProfile) { showToast('Çocuk profilinde indirme kapalı.'); return; }
     const existing = downloads.find((d) => d.mediaId === item.id);
@@ -990,6 +1025,7 @@ export default function App() {
                 onBackToPlaylists={() => { if (!isChildProfile) setCurrentScreen('playlists'); }}
                 onPlayMedia={safePlay}
                 onDownloadMedia={handleDownloadMedia}
+                onScheduleMedia={(item) => { if (!isChildProfile) setScheduleSelection([item]); }}
                 onToggleFavorite={handleToggleFavorite}
                 onOpenSeriesDetail={(item) => { if (canAccessMedia(item)) { setCatalogTargetSeason(undefined); setSelectedSeriesItem(item); } }}
                 onOpenTmdbInfo={(item) => { if (canAccessMedia(item)) setTmdbInfoItem(item); }}
@@ -1001,6 +1037,9 @@ export default function App() {
             {!isChildProfile && currentScreen === 'downloads' && (
               <DownloadsScreen
                 downloads={downloads}
+                scheduledDownloads={scheduledDownloads}
+                onRefreshScheduled={() => void refreshScheduled()}
+                onCancelScheduled={(id) => { void ScheduleService.cancel(id).then(() => refreshScheduled()).catch(err => showToast(String(err))); }}
                 stats={stats}
                 onPlayMedia={handlePlayDownloadedItem}
                 onOpenDownloadedFile={handleOpenDownloadedFile}
@@ -1106,8 +1145,20 @@ export default function App() {
         onClose={() => { setSelectedSeriesItem(null); setCatalogTargetSeason(undefined); }}
         onPlayEpisode={(episode, seriesItem, nextEpisode, nextNextEpisode) => { if (canAccessMedia(seriesItem)) handlePlayEpisode(episode, seriesItem, nextEpisode, nextNextEpisode); }}
         onDownloadEpisode={handleDownloadEpisode}
+        onScheduleEpisodes={handleScheduleEpisodes}
         initialSeason={catalogTargetSeason}
       />
+
+      {scheduleSelection.length > 0 && !isChildProfile && <ScheduleDownloadModal
+        items={scheduleSelection}
+        onClose={() => setScheduleSelection([])}
+        onSaved={() => {
+          setScheduleSelection([]);
+          void refreshScheduled();
+          setCurrentScreen('downloads');
+          showToast('Zamanlanmış indirme kuyruğuna eklendi.');
+        }}
+      />}
 
       {/* Real Video Player Modal */}
       <VideoPlayerModal
