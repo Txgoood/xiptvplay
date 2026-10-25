@@ -384,6 +384,13 @@ export default function App() {
                 showToast(`"${item.title}" indirildi.`);
             },
             (error) => {
+                // Bildirim çubuğundaki sistem iptali uygulamanın cancelDownload
+                // fonksiyonunu çağırmayabilir; iptal hatasını listeden de kaldır.
+                if (/iptal|cancel(?:led|ed)?|canceled|aborted by user/i.test(error)) {
+                  setDownloads(prev => prev.filter(d => d.id !== newDownload.id));
+                  showToast(`"${item.title}" indirmesi iptal edildi; yarım kalan dosya temizlendi.`);
+                  return;
+                }
                 setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, status: 'error', statusLabel: 'Hata', errorMessage: error } : d));
                 showToast(`İndirme hatası: ${error}`);
             },
