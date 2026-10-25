@@ -579,6 +579,7 @@ export default function App() {
 
     const episodeMedia: MediaItem = {
       id: `ep-${seriesItem.id}-${episode.id}`,
+      parentSeriesId: seriesItem.id,
       playlistId: seriesItem.playlistId,
       title: `${seriesItem.title} - S${seasonStr}E${epStr}: ${episode.title}`,
       category: seriesItem.category || 'Dizi',
