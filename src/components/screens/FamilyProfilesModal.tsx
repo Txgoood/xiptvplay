@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LockKeyhole, ShieldCheck, UserRound, Baby, X, Check, Settings2 } from 'lucide-react';
 import type { MediaItem } from '../../types';
 import { ChildAge, FamilyConfiguration, FamilyProfile, FamilyProfilesService } from '../../services/familyProfiles';
@@ -38,6 +38,7 @@ export const FamilyProfilesModal: React.FC<Props> = ({
   const [suggestedItemIds, setSuggestedItemIds] = useState<string[]>([]);
   const [selectedMovieCategories, setSelectedMovieCategories] = useState<string[]>([]);
   const [requestedScan, setRequestedScan] = useState(0);
+  const previousScan = useRef<{ age: ChildAge; data: AutoChildScan } | null>(null);
   const categories = useMemo(() => {
     const map = new Map<string, { key: string; label: string; count: number }>();
     const approvedIds = new Set(autoScan?.suggestedItemIds || []);
@@ -53,21 +54,39 @@ export const FamilyProfilesModal: React.FC<Props> = ({
       .sort((a,b) => a.label.localeCompare(b.label, 'tr'));
   }, [catalog, search, autoScan]);
 
-  // Automatic analysis runs before presenting child category approvals.
-  // Age changes trigger a fresh scan; all suggestions still require explicit parent approval.
+  // Scan the first batch automatically, then continue through remaining batches on demand.
+  // The approval list accumulates *verified* titles; unverified media stays blocked.
   useEffect(() => {
     if (mode !== 'manage') return;
     let active = true;
-    setScanBusy(true); setScanMessage('TR kategorileri ve TMDB yaş bilgileri inceleniyor...');
-    setAutoScan(null); setSelectedMovieCategories([]); setSuggestedItemIds([]);
-    ChildAutoScanService.analyze(catalog, age, message => { if (active) setScanMessage(message); })
+    const prior = previousScan.current?.age === age ? previousScan.current.data : null;
+    const checked = prior?.scannedItemIds || [];
+    setScanBusy(true);
+    setScanMessage('TR kategorileri ve TMDB yaş bilgileri inceleniyor...');
+    if (!prior) {
+      setAutoScan(null); setSelectedMovieCategories([]); setSuggestedItemIds([]); setAuthorizations([]);
+    }
+    ChildAutoScanService.analyze(catalog, age, message => { if (active) setScanMessage(message); }, checked)
       .then(result => {
         if (!active) return;
-        setAutoScan(result);
-        setAuthorizations([]);
-        setScanMessage('Otomatik inceleme tamamlandı. Önerilen kategorileri kontrol edip seç.');
+        const merged: AutoChildScan = prior ? {
+          ...result,
+          scannedItemIds: [...new Set([...prior.scannedItemIds, ...result.scannedItemIds])],
+          suggestedItemIds: [...new Set([...prior.suggestedItemIds, ...result.suggestedItemIds])],
+          checkedMovies: prior.checkedMovies + result.checkedMovies,
+          acceptedMovies: prior.acceptedMovies + result.acceptedMovies,
+          unknownMovies: prior.unknownMovies + result.unknownMovies,
+        } : result;
+        previousScan.current = { age, data: merged };
+        setAutoScan(merged);
+        if (prior) {
+          const approved = new Set(merged.suggestedItemIds);
+          const selectedCategories = new Set(selectedMovieCategories);
+          setSuggestedItemIds(catalog.filter(item => selectedCategories.has(FamilyProfilesService.categoryKey(item)) && approved.has(item.id)).map(item => item.id));
+        }
+        setScanMessage('Analiz tamamlandı. Önerileri kontrol edip onayla.');
       })
-      .catch(err => { if (active) setScanMessage('İnceleme tamamlanamadı: ' + (err?.message || 'Bilinmeyen hata')); })
+      .catch(err => { if (active) setScanMessage('Analiz tamamlanamadı: ' + (err?.message || 'Bilinmeyen hata')); })
       .finally(() => { if (active) setScanBusy(false); });
     return () => { active = false; };
   }, [mode, age, catalog, requestedScan]);
@@ -160,11 +179,14 @@ export const FamilyProfilesModal: React.FC<Props> = ({
             {autoScan && <>
               <p className="text-xs text-[#d0eff1]">🇹🇷 TR canlı: {autoScan.scannedChannels.toLocaleString('tr-TR')} · çocuk kategorilerinde önerilen kanal: {autoScan.suggestedChannelCount.toLocaleString('tr-TR')}</p>
               <p className="text-xs text-[#d0eff1]">TMDB ile incelenen film/dizi: {autoScan.checkedMovies.toLocaleString('tr-TR')} · yaşa uygun: {autoScan.acceptedMovies.toLocaleString('tr-TR')} · belirsiz/uygunsuz: {autoScan.unknownMovies.toLocaleString('tr-TR')}</p>
-              {autoScan.unscannedMovies > 0 && <p className="text-xs text-amber-200">Bu taramada {autoScan.unscannedMovies.toLocaleString('tr-TR')} film/dizi kontrol edilmedi; otomatik izin verilmedi. Büyük kütüphaneler güvenli gruplar hâlinde taranır.</p>}
+              {autoScan.unscannedMovies > 0 && <p className="text-xs text-amber-200">Bu taramada {autoScan.unscannedMovies.toLocaleString('tr-TR')} film/dizi henüz incelenmedi; otomatik izin verilmedi. Sonraki grubu taramak için aşağıdaki düğmeye bas.</p>}
             </>}
-            <button type="button" onClick={() => setRequestedScan(x => x + 1)} disabled={scanBusy}
+            <button type="button" onClick={() => {
+                if (!autoScan?.unscannedMovies) previousScan.current = null;
+                setRequestedScan(x => x + 1);
+              }} disabled={scanBusy}
               className="rounded-lg bg-[#25252a] border border-white/20 px-3 py-2 text-xs font-semibold disabled:opacity-50">
-              {scanBusy ? 'Tarama sürüyor...' : 'Yeniden Tara'}
+              {scanBusy ? 'Tarama sürüyor...' : autoScan?.unscannedMovies ? 'Sonraki 200 Film/Diziyi Tara' : 'Baştan Tara'}
             </button>
           </div>
           <div><p className="text-sm font-semibold">Otomatik elemeden geçen kategoriler</p>
