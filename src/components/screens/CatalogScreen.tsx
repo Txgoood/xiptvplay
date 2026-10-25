@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { MediaItem, Playlist } from '../../types';
 import { StorageService } from '../../services/storage';
+import type { WatchHistoryEntry } from '../../services/watchHistory';
 import {
   ArrowLeft,
   Search,
@@ -30,6 +31,7 @@ interface CatalogScreenProps {
   onOpenEpgGuide: (item: MediaItem) => void;
   isCatalogLoading?: boolean;
   isChildMode?: boolean;
+  continueWatching?: WatchHistoryEntry[];
 }
 
 const PAGE_CHUNK = 60;
@@ -46,6 +48,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   onOpenEpgGuide,
   isCatalogLoading,
   isChildMode = false,
+  continueWatching = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'live' | 'movie' | 'series'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
@@ -247,6 +250,22 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         )}
       </div>
 
+      {continueWatching.length > 0 && (
+        <section className="rounded-2xl bg-[#1d272b] border border-[#00f0ff]/20 p-3">
+          <h2 className="font-bold text-sm text-[#00f0ff] mb-2">▶ İzlemeye Devam Et</h2>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {continueWatching.slice(0, 12).map(entry => (
+              <button key={entry.id} className="w-32 shrink-0 text-left" onClick={() => onPlayMedia(entry.media as MediaItem)}>
+                <img src={entry.media.poster} alt="" className="w-full h-20 rounded-lg object-cover bg-[#29292c]"/>
+                <span className="text-xs font-bold line-clamp-2 mt-1">{entry.media.title}</span>
+                <div className="h-1.5 mt-2 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full bg-[#00f0ff]" style={{width: Math.min(100, Math.max(0, 100 * entry.positionSeconds / entry.durationSeconds))+'%'}} />
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       {/* Media Type Tabs with Real Server Totals */}
       <div className="flex items-center gap-1.5 p-1 rounded-full bg-[#1c1b1d] border border-white/5">
         <button
