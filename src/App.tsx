@@ -19,6 +19,7 @@ import { PrdHub } from './components/prd/PrdHub';
 import { Info, Cast as CastIcon, Tv as TvIcon, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
+import { DownloadNotifications } from './services/downloadNotifications';
 
 export default function App() {
   const [appMode, setAppMode] = useState<AppMode>('app');
@@ -57,6 +58,9 @@ export default function App() {
     setToast(message);
     setTimeout(() => setToast(null), 3200);
   };
+
+  // Android bildirim iznini iste; izin reddedilirse uygulama normal çalışmaya devam eder.
+  useEffect(() => { void DownloadNotifications.requestPermission(); }, []);
 
   // Sync playlists to persistent storage whenever modified
   useEffect(() => {
@@ -334,11 +338,13 @@ export default function App() {
 
     setDownloads((prev) => [newDownload, ...prev]);
     showToast(`"${item.title}" indirme başlatılıyor...`);
+    void DownloadNotifications.progress(newDownload.id, item.title, 0, 'İndirme başlatılıyor');
     
     import('./services/downloadManager').then(dm => {
         dm.startDownload(
             newDownload,
             (progress, downloadedGb, speedMbps, eta, reportedTotalSizeGb) => {
+                void DownloadNotifications.progress(newDownload.id, item.title, progress, `${progress}% • ${speedMbps.toFixed(1)} Mbps`);
                 setDownloads(prev => prev.map(d => {
                   if (d.id !== newDownload.id) return d;
                   const totalSizeGb = reportedTotalSizeGb && reportedTotalSizeGb > 0 ? reportedTotalSizeGb : d.totalSizeGb;
@@ -381,16 +387,19 @@ export default function App() {
                     eta: 'Tamamlandı'
                   } : d));
                 })();
+                void DownloadNotifications.complete(newDownload.id, item.title);
                 showToast(`"${item.title}" indirildi.`);
             },
             (error) => {
                 // Bildirim çubuğundaki sistem iptali uygulamanın cancelDownload
                 // fonksiyonunu çağırmayabilir; iptal hatasını listeden de kaldır.
                 if (/iptal|cancel(?:led|ed)?|canceled|aborted by user/i.test(error)) {
+                  void DownloadNotifications.cancel(newDownload.id);
                   setDownloads(prev => prev.filter(d => d.id !== newDownload.id));
                   showToast(`"${item.title}" indirmesi iptal edildi; yarım kalan dosya temizlendi.`);
                   return;
                 }
+                void DownloadNotifications.cancel(newDownload.id);
                 setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, status: 'error', statusLabel: 'Hata', errorMessage: error } : d));
                 showToast(`İndirme hatası: ${error}`);
             },
