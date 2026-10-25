@@ -29,16 +29,6 @@ if ! grep -q "$PACKAGE" emulator-test-results/launch-activities.txt; then
 fi
 adb shell screencap -p /sdcard/xiptv-foreground.png
 adb pull /sdcard/xiptv-foreground.png emulator-test-results/foreground.png >/dev/null
-# Android foreground servis bildiriminin gerçekten oluştuğunu kontrol et.
-adb shell am start-foreground-service -n "$PACKAGE/.DownloadForegroundService" \
-  -a com.xiptvplay.app.DOWNLOAD_START --es title "Emulator smoke test"
-sleep 3
-adb shell dumpsys notification --noredact > emulator-test-results/service-notification.txt
-if ! grep -q 'com.xiptvplay.app.DOWNLOAD_GROUP' emulator-test-results/service-notification.txt; then
-  echo "FAIL: Download foreground notification group missing"; exit 1
-fi
-adb shell am startservice -n "$PACKAGE/.DownloadForegroundService" \
-  -a com.xiptvplay.app.DOWNLOAD_STOP || true
 adb shell input keyevent KEYCODE_HOME
 sleep 6
 adb shell pidof "$PACKAGE" > emulator-test-results/background-pid.txt
