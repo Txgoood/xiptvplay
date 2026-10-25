@@ -64,6 +64,7 @@ public class NativePlayerActivity extends Activity {
     }
 
     private void closePlayerAndFinish() {
+        savePlaybackPosition();
         releasePlayer();
         if (!isFinishing()) {
             finishAndRemoveTask();
@@ -463,8 +464,13 @@ public class NativePlayerActivity extends Activity {
     private void savePlaybackPosition() {
         if (player == null || progressPreferenceKey == null) return;
         long position = Math.max(0L, player.getCurrentPosition());
+        long duration = Math.max(0L, player.getDuration());
         getSharedPreferences("playback_progress", MODE_PRIVATE).edit()
             .putLong(progressPreferenceKey, position).apply();
+        Intent historyData = new Intent();
+        historyData.putExtra("positionMs", position);
+        historyData.putExtra("durationMs", duration);
+        setResult(Activity.RESULT_OK, historyData);
     }
 
     @Override
