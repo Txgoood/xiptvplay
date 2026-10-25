@@ -29,6 +29,7 @@ public class DownloadForegroundService extends Service {
             .setContentText(title + " indiriliyor")
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setGroup("com.xiptvplay.app.DOWNLOAD_GROUP")
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build();
