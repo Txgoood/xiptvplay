@@ -106,6 +106,7 @@ public class NativePlayerActivity extends Activity {
     private String nextNextTitle;
     private static final String PIP_PAUSE_ACTION = "com.xiptvplay.app.PIP_TOGGLE_PAUSE";
     private static final String PIP_NEXT_ACTION = "com.xiptvplay.app.PIP_NEXT_EPISODE";
+    private static final String PIP_CLOSE_ACTION = "com.xiptvplay.app.PIP_CLOSE_PLAYER";
     private BroadcastReceiver pipActionReceiver;
     private JSONArray offlineEpisodeQueue;
     private int offlineEpisodeIndex = 0;
@@ -119,7 +120,12 @@ public class NativePlayerActivity extends Activity {
         activeInstance = this;
         pipActionReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
-                if (intent == null || player == null) return;
+                if (intent == null) return;
+                if (PIP_CLOSE_ACTION.equals(intent.getAction())) {
+                    closePlayerAndFinish();
+                    return;
+                }
+                if (player == null) return;
                 if (PIP_PAUSE_ACTION.equals(intent.getAction())) {
                     if (player.isPlaying()) player.pause(); else player.play();
                     updatePipActions();
@@ -132,6 +138,7 @@ public class NativePlayerActivity extends Activity {
         IntentFilter pipFilter = new IntentFilter();
         pipFilter.addAction(PIP_PAUSE_ACTION);
         pipFilter.addAction(PIP_NEXT_ACTION);
+        pipFilter.addAction(PIP_CLOSE_ACTION);
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             registerReceiver(pipActionReceiver, pipFilter, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -494,14 +501,25 @@ public class NativePlayerActivity extends Activity {
             playing ? "Duraklat" : "Oynat",
             playing ? "Videoyu duraklat" : "Videoyu oynat",
             togglePending);
-        if (nextUrl == null || nextUrl.isEmpty()) return java.util.Collections.singletonList(playPause);
+        // Samsung / Android PiP kontrolleri sistem tarafindan cizilir.
+        // Bu X eylemi sistem kontrol paneli acildiginda gorunur ve gercek
+        // oynatici oturumunu durdurur (yalniz pencereyi gizlemez).
+        Intent close = new Intent(PIP_CLOSE_ACTION).setPackage(getPackageName());
+        PendingIntent closePending = PendingIntent.getBroadcast(this, 453, close,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        RemoteAction closeAction = new RemoteAction(
+            Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
+            "Kapat", "Videoyu ve sesi tamamen kapat", closePending);
+        if (nextUrl == null || nextUrl.isEmpty()) {
+            return Arrays.asList(playPause, closeAction);
+        }
         Intent next = new Intent(PIP_NEXT_ACTION).setPackage(getPackageName());
         PendingIntent nextPending = PendingIntent.getBroadcast(this, 452, next,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         RemoteAction nextAction = new RemoteAction(
             Icon.createWithResource(this, android.R.drawable.ic_media_next),
             "Sonraki bölüm", "Sıradaki dizi bölümünü oynat", nextPending);
-        return Arrays.asList(playPause, nextAction);
+        return Arrays.asList(playPause, nextAction, closeAction);
     }
 
     private void updatePipActions() {
