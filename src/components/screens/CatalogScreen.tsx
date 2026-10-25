@@ -29,6 +29,7 @@ interface CatalogScreenProps {
   onOpenTmdbInfo: (item: MediaItem) => void;
   onOpenEpgGuide: (item: MediaItem) => void;
   isCatalogLoading?: boolean;
+  isChildMode?: boolean;
 }
 
 const PAGE_CHUNK = 60;
@@ -44,6 +45,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   onOpenTmdbInfo,
   onOpenEpgGuide,
   isCatalogLoading,
+  isChildMode = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'live' | 'movie' | 'series'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
@@ -192,13 +194,13 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
       {/* Active Playlist Header Strip */}
       <div className="flex items-center justify-between p-3 rounded-2xl bg-[#1c1b1d] border border-white/5 shadow-md">
         <div className="flex items-center gap-2.5 min-w-0">
-          <button
+          {!isChildMode && <button
             onClick={onBackToPlaylists}
             className="w-8 h-8 rounded-full bg-[#201f21] hover:bg-[#2a2a2c] flex items-center justify-center text-[#00f0ff] shrink-0 border border-white/5 cursor-pointer"
             title="Playlistlere Dön"
           >
             <ArrowLeft className="w-4 h-4 text-[#00f0ff]" />
-          </button>
+          </button>}
           <div className="flex flex-col min-w-0">
             <span className="font-headline text-xs font-bold text-white truncate">
               {activePlaylist ? activePlaylist.name : 'Tüm Kanallar'}
@@ -516,7 +518,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
                       </button>
                     )}
 
-                    <button
+                    {!isChildMode && <button
                       onClick={() => {
                         if (isSeries) {
                           onOpenSeriesDetail(item);
@@ -529,7 +531,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
                     >
                       <Download className="w-3.5 h-3.5 text-[#00f0ff]" />
                       <span className="hidden sm:inline">{isSeries ? 'Bölümler' : 'İndir'}</span>
-                    </button>
+                    </button>}
                   </div>
                 </div>
               );
