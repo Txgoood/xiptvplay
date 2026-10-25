@@ -127,6 +127,7 @@ async function runSingleDownload(
           await new Promise(resolve => setTimeout(resolve, waitMs));
         }
       }
+      if (cancelledDownloadIds.has(item.id)) throw new Error('İndirme iptal edildi.');
       if (!result) throw new Error('İndirme tamamlanamadı; bağlantı hatası sonrası tekrar denendi.');
       if (progressListener) { try { await progressListener.remove(); } catch {} }
       const savedPath = result.path || fullPath;
