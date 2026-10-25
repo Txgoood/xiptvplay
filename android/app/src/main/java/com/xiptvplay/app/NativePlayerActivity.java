@@ -125,8 +125,9 @@ public class NativePlayerActivity extends Activity {
         root.setFitsSystemWindows(true);
 
         playerView = new PlayerView(this);
-        playerView.setUseController(true);
-        playerView.setControllerAutoShow(true);
+        // Uygulamanin kendi oynatici kontrolleri kullaniliyor.
+        // Media3/ExoPlayer varsayilan kontrol katmanini tamamen devre disi birak.
+        playerView.setUseController(false);
         playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS);
         playerView.setKeepContentOnPlayerReset(true);
         videoContainer.addView(playerView, new FrameLayout.LayoutParams(
@@ -523,10 +524,8 @@ public class NativePlayerActivity extends Activity {
         controlsVisible = visible;
         if (topBar != null) topBar.setVisibility(visible ? View.VISIBLE : View.GONE);
         if (bottomBar != null) bottomBar.setVisibility(visible ? View.VISIBLE : View.GONE);
-        if (playerView != null) {
-            if (visible) playerView.showController();
-            else playerView.hideController();
-        }
+        // PlayerView'in yerlesik kontrol katmani kapali kalmali.
+        // Sadece custom topBar/bottomBar gorunurlugunu degistir.
     }
 
     private String formatTime(long timeMs) {
