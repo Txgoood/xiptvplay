@@ -489,7 +489,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
                       onClick={() => onOpenTmdbInfo(item)}
                       className="h-9 px-3 rounded-full bg-[#201f21] text-[#00f0ff] border border-white/10 flex items-center justify-center gap-1 text-xs font-semibold"
                       title="Film / dizi bilgileri"
-                    ><Info className="w-4 h-4" /><span>Bilgi</span></button>
+                    ><Info className="w-4 h-4" /><span>Bilgi</span></button>}
                     {isSeries ? (
                       <button
                         onClick={() => onOpenSeriesDetail(item)}
