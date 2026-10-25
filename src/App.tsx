@@ -18,7 +18,7 @@ import { VideoPlayerModal } from './components/player/VideoPlayerModal';
 import { PrdHub } from './components/prd/PrdHub';
 import { Info, Cast as CastIcon, Tv as TvIcon, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { DownloadNotifications } from './services/downloadNotifications';
 
 export default function App() {
@@ -655,27 +655,23 @@ export default function App() {
     showToast('Yerel dosya bulunamadı. İnternet üzerinden oynatılacak.');
   };
 
-  // Dosyanın konumunu göster; indirme servisi Documents/downloads kullanır.
+  // Android 10+ scoped storage: videoyu Movies/XIPTVPlay icine yayinlayip
+  // sistem dosya yoneticisinde konumunu goster. Genel dosya erisim izni gerekmez.
   const handleOpenDownloadedFile = async (item: DownloadItem) => {
+    if (!item.offlinePath) {
+      showToast('Önce video indirmesinin tamamlanması gerekiyor.');
+      return;
+    }
+    if (!Capacitor.isNativePlatform()) {
+      showToast(`Dosya yolu: ${item.offlinePath}`);
+      return;
+    }
     try {
-      let fileUri = item.fileUri;
-      if (!fileUri && item.offlinePath) {
-        try {
-          const result = await Filesystem.getUri({ path: item.offlinePath, directory: Directory.Data });
-          fileUri = result.uri;
-        } catch {
-          const result = await Filesystem.getUri({ path: item.offlinePath, directory: Directory.Documents });
-          fileUri = result.uri;
-        }
-      }
-      const path = item.offlinePath || fileUri;
-      if (!path) {
-        showToast('Dosya yolu bulunamadı. İndirme kaydı eksik olabilir.');
-        return;
-      }
-      showToast(`Dosya konumu: ${path}`);
+      const DownloadFiles = registerPlugin<{ openLocation(options: { path: string }): Promise<void> }>('DownloadFiles');
+      await DownloadFiles.openLocation({ path: item.offlinePath });
+      showToast('Dosya Movies/XIPTVPlay klasörüne aktarıldı. Dosya yöneticisinden Movies → XIPTVPlay klasörünü aç.');
     } catch (err: any) {
-      showToast(`Dosya konumu alınamadı: ${err?.message || 'Bilinmeyen hata'}`);
+      showToast(`Dosya konumu açılamadı: ${err?.message || 'Bilinmeyen hata'}`);
     }
   };
 
