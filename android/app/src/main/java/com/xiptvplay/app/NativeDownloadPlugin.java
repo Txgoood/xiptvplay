@@ -2,6 +2,8 @@ package com.xiptvplay.app;
 
 import android.os.Handler;
 import android.os.Looper;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -33,6 +35,7 @@ public class NativeDownloadPlugin extends Plugin {
         final String id = call.getString("id");
         final String url = call.getString("url");
         final String relativePath = call.getString("path");
+        final String downloadTitle = call.getString("title", "İndiriliyor");
         if (id == null || id.isEmpty() || url == null || url.isEmpty() || relativePath == null || relativePath.isEmpty()) {
             call.reject("İndirme bilgileri eksik.");
             return;
@@ -75,6 +78,7 @@ public class NativeDownloadPlugin extends Plugin {
                     if (now - lastEmit >= 250) {
                         final long current = received;
                         final long length = total;
+                        postProgressNotification(id, downloadTitle, current, length);
                         JSObject event = new JSObject();
                         event.put("id", id);
                         event.put("bytes", current);
@@ -105,6 +109,31 @@ public class NativeDownloadPlugin extends Plugin {
                 cancellations.remove(id);
             }
         });
+    }
+
+    // Bildirimi doğrudan indirme motorundan güncelle: JS ekranı veya listener gecikse bile yüzde ilerler.
+    private void postProgressNotification(String id, String title, long received, long total) {
+        try {
+            if (!NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) return;
+            int notificationId = id.hashCode() & 0x7fffffff;
+            int progress = total > 0 ? (int) Math.min(100, Math.max(0, (received * 100L) / total)) : 0;
+            String detail = total > 0
+                ? progress + "% indirildi"
+                : String.format(java.util.Locale.getDefault(), "%.1f MB indirildi", received / 1_000_000.0);
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), "xiptv_downloads")
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setContentTitle(title)
+                .setContentText(detail)
+                .setOnlyAlertOnce(true)
+                .setOngoing(true)
+                .setGroup("com.xiptvplay.app.DOWNLOAD_GROUP")
+                .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+                .setProgress(100, progress, total <= 0)
+                .setPriority(NotificationCompat.PRIORITY_LOW);
+            NotificationManagerCompat.from(getContext()).notify(notificationId, builder.build());
+        } catch (Exception ignored) {
+            // Bildirim başarısızlığı indirme akışını durdurmamalı.
+        }
     }
 
     @PluginMethod
