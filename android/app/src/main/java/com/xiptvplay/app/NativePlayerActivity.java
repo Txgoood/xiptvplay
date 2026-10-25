@@ -2,6 +2,13 @@ package com.xiptvplay.app;
 
 import android.app.Activity;
 import android.app.PictureInPictureParams;
+import android.app.RemoteAction;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
+import android.graphics.drawable.Icon;
+import java.util.Arrays;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -97,6 +104,9 @@ public class NativePlayerActivity extends Activity {
     private String nextTitle;
     private String nextNextUrl;
     private String nextNextTitle;
+    private static final String PIP_PAUSE_ACTION = "com.xiptvplay.app.PIP_TOGGLE_PAUSE";
+    private static final String PIP_NEXT_ACTION = "com.xiptvplay.app.PIP_NEXT_EPISODE";
+    private BroadcastReceiver pipActionReceiver;
     private JSONArray offlineEpisodeQueue;
     private int offlineEpisodeIndex = 0;
     private final Handler controlsHandler = new Handler(Looper.getMainLooper());
@@ -107,6 +117,26 @@ public class NativePlayerActivity extends Activity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         activeInstance = this;
+        pipActionReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                if (intent == null || player == null) return;
+                if (PIP_PAUSE_ACTION.equals(intent.getAction())) {
+                    if (player.isPlaying()) player.pause(); else player.play();
+                    updatePipActions();
+                } else if (PIP_NEXT_ACTION.equals(intent.getAction())) {
+                    playNextEpisode();
+                    updatePipActions();
+                }
+            }
+        };
+        IntentFilter pipFilter = new IntentFilter();
+        pipFilter.addAction(PIP_PAUSE_ACTION);
+        pipFilter.addAction(PIP_NEXT_ACTION);
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(pipActionReceiver, pipFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(pipActionReceiver, pipFilter);
+        }
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
@@ -225,6 +255,11 @@ public class NativePlayerActivity extends Activity {
             public void onTracksChanged(Tracks tracks) {
                 updateSubtitleButton(tracks);
                 updateAudioButton(tracks);
+            }
+
+            @Override
+            public void onIsPlayingChanged(boolean isPlaying) {
+                updatePipActions();
             }
 
             @Override
@@ -439,12 +474,45 @@ public class NativePlayerActivity extends Activity {
             try {
                 PictureInPictureParams params = new PictureInPictureParams.Builder()
                     .setAspectRatio(new Rational(16, 9))
+                    .setActions(buildPipActions())
                     .build();
                 enterPictureInPictureMode(params);
             } catch (Exception ignored) {
                 // PiP cihaz tarafından desteklenmiyorsa normal arka plan davranışı sürer.
             }
         }
+    }
+
+    private java.util.List<RemoteAction> buildPipActions() {
+        if (android.os.Build.VERSION.SDK_INT < 26 || player == null) return java.util.Collections.emptyList();
+        boolean playing = player.isPlaying();
+        Intent toggle = new Intent(PIP_PAUSE_ACTION).setPackage(getPackageName());
+        PendingIntent togglePending = PendingIntent.getBroadcast(this, 451, toggle,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        RemoteAction playPause = new RemoteAction(
+            Icon.createWithResource(this, playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play),
+            playing ? "Duraklat" : "Oynat",
+            playing ? "Videoyu duraklat" : "Videoyu oynat",
+            togglePending);
+        if (nextUrl == null || nextUrl.isEmpty()) return java.util.Collections.singletonList(playPause);
+        Intent next = new Intent(PIP_NEXT_ACTION).setPackage(getPackageName());
+        PendingIntent nextPending = PendingIntent.getBroadcast(this, 452, next,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        RemoteAction nextAction = new RemoteAction(
+            Icon.createWithResource(this, android.R.drawable.ic_media_next),
+            "Sonraki bölüm", "Sıradaki dizi bölümünü oynat", nextPending);
+        return Arrays.asList(playPause, nextAction);
+    }
+
+    private void updatePipActions() {
+        if (android.os.Build.VERSION.SDK_INT < 26 || player == null) return;
+        if (!isInPictureInPictureMode()) return;
+        try {
+            setPictureInPictureParams(new PictureInPictureParams.Builder()
+                .setAspectRatio(new Rational(16, 9))
+                .setActions(buildPipActions())
+                .build());
+        } catch (Exception ignored) {}
     }
 
     @Override
@@ -727,6 +795,7 @@ public class NativePlayerActivity extends Activity {
             setOfflineNextFromQueue();
         }
         nextButton.setVisibility(nextUrl == null || nextUrl.trim().isEmpty() ? View.GONE : View.VISIBLE);
+        updatePipActions();
         MediaItem next = new MediaItem.Builder()
             .setUri(Uri.parse(urlToPlay))
             .setMediaId(titleToPlay == null ? "Sonraki bölüm" : titleToPlay)
@@ -789,6 +858,11 @@ public class NativePlayerActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (pipActionReceiver != null) {
+            try { unregisterReceiver(pipActionReceiver); } catch (Exception ignored) {}
+            pipActionReceiver = null;
+        }
+
         releasePlayer();
         if (activeInstance == this) activeInstance = null;
         super.onDestroy();
