@@ -40,7 +40,39 @@ export default function App() {
   const [downloads, setDownloads] = useState<DownloadItem[]>(() => StorageService.getDownloads());
   const [scheduledDownloads, setScheduledDownloads] = useState<ScheduledDownload[]>([]);
   const [scheduleSelection, setScheduleSelection] = useState<MediaItem[]>([]);
-  const refreshScheduled = async () => { setScheduledDownloads(await ScheduleService.list()); };
+  const refreshScheduled = async () => {
+    const jobs = await ScheduleService.list();
+    setScheduledDownloads(jobs);
+    // A completed native job is also a regular offline item, even if the
+    // app was closed during the scheduled download.
+    const completed = jobs.filter(j => j.status === 'completed' && j.path);
+    if (!completed.length) return;
+    const resolved = await Promise.all(completed.map(async job => {
+      try {
+        const stat = await Filesystem.stat({ path: job.path!, directory: Directory.Data });
+        const uri = await Filesystem.getUri({ path: job.path!, directory: Directory.Data });
+        return { job, bytes: Number(stat.size || job.bytes || 0), fileUri: uri.uri };
+      } catch { return null; }
+    }));
+    setDownloads(prev => {
+      const existing = new Set(prev.map(d => d.id));
+      const additions: DownloadItem[] = resolved.filter((row): row is NonNullable<typeof row> => Boolean(row))
+        .filter(({job}) => !existing.has(job.id))
+        .map(({job,bytes,fileUri}) => ({
+          id: job.id, mediaId: job.mediaId, playlistId: job.playlistId,
+          title: job.title, subtitle: (job.category || 'Zamanlanmış') + ' • İndirildi',
+          type: job.mediaType || 'movie', resolutionBadge: job.resolution || 'HD',
+          totalSizeGb: bytes / 1e9, downloadedGb: bytes / 1e9,
+          speedMbps: 0, eta: 'Tamamlandı', progressPercent: 100,
+          status: 'completed' as const, statusLabel: 'Tamamlandı',
+          poster: job.poster || '', streamUrl: job.url, rawStreamUrl: job.url,
+          offlinePath: job.path, fileUri,
+          seriesTitle: job.seriesTitle, seasonNumber: job.seasonNumber,
+          episodeNumber: job.episodeNumber, episodeTitle: job.episodeTitle,
+        }));
+      return additions.length ? [...additions, ...prev] : prev;
+    });
+  };
   useEffect(() => {
     void refreshScheduled();
     const id = setInterval(() => void refreshScheduled(), 30000);
