@@ -34,6 +34,9 @@ public class NativeMediaPlayerPlugin extends Plugin {
         intent.putExtra("nextTitle", call.getString("nextTitle"));
         intent.putExtra("nextNextUrl", call.getString("nextNextUrl"));
         intent.putExtra("nextNextTitle", call.getString("nextNextTitle"));
+        if (call.getArray("offlineEpisodeQueue") != null) {
+            intent.putExtra("offlineEpisodeQueue", call.getArray("offlineEpisodeQueue").toString());
+        }
         try {
             startActivityForResult(call, intent, "handlePlayerResult");
         } catch (Exception error) {
