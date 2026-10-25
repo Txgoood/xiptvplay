@@ -27,7 +27,7 @@ export const WatchHistoryService = {
     const entries = this.read(profileId);
     const existing = entries.find(e => e.id === media.id);
     const duration = Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : existing?.durationSeconds || 0;
-    const position = Number.isFinite(positionSeconds) && positionSeconds >= 0 ? positionSeconds : existing?.positionSeconds || 0;
+    const position = Number.isFinite(positionSeconds) && positionSeconds > 0 ? positionSeconds : existing?.positionSeconds || 0;
     const completed = finished || (duration > 60 && position / duration >= 0.95);
     const next: WatchHistoryEntry = {
       id: media.id, profileId, media,
