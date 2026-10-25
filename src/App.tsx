@@ -636,10 +636,51 @@ export default function App() {
         const localUrl = Capacitor.convertFileSrc(localFileUri);
         const fileInfo = await Filesystem.stat({ path: relativePath, directory });
         const actualSizeGb = Number(fileInfo.size || 0) / 1_000_000_000;
+        // Offline dizilerde yalnizca ayni dizinin art arda gelen,
+        // telefonda gercekten bulunan bolumlerini siraya ekle.
+        const offlineNext: Array<{ uri: string; title: string }> = [];
+        if (item.type === 'series' && item.seriesTitle &&
+            typeof item.seasonNumber === 'number' &&
+            typeof item.episodeNumber === 'number') {
+          const available = downloads.filter(d =>
+            d.id !== item.id && d.type === 'series' && d.status === 'completed' &&
+            d.seriesTitle === item.seriesTitle &&
+            d.playlistId === item.playlistId &&
+            typeof d.seasonNumber === 'number' &&
+            typeof d.episodeNumber === 'number' && !!d.offlinePath
+          ).sort((a, b) =>
+            (a.seasonNumber! - b.seasonNumber!) ||
+            (a.episodeNumber! - b.episodeNumber!)
+          );
+          let expectedSeason = item.seasonNumber;
+          let expectedEpisode = item.episodeNumber + 1;
+          for (const next of available) {
+            if (next.seasonNumber !== expectedSeason || next.episodeNumber !== expectedEpisode) continue;
+            try {
+              let nextDirectory = Directory.Data;
+              try {
+                await Filesystem.stat({ path: next.offlinePath!, directory: nextDirectory });
+              } catch {
+                nextDirectory = Directory.Documents;
+                await Filesystem.stat({ path: next.offlinePath!, directory: nextDirectory });
+              }
+              const found = await Filesystem.getUri({ path: next.offlinePath!, directory: nextDirectory });
+              if (!found.uri?.startsWith('file://')) break;
+              offlineNext.push({ uri: found.uri, title: next.title });
+              expectedEpisode++;
+            } catch {
+              break; // Siradaki bolum yoksa asla internete gecme.
+            }
+          }
+        }
         setActivePlayerMedia({
           ...item,
           fileUri: localFileUri,
           localUrl,
+          nextEpisodeUrl: offlineNext[0]?.uri,
+          nextEpisodeTitle: offlineNext[0]?.title,
+          nextNextEpisodeUrl: offlineNext[1]?.uri,
+          nextNextEpisodeTitle: offlineNext[1]?.title,
           ...(actualSizeGb > 0 ? { totalSizeGb: actualSizeGb, downloadedGb: actualSizeGb } : {}),
         });
         showToast('İndirilen dosya telefondan açılıyor; internetten yeniden indirilmeyecek.');
