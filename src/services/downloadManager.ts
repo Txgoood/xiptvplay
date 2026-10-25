@@ -91,7 +91,7 @@ async function runSingleDownload(
             if (!event || (event.type !== 'cancelAll' && event.id !== item.id)) return;
             if (event.type === 'progress') {
               const bytes = Number(event.bytes || 0);
-              const contentLength = Number(event.contentLength || 0);
+              const contentLength = Number(event.total || event.contentLength || 0);
               const percent = contentLength > 0 ? Math.round(bytes / contentLength * 100) : 0;
               const now = Date.now();
               const dt = (now - lastTime) / 1000;
