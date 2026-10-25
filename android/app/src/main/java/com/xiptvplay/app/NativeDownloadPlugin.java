@@ -24,8 +24,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @CapacitorPlugin(name = "NativeDownload")
 public class NativeDownloadPlugin extends Plugin {
     private final ExecutorService executor = Executors.newCachedThreadPool();
-    private final ConcurrentHashMap<String, AtomicBoolean> cancellations = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, HttpURLConnection> connections = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, AtomicBoolean> cancellations = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, HttpURLConnection> connections = new ConcurrentHashMap<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @PluginMethod
@@ -111,15 +111,18 @@ public class NativeDownloadPlugin extends Plugin {
         });
     }
 
+    public static void cancelDownloadById(String id) {
+        if (id == null) return;
+        AtomicBoolean flag = cancellations.get(id);
+        if (flag != null) flag.set(true);
+        HttpURLConnection connection = connections.get(id);
+        if (connection != null) connection.disconnect();
+    }
+
     @PluginMethod
     public void cancelDownload(PluginCall call) {
         String id = call.getString("id");
-        if (id != null) {
-            AtomicBoolean flag = cancellations.get(id);
-            if (flag != null) flag.set(true);
-            HttpURLConnection connection = connections.get(id);
-            if (connection != null) connection.disconnect();
-        }
+        cancelDownloadById(id);
         call.resolve();
     }
 }
