@@ -8,11 +8,23 @@ type NativeNotificationsPlugin = {
   startForegroundDownload(options: { title: string }): Promise<void>;
   stopForegroundDownload(): Promise<void>;
   addListener(eventName: 'cancelAllRequested', listenerFunc: () => void): Promise<{ remove: () => Promise<void> }>;
+  addListener(eventName: 'cancelItemRequested', listenerFunc: (event: { id: string }) => void): Promise<{ remove: () => Promise<void> }>;
 };
 
 const NativeNotifications = registerPlugin<NativeNotificationsPlugin>('NativeNotifications');
 
 export const DownloadNotifications = {
+  async onCancelItemRequested(callback: (id: string) => void): Promise<{ remove: () => Promise<void> } | null> {
+    if (!Capacitor.isNativePlatform()) return null;
+    try {
+      return await NativeNotifications.addListener('cancelItemRequested', (event) => {
+        if (event?.id) callback(event.id);
+      });
+    } catch (error) {
+      console.warn('[Notifications] Per-item cancel listener failed:', error);
+      return null;
+    }
+  },
   async onCancelAllRequested(callback: () => void): Promise<{ remove: () => Promise<void> } | null> {
     if (!Capacitor.isNativePlatform()) return null;
     try { return await NativeNotifications.addListener('cancelAllRequested', callback); }
