@@ -62,6 +62,23 @@ export default function App() {
   // Android bildirim iznini iste; izin reddedilirse uygulama normal çalışmaya devam eder.
   useEffect(() => { void DownloadNotifications.requestPermission(); }, []);
 
+  // Bildirim panelindeki toplu iptal düğmesi kuyruktaki ve aktif indirmeleri gerçekten durdurur.
+  useEffect(() => {
+    let listener: { remove: () => Promise<void> } | null = null;
+    let mounted = true;
+    void DownloadNotifications.onCancelAllRequested(async () => {
+      const dm = await import('./services/downloadManager');
+      dm.cancelAllDownloads();
+    }).then((handle) => {
+      if (mounted) listener = handle;
+      else if (handle) void handle.remove();
+    });
+    return () => {
+      mounted = false;
+      if (listener) void listener.remove();
+    };
+  }, []);
+
   // Sync playlists to persistent storage whenever modified
   useEffect(() => {
     StorageService.savePlaylists(playlists);
