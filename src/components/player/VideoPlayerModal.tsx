@@ -357,6 +357,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       : null;
     // Never let the fallback/proxy URL replace a verified offline file URI.
     const playbackUrl = localFileUri || effectiveUrl;
+    // Native oynatici aktifken arkadaki HTML5 video ses cikarmamali.
+    if (videoRef.current) videoRef.current.pause();
     NativeMediaPlayer.play({
       url: playbackUrl,
       isLocalFile: !!localFileUri,
