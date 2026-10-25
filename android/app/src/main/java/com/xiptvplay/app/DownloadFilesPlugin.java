@@ -29,7 +29,7 @@ public class DownloadFilesPlugin extends Plugin {
     public void openLocation(PluginCall call) {
         String path = call.getString("path");
         if (path == null || path.isEmpty()) { call.reject("Dosya yolu eksik."); return; }
-        getBridge().execute(() -> {
+        new Thread(() -> {
             try {
                 String fileName = new File(path).getName();
                 File source = new File(new File(getContext().getFilesDir(), "downloads"), fileName);
@@ -84,7 +84,7 @@ public class DownloadFilesPlugin extends Plugin {
             } catch (Exception error) {
                 call.reject("Konum acilamadi: " + error.getMessage(), error);
             }
-        });
+        }, "XIPTV-ExportFile").start();
     }
 
     private void openFolderPicker() {
@@ -94,7 +94,7 @@ public class DownloadFilesPlugin extends Plugin {
             picker.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             if (Build.VERSION.SDK_INT >= 26) {
                 Uri initial = DocumentsContract.buildDocumentUri(
-                    "com.android.externalstorage.documents", "primary:Movies");
+                    "com.android.externalstorage.documents", "primary:Movies/XIPTVPlay");
                 picker.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initial);
             }
             try { getActivity().startActivity(picker); }
