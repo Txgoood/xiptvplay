@@ -137,7 +137,6 @@ async function runSingleDownload(
       const uri = result.fileUri ? { uri: result.fileUri } : await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
       if (!uri.uri || !uri.uri.startsWith('file://')) throw new Error('Yerel dosya adresi doğrulanamadı.');
       const localUrl = Capacitor.convertFileSrc(uri.uri);
-      await DownloadNotifications.stopForegroundDownload();
       onDone(localUrl, savedPath, uri.uri);
     } catch (err: any) {
       try { await NativeDownload.cancelDownload({ id: item.id }); } catch {}
@@ -273,6 +272,12 @@ async function processDownloadQueue(): Promise<void> {
     }
   } finally {
     queueRunning = false;
-    if (downloadQueue.length) void processDownloadQueue();
+    if (downloadQueue.length) {
+      // Kuyrukta başka dosyalar varsa foreground servisini açık tut; uygulama arka plandayken sıradaki bölüm de başlasın.
+      void processDownloadQueue();
+    } else {
+      // Foreground servisini yalnızca bütün kuyruk bittiğinde kapat.
+      await DownloadNotifications.stopForegroundDownload();
+    }
   }
 }
