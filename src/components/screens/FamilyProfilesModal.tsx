@@ -17,7 +17,7 @@ const ages: ChildAge[] = [3, 7, 13, 16];
 const kinds: Record<string, string> = { live: 'Canlı TV', movie: 'Film', series: 'Dizi' };
 // Only Turkish-prefixed IPTV categories are offered in the child approval list.
 // Matching the category itself (not the media title) avoids false positives.
-const isTurkishCategory = (category: string): boolean => /^TR(?:\\b|[\\s:|_\\-])/i.test(category.trim());
+const isTurkishCategory = (category: string): boolean => /^TR(?:$|[^A-Za-z0-9])/i.test(category.trim());
 
 export const FamilyProfilesModal: React.FC<Props> = ({
   mode, configuration, catalog, activePlaylistName, onCreate, onSave, onSelect, onClose,
