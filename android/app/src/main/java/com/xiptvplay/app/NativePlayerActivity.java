@@ -58,6 +58,12 @@ public class NativePlayerActivity extends Activity {
     private static volatile ExoPlayer activeAudioPlayer;
     private boolean playerClosing = false;
 
+    public static boolean isActivePlayerPresent() {
+        NativePlayerActivity activity = activeInstance;
+        return activity != null && !activity.isFinishing() && !activity.isDestroyed()
+            && !activity.playerClosing && activity.player != null;
+    }
+
     public static void closeActivePlayer() {
         NativePlayerActivity activity = activeInstance;
         if (activity != null) {
@@ -530,6 +536,8 @@ public class NativePlayerActivity extends Activity {
         if (isInPictureInPictureMode) {
             if (topBar != null) topBar.setVisibility(View.GONE);
             if (bottomBar != null) bottomBar.setVisibility(View.GONE);
+        } else if (isFinishing() || isDestroyed() || playerClosing) {
+            closePlayerAndFinish();
         } else {
             showControlsTemporarily();
         }
@@ -832,8 +840,8 @@ public class NativePlayerActivity extends Activity {
 
     @Override
     protected void onStop() {
-        playerClosing = true;
         savePlaybackPosition();
+        playerClosing = true;
         // PiP penceresi sistem tarafından X ile kapatıldığında sesi önce sustur,
         // PlayerView bağlantısını kes ve ardından ExoPlayer'ı serbest bırak.
         releasePlayer();
@@ -841,6 +849,10 @@ public class NativePlayerActivity extends Activity {
         controlsHandler.removeCallbacks(progressUpdater);
         if (orientationListener != null) orientationListener.disable();
         super.onStop();
+        // PiP pencere X ile silindiginde Android aktiviteyi arka planda tutabilir.
+        // Oynatici kesin olarak serbest birakildi; aktiviteyi de bitir ki WebView
+        // bekleyen native play sonucunu alarak modalini kapatabilsin.
+        if (!isFinishing()) finish();
     }
 
     private void releasePlayer() {
