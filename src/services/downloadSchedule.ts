@@ -2,6 +2,8 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 
 export interface ScheduledDownload {
  id:string; title:string; url:string; poster?:string; mediaId:string;
+ mediaType?:'movie'|'series'; playlistId?:string; resolution?:string; category?:string;
+ seriesTitle?:string; seasonNumber?:number; episodeNumber?:number; episodeTitle?:string;
  mode:'once'|'night'; startAt:number; fromMinute:number; toMinute:number;
  wifiOnly:boolean; chargingOnly:boolean; status:'scheduled'|'downloading'|'completed'|'paused'|'error'|'cancelled';
  bytes:number; total:number; path?:string; error?:string;
