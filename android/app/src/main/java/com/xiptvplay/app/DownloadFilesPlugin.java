@@ -87,20 +87,46 @@ public class DownloadFilesPlugin extends Plugin {
         }, "XIPTV-ExportFile").start();
     }
 
+    // Klasor secme izni istemiyoruz: Samsung Dosyalarim'i normal gezinme
+    // modunda aciyoruz. Burada tasima, kopyalama, yeniden adlandirma kullanilabilir.
     private void openFolderPicker() {
         getActivity().runOnUiThread(() -> {
-            // Android bu sistem arayuzunu destekler; dosya yoneticisi markaya gore degisir.
-            Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-            picker.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            if (Build.VERSION.SDK_INT >= 26) {
-                Uri initial = DocumentsContract.buildDocumentUri(
-                    "com.android.externalstorage.documents", "primary:Movies/XIPTVPlay");
-                picker.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initial);
+            String absoluteFolder = Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_MOVIES).getAbsolutePath() + "/XIPTVPlay/";
+            // Samsung My Files: acilacak klasoru intent extra olarak bildir.
+            Intent samsung = new Intent("com.sec.android.app.myfiles.VIEW");
+            samsung.setPackage("com.sec.android.app.myfiles");
+            samsung.putExtra("folderPath", absoluteFolder);
+            samsung.putExtra("FOLDERPATH", absoluteFolder);
+            try {
+                getActivity().startActivity(samsung);
+                return;
+            } catch (Exception ignored) { /* Farkli Samsung surumu / telefon */ }
+
+            // Genel Android: klasor goruntuleme intent'i, izin secici degil.
+            Intent view = new Intent(Intent.ACTION_VIEW);
+            view.setDataAndType(
+                DocumentsContract.buildDocumentUri("com.android.externalstorage.documents",
+                    "primary:Movies/XIPTVPlay"),
+                "vnd.android.document/directory");
+            view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            view.putExtra("org.openintents.extra.ABSOLUTE_PATH", absoluteFolder);
+            try {
+                getActivity().startActivity(view);
+                return;
+            } catch (Exception ignored) { /* Cihazda klasor intent'i desteklenmiyor */ }
+
+            // Son secenek: dosya yoneticisinin ana ekranini ac.
+            // ACTION_OPEN_DOCUMENT_TREE kullanma: her seferinde izin ister.
+            Intent manager = getActivity().getPackageManager().getLaunchIntentForPackage(
+                "com.sec.android.app.myfiles");
+            if (manager != null) {
+                try { getActivity().startActivity(manager); return; }
+                catch (Exception ignored) {}
             }
-            try { getActivity().startActivity(picker); }
-            catch (ActivityNotFoundException ignored) {
-                // Dosya secici olmayan cihazda kullaniciya hata bildir.
-            }
+            android.widget.Toast.makeText(getContext(),
+                "Dosyalarim > Dahili depolama > Movies > XIPTVPlay klasorunu acin.",
+                android.widget.Toast.LENGTH_LONG).show();
         });
     }
 }
