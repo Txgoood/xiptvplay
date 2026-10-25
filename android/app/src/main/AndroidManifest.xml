@@ -10,6 +10,15 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
 
+        <receiver android:name=".ScheduledDownloadReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <service android:name=".ScheduledDownloadService" android:exported="false" android:foregroundServiceType="dataSync" />
+
         <receiver
             android:name=".CancelAllDownloadsReceiver"
             android:exported="false" />
@@ -56,6 +65,8 @@
 
     <!-- Permissions -->
 
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
