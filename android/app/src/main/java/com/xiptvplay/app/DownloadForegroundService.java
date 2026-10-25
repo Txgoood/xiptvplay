@@ -20,7 +20,7 @@ public class DownloadForegroundService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
             releaseWakeLock();
-            stopForeground(STOP_FOREGROUND_REMOVE);
+            stopForeground(STOP_FOREGROUND_DETACH); // Grup ozeti tamamlanan dosyalar icin gorunur kalir
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -34,6 +34,7 @@ public class DownloadForegroundService extends Service {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setGroup("com.xiptvplay.app.DOWNLOAD_GROUP")
+            .setGroupSummary(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build();
