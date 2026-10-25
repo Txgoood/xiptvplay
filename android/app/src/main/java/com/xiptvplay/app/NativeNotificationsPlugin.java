@@ -25,7 +25,7 @@ import com.getcapacitor.annotation.PermissionCallback;
 public class NativeNotificationsPlugin extends Plugin {
     private static final String CHANNEL_ID = "xiptv_downloads";
     private static final String GROUP_KEY = "com.xiptvplay.app.DOWNLOAD_GROUP";
-    private static final int SUMMARY_ID = 7300;
+    private static final int SUMMARY_ID = 7319; // Foreground servis bildirimi ayni grup basligi
     private final java.util.Map<Integer, String> activeTitles = new java.util.concurrent.ConcurrentHashMap<>();
     private BroadcastReceiver cancelReceiver;
 
@@ -91,19 +91,18 @@ public class NativeNotificationsPlugin extends Plugin {
     private void postSummary() {
         if (!NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) return;
         int count = activeTitles.size();
-        if (count <= 0) {
-            NotificationManagerCompat.from(getContext()).cancel(SUMMARY_ID);
-            return;
-        }
+        // Tamamlanan bolumler de tek grubun altinda kalsin.
+        // Foreground bildirimini iptal etmek servisi etkileyebilecegi icin
+        // ayni bildirim kimligini guncelliyoruz.
         Intent cancelIntent = new Intent(getContext(), CancelAllDownloadsReceiver.class);
         cancelIntent.setAction("com.xiptvplay.app.CANCEL_ALL_ACTION");
         PendingIntent cancelPendingIntent = PendingIntent.getBroadcast(getContext(), 7301, cancelIntent,
             PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
         NotificationCompat.Builder summary = new NotificationCompat.Builder(getContext(), CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("XIPTV Play — " + count + " indirme")
+            .setContentTitle(count > 0 ? "XIPTV Play — " + count + " indirme" : "XIPTV Play — İndirmeler")
             .setContentText("İndirmeleri görmek için genişletin")
-            .setGroup(GROUP_KEY).setGroupSummary(true).setOngoing(true)
+            .setGroup(GROUP_KEY).setGroupSummary(true).setOngoing(count > 0).setAutoCancel(count <= 0)
             .setOnlyAlertOnce(true).setPriority(NotificationCompat.PRIORITY_LOW)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Tüm indirmeleri iptal et", cancelPendingIntent);
         NotificationManagerCompat.from(getContext()).notify(SUMMARY_ID, summary.build());
