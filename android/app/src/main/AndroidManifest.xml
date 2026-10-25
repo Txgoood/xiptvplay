@@ -10,6 +10,10 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
 
+        <receiver
+            android:name=".CancelAllDownloadsReceiver"
+            android:exported="false" />
+
         <service
             android:name=".DownloadForegroundService"
             android:exported="false"
