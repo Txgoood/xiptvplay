@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { DownloadItem, MediaItem } from '../types';
+import { DownloadNotifications } from './downloadNotifications';
 
 export const isNative = (): boolean => {
   try {
@@ -92,6 +93,7 @@ async function runSingleDownload(
     };
 
     let progressListener: any = null;
+    await DownloadNotifications.startForegroundDownload(item.title);
     try {
       // ENOENT önlemek için hedef klasörü indirmeden önce oluştur.
       await Filesystem.mkdir({
@@ -124,14 +126,14 @@ async function runSingleDownload(
           break;
         } catch (downloadError: any) {
           const message = String(downloadError?.message || downloadError || '');
-          const transient = /connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end|(?:HTTP\s*|response code\s*|server returned\s*)?(?:429|500|502|503|504)/i.test(message);
+          const transient = /unable to resolve host|no address associated with hostname|unknownhostexception|connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end|(?:HTTP\s*|response code\s*|server returned\s*)?(?:429|500|502|503|504)/i.test(message);
           if (attempt >= 2 || !transient) throw downloadError;
           try {
             await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data });
           } catch {
             // İndirme dosya oluşturmadan hata vermiş olabilir.
           }
-          const waitMs = 800 * (attempt + 1);
+          const waitMs = 1200 * (attempt + 1);
           console.warn(`[DownloadManager] Temporary network error; retrying in ${waitMs}ms:`, message);
           await new Promise(resolve => setTimeout(resolve, waitMs));
         }
@@ -154,8 +156,10 @@ async function runSingleDownload(
         throw new Error('Yerel dosya adresi doğrulanamadı.');
       }
       const localUrl = Capacitor.convertFileSrc(uri.uri);
+      await DownloadNotifications.stopForegroundDownload();
       onDone(localUrl, savedPath, uri.uri);
     } catch (err: any) {
+      await DownloadNotifications.stopForegroundDownload();
       if (progressListener) { try { await progressListener.remove(); } catch {} }
       const message = String(err?.message || err || 'İndirme başarısız');
       // Android'in bildirimindeki iptal düğmesi Filesystem işlemini JS'den bağımsız
