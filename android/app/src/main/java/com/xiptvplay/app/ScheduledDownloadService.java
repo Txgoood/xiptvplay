@@ -75,7 +75,11 @@ public class ScheduledDownloadService extends Service {
                 }
                 try{download(job);}catch(Exception e){
                     if("paused".equals(job.optString("status")))continue;
-                    job.put("status","error");job.put("error",String.valueOf(e.getMessage()));
+                    int retries=job.optInt("retryCount",0)+1;
+                    job.put("retryCount",retries);
+                    job.put("status",retries>=3?"error":"paused");
+                    job.put("retryAt",System.currentTimeMillis()+15*60000L);
+                    job.put("error",String.valueOf(e.getMessage()));
                     persist(job);
                 }
             }
@@ -137,7 +141,7 @@ public class ScheduledDownloadService extends Service {
                 if(!stopped&&ScheduledDownloadStore.inWindow(job,System.currentTimeMillis())
                     && ScheduledDownloadStore.conditions(this,job)
                     && (total<=0||read>=total) && find(id)!=null){
-                    job.put("status","completed");job.put("path","downloads/"+target.getName());
+                    job.put("status","completed");job.put("retryCount",0);job.put("path","downloads/"+target.getName());
                 }else{
                     job.put("status","paused");
                     job.put("retryAt",System.currentTimeMillis()+15*60000L);
