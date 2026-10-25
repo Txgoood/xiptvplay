@@ -55,14 +55,6 @@ import org.json.JSONObject;
 
 public class NativePlayerActivity extends Activity {
     private static volatile NativePlayerActivity activeInstance;
-    private static volatile ExoPlayer activeAudioPlayer;
-    private boolean playerClosing = false;
-
-    public static boolean isActivePlayerPresent() {
-        NativePlayerActivity activity = activeInstance;
-        return activity != null && !activity.isFinishing() && !activity.isDestroyed()
-            && !activity.playerClosing && activity.player != null;
-    }
 
     public static void closeActivePlayer() {
         NativePlayerActivity activity = activeInstance;
@@ -72,7 +64,6 @@ public class NativePlayerActivity extends Activity {
     }
 
     private void closePlayerAndFinish() {
-        playerClosing = true;
         releasePlayer();
         if (!isFinishing()) {
             finishAndRemoveTask();
@@ -125,11 +116,6 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Eski PiP oturumu pencere kapandiktan sonra ses uretiyorsa sonlandir.
-        NativePlayerActivity previousActivity = activeInstance;
-        if (previousActivity != null && previousActivity != this) {
-            previousActivity.runOnUiThread(previousActivity::closePlayerAndFinish);
-        }
         activeInstance = this;
         pipActionReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
@@ -249,7 +235,6 @@ public class NativePlayerActivity extends Activity {
             .setBufferDurationsMs(minBufferMs, maxBufferMs, Math.min(1500, minBufferMs), Math.min(3000, minBufferMs))
             .build();
         player = new ExoPlayer.Builder(this).setLoadControl(loadControl).build();
-        activeAudioPlayer = player;
         // Türkçe izi varsa tercih et; yoksa ExoPlayer varsayılan ses izini seçer.
         player.setTrackSelectionParameters(
             player.getTrackSelectionParameters().buildUpon()
@@ -484,7 +469,7 @@ public class NativePlayerActivity extends Activity {
     @Override
     public void onUserLeaveHint() {
         super.onUserLeaveHint();
-        if (!playerClosing && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
                 && player != null && player.isPlaying()) {
             try {
                 PictureInPictureParams params = new PictureInPictureParams.Builder()
@@ -536,8 +521,6 @@ public class NativePlayerActivity extends Activity {
         if (isInPictureInPictureMode) {
             if (topBar != null) topBar.setVisibility(View.GONE);
             if (bottomBar != null) bottomBar.setVisibility(View.GONE);
-        } else if (isFinishing() || isDestroyed() || playerClosing) {
-            closePlayerAndFinish();
         } else {
             showControlsTemporarily();
         }
@@ -834,14 +817,12 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Kapatilan mini oynatici yasam dongusu yeniden baslasa da ses acma.
-        if (!playerClosing && player != null && !isFinishing()) player.play();
+        if (player != null) player.play();
     }
 
     @Override
     protected void onStop() {
         savePlaybackPosition();
-        playerClosing = true;
         // PiP penceresi sistem tarafından X ile kapatıldığında sesi önce sustur,
         // PlayerView bağlantısını kes ve ardından ExoPlayer'ı serbest bırak.
         releasePlayer();
@@ -849,16 +830,11 @@ public class NativePlayerActivity extends Activity {
         controlsHandler.removeCallbacks(progressUpdater);
         if (orientationListener != null) orientationListener.disable();
         super.onStop();
-        // PiP pencere X ile silindiginde Android aktiviteyi arka planda tutabilir.
-        // Oynatici kesin olarak serbest birakildi; aktiviteyi de bitir ki WebView
-        // bekleyen native play sonucunu alarak modalini kapatabilsin.
-        if (!isFinishing()) finish();
     }
 
     private void releasePlayer() {
         ExoPlayer oldPlayer = player;
         player = null;
-        if (activeAudioPlayer == oldPlayer) activeAudioPlayer = null;
         if (playerView != null) {
             try {
                 playerView.setPlayer(null);
@@ -887,7 +863,6 @@ public class NativePlayerActivity extends Activity {
             pipActionReceiver = null;
         }
 
-        playerClosing = true;
         releasePlayer();
         if (activeInstance == this) activeInstance = null;
         super.onDestroy();
