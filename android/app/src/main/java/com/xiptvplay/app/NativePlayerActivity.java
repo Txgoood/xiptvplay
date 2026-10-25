@@ -68,6 +68,7 @@ public class NativePlayerActivity extends Activity {
     private FrameLayout root;
     private FrameLayout videoContainer;
     private LinearLayout topBar;
+    private TextView currentEpisodeTitleView;
     private LinearLayout bottomBar;
     private Button fullscreenButton;
     private Button closeButton;
@@ -273,7 +274,8 @@ public class NativePlayerActivity extends Activity {
         );
         videoContainer.addView(topBar, topParams);
 
-        TextView title = new TextView(this);
+        currentEpisodeTitleView = new TextView(this);
+        TextView title = currentEpisodeTitleView;
         title.setText(getIntent().getStringExtra("title") == null ? "XIPTV Play" : getIntent().getStringExtra("title"));
         title.setTextColor(Color.WHITE);
         title.setTextSize(15);
@@ -735,6 +737,9 @@ public class NativePlayerActivity extends Activity {
         player.setMediaItem(next);
         player.prepare();
         player.play();
+        if (currentEpisodeTitleView != null) {
+            currentEpisodeTitleView.setText(titleToPlay == null || titleToPlay.isEmpty() ? "Sonraki bölüm" : titleToPlay);
+        }
         if (titleToPlay != null && !titleToPlay.isEmpty()) {
             Toast.makeText(this, "Oynatılıyor: " + titleToPlay, Toast.LENGTH_SHORT).show();
         }
