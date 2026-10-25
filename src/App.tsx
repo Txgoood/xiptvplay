@@ -62,6 +62,38 @@ export default function App() {
   // Android bildirim iznini iste; izin reddedilirse uygulama normal çalışmaya devam eder.
   useEffect(() => { void DownloadNotifications.requestPermission(); }, []);
 
+  // Bildirimdeki tekil ✕: aktif transferi iptal et, kuyruktan ve listeden sil.
+  // Tamamlanmis dosya icin depolamadaki kopyasini da sil.
+  useEffect(() => {
+    let listener: { remove: () => Promise<void> } | null = null;
+    let mounted = true;
+    void DownloadNotifications.onCancelItemRequested((id) => {
+      void import('./services/downloadManager').then(dm => dm.cancelDownload(id));
+      setDownloads(prev => {
+        const target = prev.find(d => d.id === id);
+        if (target?.offlinePath) {
+          void (async () => {
+            for (const directory of [Directory.Data, Directory.Documents]) {
+              try {
+                await Filesystem.deleteFile({ path: target.offlinePath!, directory });
+                break;
+              } catch { /* dosya diger dizinde olabilir veya zaten silinmis olabilir */ }
+            }
+          })();
+        }
+        return prev.filter(d => d.id !== id);
+      });
+      void DownloadNotifications.cancel(id);
+    }).then(handle => {
+      if (mounted) listener = handle;
+      else if (handle) void handle.remove();
+    });
+    return () => {
+      mounted = false;
+      if (listener) void listener.remove();
+    };
+  }, []);
+
   // Bildirim panelindeki toplu iptal düğmesi kuyruktaki ve aktif indirmeleri gerçekten durdurur.
   useEffect(() => {
     let listener: { remove: () => Promise<void> } | null = null;
