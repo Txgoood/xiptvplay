@@ -7,11 +7,17 @@ type NativeNotificationsPlugin = {
   cancel(options: { id: string }): Promise<void>;
   startForegroundDownload(options: { title: string }): Promise<void>;
   stopForegroundDownload(): Promise<void>;
+  addListener(eventName: 'cancelAllRequested', listenerFunc: () => void): Promise<{ remove: () => Promise<void> }>;
 };
 
 const NativeNotifications = registerPlugin<NativeNotificationsPlugin>('NativeNotifications');
 
 export const DownloadNotifications = {
+  async onCancelAllRequested(callback: () => void): Promise<{ remove: () => Promise<void> } | null> {
+    if (!Capacitor.isNativePlatform()) return null;
+    try { return await NativeNotifications.addListener('cancelAllRequested', callback); }
+    catch (error) { console.warn('[Notifications] Cancel-all listener failed:', error); return null; }
+  },
   async requestPermission(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
     try { await NativeNotifications.requestPermission(); }
