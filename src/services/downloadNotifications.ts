@@ -5,6 +5,8 @@ type NativeNotificationsPlugin = {
   showProgress(options: { id: string; title: string; progress: number; detail: string }): Promise<void>;
   complete(options: { id: string; title: string }): Promise<void>;
   cancel(options: { id: string }): Promise<void>;
+  startForegroundDownload(options: { title: string }): Promise<void>;
+  stopForegroundDownload(): Promise<void>;
 };
 
 const NativeNotifications = registerPlugin<NativeNotificationsPlugin>('NativeNotifications');
@@ -24,6 +26,16 @@ export const DownloadNotifications = {
     if (!Capacitor.isNativePlatform()) return;
     try { await NativeNotifications.complete({ id, title }); }
     catch (error) { console.warn('[Notifications] Completion notification failed:', error); }
+  },
+  async startForegroundDownload(title: string): Promise<void> {
+    if (!Capacitor.isNativePlatform()) return;
+    try { await NativeNotifications.startForegroundDownload({ title }); }
+    catch (error) { console.warn('[Notifications] Foreground download service failed:', error); }
+  },
+  async stopForegroundDownload(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) return;
+    try { await NativeNotifications.stopForegroundDownload(); }
+    catch (error) { console.warn('[Notifications] Foreground download service stop failed:', error); }
   },
   async cancel(id: string): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
