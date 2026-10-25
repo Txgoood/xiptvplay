@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { LockKeyhole, ShieldCheck, UserRound, Baby, X, Check, Settings2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { LockKeyhole, ShieldCheck, UserRound, Baby, X, Settings2 } from 'lucide-react';
 import type { MediaItem } from '../../types';
 import { ChildAge, FamilyConfiguration, FamilyProfile, FamilyProfilesService } from '../../services/familyProfiles';
-import { AutoChildScan, ChildAutoScanService } from '../../services/childAutoScan';
+import { ChildAutoScanService } from '../../services/childAutoScan';
 
 interface Props {
   mode: 'setup' | 'choose' | 'manage';
@@ -32,79 +32,83 @@ export const FamilyProfilesModal: React.FC<Props> = ({
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [autoScan, setAutoScan] = useState<AutoChildScan | null>(null);
+  const [selectionMode, setSelectionMode] = useState<'mixed' | 'manual' | 'automatic'>('mixed');
   const [scanBusy, setScanBusy] = useState(false);
   const [scanMessage, setScanMessage] = useState('');
-  const [suggestedItemIds, setSuggestedItemIds] = useState<string[]>([]);
-  const [selectedMovieCategories, setSelectedMovieCategories] = useState<string[]>([]);
-  const [requestedScan, setRequestedScan] = useState(0);
-  const previousScan = useRef<{ age: ChildAge; data: AutoChildScan } | null>(null);
+  const [scanTarget, setScanTarget] = useState<string | null>(null);
+  const [autoSuggestedCategories, setAutoSuggestedCategories] = useState<string[]>([]);
+  const [autoSuggestedItemIds, setAutoSuggestedItemIds] = useState<string[]>([]);
+  const [scannedIds, setScannedIds] = useState<Record<string, string[]>>({});
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>(configuration?.profiles.find(p => p.kind === 'child')?.allowedItemIds || []);
+  const [lastScan, setLastScan] = useState<{ checked: number; approved: number; remaining: number } | null>(null);
   const categories = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; count: number }>();
-    const approvedIds = new Set(autoScan?.suggestedItemIds || []);
-    const approvedChannelCategories = new Set(autoScan?.suggestedCategoryKeys || []);
+    const map = new Map<string, { key: string; label: string; count: number; type: MediaItem['type'] }>();
     for (const item of catalog) {
       if (!isTurkishCategory(item.category || '')) continue;
       const key = FamilyProfilesService.categoryKey(item);
-      if (item.type === 'live' ? !approvedChannelCategories.has(key) : !approvedIds.has(item.id)) continue;
-      if (!map.has(key)) map.set(key, { key, label: `${kinds[item.type]} · ${item.category || 'Genel'}`, count: 0 });
+      if (!map.has(key)) map.set(key, { key, label: \`\${kinds[item.type]} · \${item.category || 'Genel'}\`, count: 0, type: item.type });
       map.get(key)!.count++;
     }
-    return [...map.values()].filter(row => row.label.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR')))
-      .sort((a,b) => a.label.localeCompare(b.label, 'tr'));
-  }, [catalog, search, autoScan]);
+    return [...map.values()].filter(row => {
+      if (selectionMode === 'automatic') {
+        if (!autoSuggestedCategories.includes(row.key) &&
+            !catalog.some(item => FamilyProfilesService.categoryKey(item) === row.key && autoSuggestedItemIds.includes(item.id))) return false;
+      }
+      return row.label.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR'));
+    }).sort((a, b) => a.label.localeCompare(b.label, 'tr'));
+  }, [catalog, search, selectionMode, autoSuggestedCategories, autoSuggestedItemIds]);
 
-  // Scan the first batch automatically, then continue through remaining batches on demand.
-  // The approval list accumulates *verified* titles; unverified media stays blocked.
-  useEffect(() => {
-    if (mode !== 'manage') return;
-    let active = true;
-    const prior = previousScan.current?.age === age ? previousScan.current.data : null;
-    const checked = prior?.scannedItemIds || [];
+  const runScan = async (categoryKey?: string) => {
+    if (scanBusy) return;
+    const currentChecked = categoryKey ? (scannedIds[categoryKey] || []) : [];
     setScanBusy(true);
-    setScanMessage('TR kategorileri ve TMDB yaş bilgileri inceleniyor...');
-    if (!prior) {
-      setAutoScan(null); setSelectedMovieCategories([]); setSuggestedItemIds([]); setAuthorizations([]);
-    }
-    ChildAutoScanService.analyze(catalog, age, message => { if (active) setScanMessage(message); }, checked)
-      .then(result => {
-        if (!active) return;
-        const merged: AutoChildScan = prior ? {
-          ...result,
-          scannedItemIds: [...new Set([...prior.scannedItemIds, ...result.scannedItemIds])],
-          suggestedItemIds: [...new Set([...prior.suggestedItemIds, ...result.suggestedItemIds])],
-          checkedMovies: prior.checkedMovies + result.checkedMovies,
-          acceptedMovies: prior.acceptedMovies + result.acceptedMovies,
-          unknownMovies: prior.unknownMovies + result.unknownMovies,
-        } : result;
-        previousScan.current = { age, data: merged };
-        setAutoScan(merged);
-        if (prior) {
-          const approved = new Set(merged.suggestedItemIds);
-          const selectedCategories = new Set(selectedMovieCategories);
-          setSuggestedItemIds(catalog.filter(item => selectedCategories.has(FamilyProfilesService.categoryKey(item)) && approved.has(item.id)).map(item => item.id));
-        }
-        setScanMessage('Analiz tamamlandı. Önerileri kontrol edip onayla.');
-      })
-      .catch(err => { if (active) setScanMessage('Analiz tamamlanamadı: ' + (err?.message || 'Bilinmeyen hata')); })
-      .finally(() => { if (active) setScanBusy(false); });
-    return () => { active = false; };
-  }, [mode, age, catalog, requestedScan]);
-
-  const toggleSuggestedCategory = (key: string) => {
-    if (!autoScan) return;
-    if (autoScan.suggestedCategoryKeys.includes(key)) {
-      setAuthorizations(prev => prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key]);
-    } else {
-      const allowed = catalog.filter(item => FamilyProfilesService.categoryKey(item) === key
-        && autoScan.suggestedItemIds.includes(item.id)).map(item => item.id);
-      setSelectedMovieCategories(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]);
-      setSuggestedItemIds(prev => prev.some(id => allowed.includes(id))
-        ? prev.filter(id => !allowed.includes(id))
-        : [...new Set([...prev, ...allowed])]);
+    setScanTarget(categoryKey || null);
+    setError('');
+    setScanMessage(categoryKey ? 'Seçtiğin TR kategorisi yaş kontrolünden geçiriliyor...' : 'TR kanalları ve film/diziler taranıyor...');
+    try {
+      const result = await ChildAutoScanService.analyze(catalog, age, setScanMessage, currentChecked, categoryKey);
+      setAutoSuggestedCategories(prev => [...new Set([...prev, ...result.suggestedCategoryKeys])]);
+      setAutoSuggestedItemIds(prev => [...new Set([...prev, ...result.suggestedItemIds])]);
+      if (categoryKey) {
+        setScannedIds(prev => ({
+          ...prev, [categoryKey]: [...new Set([...(prev[categoryKey] || []), ...result.scannedItemIds])],
+        }));
+      }
+      setLastScan({ checked: result.checkedMovies, approved: result.acceptedMovies, remaining: result.unscannedMovies });
+      setScanMessage(\`Tarama bitti: \${result.acceptedMovies} uygun film/dizi, \${result.suggestedChannelCount} canlı kanal önerildi.\${result.unscannedMovies ? ' Kalanlar için bu kategoriyi tekrar tara.' : ''}\`);
+    } catch (err: any) {
+      setError('Otomatik tarama tamamlanamadı: ' + (err?.message || 'Bilinmeyen hata'));
+    } finally {
+      setScanBusy(false);
     }
   };
 
+  // Changing the age threshold invalidates previous automatic suggestions, not manual approvals.
+  const changeAge = (value: ChildAge) => {
+    setAge(value);
+    setAutoSuggestedCategories([]);
+    setAutoSuggestedItemIds([]);
+    setScannedIds({});
+    setLastScan(null);
+    setScanMessage('Yaş sınırı değişti. Otomatik önerileri yeniden tarayabilirsin.');
+  };
+
+  const toggleManualCategory = (key: string) => {
+    setAuthorizations(prev => prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key]);
+  };
+
+  const addAutomaticCategory = (key: string, mediaType: MediaItem['type']) => {
+    if (mediaType === 'live') {
+      if (!autoSuggestedCategories.includes(key)) return;
+      setAuthorizations(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+      return;
+    }
+    const permitted = new Set(autoSuggestedItemIds);
+    const categoryIds = catalog.filter(item => FamilyProfilesService.categoryKey(item) === key && permitted.has(item.id)).map(item => item.id);
+    if (categoryIds.length === 0) return;
+    const allApproved = categoryIds.every(id => selectedItemIds.includes(id));
+    setSelectedItemIds(prev => allApproved ? prev.filter(id => !categoryIds.includes(id)) : [...new Set([...prev, ...categoryIds])]);
+  };
 
   const submitSetup = async () => {
     setError('');
@@ -128,7 +132,7 @@ export const FamilyProfilesModal: React.FC<Props> = ({
   const save = () => {
     if (!configuration) return;
     const next = { ...configuration, profiles: configuration.profiles.map(p => p.kind === 'child'
-      ? { ...p, name: childName.trim() || 'Çocuk', ageLimit: age, allowedCategories: authorizations, allowedItemIds: suggestedItemIds }
+      ? { ...p, name: childName.trim() || 'Çocuk', ageLimit: age, allowedCategories: authorizations, allowedItemIds: selectedItemIds }
       : p) };
     onSave(next);
   };
@@ -168,45 +172,72 @@ export const FamilyProfilesModal: React.FC<Props> = ({
           </div>}
         </>}
         {mode === 'manage' && <>
-          <div className="rounded-xl bg-[#2a2a30] p-3 text-xs text-[#d6d6d6]">
-            <strong>Güvenli başlangıç:</strong> Yaş seçimi henüz otomatik film yaş doğrulaması yapmaz. Sadece ebeveynin izin verdiği kategoriler görünür. IPTV kategori etiketleri her zaman güvenilir olmayabilir.
+          <div className="rounded-xl bg-[#29292d] border border-white/10 p-3 text-xs text-[#d6d6d6]">
+            Çocuk profili varsayılan olarak kapalıdır: sadece kaydettiğin izinler geçerlidir. Otomatik kontrol TMDB yaş etiketlerine bakar; manuel seçimde bir kategorinin tamamı açılır. İki yöntem birlikte kullanılabilir.
           </div>
           <label className="block text-sm">Çocuk profili adı<input value={childName} onChange={e => setChildName(e.target.value.slice(0,32))} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3"/></label>
-          <label className="block text-sm">Yaş tercihi<select value={age} onChange={e => setAge(Number(e.target.value) as ChildAge)} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3">{ages.map(a => <option key={a} value={a}>{a}+ yaş</option>)}</select></label>
+          <label className="block text-sm">Yaş tercihi<select value={age} onChange={e => changeAge(Number(e.target.value) as ChildAge)} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3">{ages.map(a => <option key={a} value={a}>{a}+ yaş</option>)}</select></label>
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="İçerik seçim yöntemi">
+            {([
+              ['mixed', 'Karma'],
+              ['manual', 'Manuel'],
+              ['automatic', 'Otomatik'],
+            ] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setSelectionMode(value)}
+              className={'rounded-xl py-2.5 text-xs font-bold border ' + (selectionMode === value ? 'bg-[#00f0ff] border-[#00f0ff] text-[#00363a]' : 'bg-[#2b2b30] border-white/10 text-white')}>{label}</button>)}
+          </div>
           <div className="rounded-xl bg-[#00f0ff]/10 border border-[#00f0ff]/20 p-3 space-y-2">
-            <h3 className="text-sm font-semibold flex items-center gap-2"><Settings2 size={16}/> Otomatik Çocuk İçerik Analizi</h3>
-            <p className="text-xs text-[#d0eff1]">{scanMessage}</p>
-            {autoScan && <>
-              <p className="text-xs text-[#d0eff1]">🇹🇷 TR canlı: {autoScan.scannedChannels.toLocaleString('tr-TR')} · çocuk kategorilerinde önerilen kanal: {autoScan.suggestedChannelCount.toLocaleString('tr-TR')}</p>
-              <p className="text-xs text-[#d0eff1]">TMDB ile incelenen film/dizi: {autoScan.checkedMovies.toLocaleString('tr-TR')} · yaşa uygun: {autoScan.acceptedMovies.toLocaleString('tr-TR')} · belirsiz/uygunsuz: {autoScan.unknownMovies.toLocaleString('tr-TR')}</p>
-              {autoScan.unscannedMovies > 0 && <p className="text-xs text-amber-200">Bu taramada {autoScan.unscannedMovies.toLocaleString('tr-TR')} film/dizi henüz incelenmedi; otomatik izin verilmedi. Sonraki grubu taramak için aşağıdaki düğmeye bas.</p>}
-            </>}
-            <button type="button" onClick={() => {
-                if (!autoScan?.unscannedMovies) previousScan.current = null;
-                setRequestedScan(x => x + 1);
-              }} disabled={scanBusy}
-              className="rounded-lg bg-[#25252a] border border-white/20 px-3 py-2 text-xs font-semibold disabled:opacity-50">
-              {scanBusy ? 'Tarama sürüyor...' : autoScan?.unscannedMovies ? 'Sonraki 200 Film/Diziyi Tara' : 'Baştan Tara'}
+            <h3 className="text-sm font-semibold flex items-center gap-2"><Settings2 size={16}/> Akıllı içerik taraması</h3>
+            <p className="text-xs text-[#c5edf0]">{scanMessage || 'İstersen TR çocuk kanallarını ve filmleri otomatik analiz et; istersen doğrudan manuel seç.'}</p>
+            {lastScan && <p className="text-xs text-[#c5edf0]">Son tarama: {lastScan.checked} film/dizi incelendi · {lastScan.approved} uygun bulundu · {lastScan.remaining} sırada.</p>}
+            <button type="button" disabled={scanBusy} onClick={() => void runScan()}
+              className="rounded-lg bg-[#25252a] border border-white/20 px-3 py-2 text-xs font-semibold disabled:opacity-40">
+              {scanBusy && !scanTarget ? 'Taranıyor...' : 'Genel Otomatik Tara (ilk 200)'}
             </button>
           </div>
-          <div><p className="text-sm font-semibold">Otomatik elemeden geçen kategoriler</p>
-            <p className="text-[11px] text-[#b9cacb] mt-1">{activePlaylistName || 'Aktif playlist'} · Film/dizi kategorisinde yalnızca TMDB doğrulamasından geçen içeriklere izin verilir. Hepsini tek tek seçmen gerekmez.</p>
+          <div>
+            <p className="text-sm font-semibold">🇹🇷 TR Kategorileri · {activePlaylistName || 'Aktif playlist'}</p>
+            <p className="text-xs text-[#b9cacb] mt-1">
+              {selectionMode === 'manual' ? 'İstediğin TR kategorisini tamamen aç veya ayrı bir yaş taraması başlat.' :
+                selectionMode === 'automatic' ? 'Sadece otomatik taramada öneri bulunan kategoriler gösterilir. Kategori bazında doğrulanmış içerikleri ekle.' :
+                'TR kategorileri arasından hem elle izin verebilir hem de kategoriye özel otomatik analiz yapabilirsin.'}
+            </p>
           </div>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Önerilen kategorilerde ara..." className="w-full rounded-xl bg-[#2b2b30] p-3 text-sm outline-none"/>
-          <div className="max-h-[35dvh] overflow-y-auto rounded-xl border border-white/10 divide-y divide-white/5">
-            {scanBusy ? <p className="p-4 text-xs text-[#b9cacb]">Güvenli analiz bitince öneriler burada listelenecek.</p> :
-              categories.length ? categories.map(row => {
-                const channel = autoScan?.suggestedCategoryKeys.includes(row.key);
-                const checked = channel ? authorizations.includes(row.key) : selectedMovieCategories.includes(row.key);
-                return <button key={row.key} type="button" onClick={() => toggleSuggestedCategory(row.key)}
-                  className="flex items-center gap-3 w-full px-3 py-3 text-left text-sm bg-[#25252a]">
-                  <span className={'w-6 h-6 border rounded-md shrink-0 flex items-center justify-center ' + (checked ? 'bg-[#00f0ff] border-[#00f0ff] text-black' : 'border-white/30')}>{checked && <Check size={14}/>}</span>
-                  <span className="flex-1">{row.label}</span><span className="text-xs text-[#aebfc0]">{row.count.toLocaleString('tr-TR')}</span>
-                </button>;
-              }) : <p className="p-4 text-xs text-[#b9cacb]">Bu yaş sınırı için doğrulanmış TR içerik önerisi bulunamadı.</p>}
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="TR kategorisi ara..." className="w-full rounded-xl bg-[#2b2b30] p-3 text-sm outline-none"/>
+          <div className="max-h-[38dvh] overflow-y-auto rounded-xl border border-white/10 divide-y divide-white/5">
+            {categories.length ? categories.map(row => {
+              const suggestedLive = autoSuggestedCategories.includes(row.key);
+              const approvedIds = catalog.filter(item => FamilyProfilesService.categoryKey(item) === row.key && autoSuggestedItemIds.includes(item.id)).map(item => item.id);
+              const manualSelected = authorizations.includes(row.key);
+              const autoSelected = row.type === 'live' ? suggestedLive && manualSelected
+                : approvedIds.length > 0 && approvedIds.every(id => selectedItemIds.includes(id));
+              return <div key={row.key} className="p-3 space-y-2 bg-[#25252a]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold min-w-0 break-words">{row.label}</span>
+                  <span className="text-xs text-[#aebfc0] shrink-0">{row.count.toLocaleString('tr-TR')} içerik</span>
+                </div>
+                {row.type !== 'live' && approvedIds.length > 0 && <p className="text-[11px] text-[#4edea3]">TMDB doğrulamalı: {approvedIds.length} içerik</p>}
+                <div className="flex flex-wrap gap-2">
+                  {selectionMode !== 'automatic' && <button type="button" onClick={() => toggleManualCategory(row.key)}
+                    className={'rounded-lg px-2.5 py-2 text-xs font-semibold border ' + (manualSelected ? 'bg-[#00f0ff] text-[#00363a] border-[#00f0ff]' : 'bg-[#39393d] text-white border-white/10')}>
+                    {manualSelected ? '✓ Tamamına izin verildi' : 'Tamamına izin ver'}
+                  </button>}
+                  {row.type !== 'live' && <button type="button" disabled={scanBusy} onClick={() => void runScan(row.key)}
+                    className="rounded-lg px-2.5 py-2 text-xs font-semibold bg-[#39393d] text-white border border-white/10 disabled:opacity-40">
+                    {scanBusy && scanTarget === row.key ? 'Taranıyor...' : (scannedIds[row.key]?.length ? 'Sonraki 200’ü Tara' : 'Bu kategoriyi tara')}
+                  </button>}
+                  {selectionMode !== 'manual' && ((row.type === 'live' && suggestedLive) || (row.type !== 'live' && approvedIds.length > 0)) &&
+                    <button type="button" onClick={() => addAutomaticCategory(row.key, row.type)}
+                      className={'rounded-lg px-2.5 py-2 text-xs font-semibold border ' + (autoSelected ? 'bg-[#4edea3]/20 border-[#4edea3]/50 text-[#4edea3]' : 'bg-[#155561] border-[#00f0ff]/30 text-[#baf6ff]')}>
+                      {autoSelected ? '✓ Otomatik öneri seçili' : 'Doğrulananları ekle'}
+                    </button>}
+                </div>
+                {manualSelected && row.type !== 'live' && <p className="text-[11px] text-amber-200">Manuel izin bu kategorideki yaş bilgisi doğrulanmamış film/dizileri de açar.</p>}
+              </div>;
+            }) : <p className="p-4 text-xs text-[#b9cacb]">Bu görünümde eşleşen TR kategori yok. Otomatik moddaysan önce tarama başlat veya Karma / Manuel seç.</p>}
           </div>
-          <p className="text-xs text-[#b9cacb]">{authorizations.length} canlı kanal kategorisi ve {suggestedItemIds.length} doğrulanmış film/dizi seçildi. İzinler ancak kaydettiğinde aktif olur.</p>
-          <button onClick={save} disabled={scanBusy || !autoScan} className="w-full disabled:opacity-40 rounded-xl bg-[#00f0ff] text-[#00363a] p-3 font-bold">İzinleri Kaydet</button>
+          <p className="text-xs text-[#c8d1d2]">Kaydedilecekler: {authorizations.length} tam kategori + {selectedItemIds.length} ayrı onaylı film/dizi. Önceden kaydettiğin izinler korunur.</p>
+          <button type="button" onClick={save} disabled={scanBusy}
+            className="w-full disabled:opacity-40 rounded-xl bg-[#00f0ff] text-[#00363a] p-3 font-bold">İzinleri Kaydet</button>
         </>}
         {error && <p role="alert" className="rounded-lg text-sm p-2 bg-red-500/15 text-red-200">{error}</p>}
       </section>
