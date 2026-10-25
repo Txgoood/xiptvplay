@@ -818,7 +818,7 @@ async function startServer() {
     if (!token) return res.status(503).json({ error: 'TMDB anahtarı sunucuda henüz tanımlanmadı.' });
     const mediaType = req.query.type === 'series' ? 'tv' : 'movie';
     const rawTitle = typeof req.query.title === 'string' ? req.query.title : '';
-    const title = rawTitle.replace(/\\b(19|20)\\d{2}\\b/g, '').replace(/\\b(4k|uhd|1080p|720p|fhd|hdr|hevc|x265|x264|multi|dual|tr dublaj|altyazılı)\\b/gi, '').replace(/[\\[\\]{}()|._-]+/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 130);
+    const title = rawTitle.replace(/\b(19|20)\d{2}\b/g, '').replace(/\b(4k|uhd|1080p|720p|fhd|hdr|hevc|x265|x264|multi|dual|tr dublaj|altyazılı)\b/gi, '').replace(/[\[\]{}()|._-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 130);
     if (!title || title.length < 2) return res.status(400).json({ error: 'Geçerli bir film veya dizi adı bulunamadı.' });
     const authHeaders = token.startsWith('eyJ') ? { Authorization: 'Bearer ' + token } : {};
     const keyParam = token.startsWith('eyJ') ? '' : '&api_key=' + encodeURIComponent(token);
