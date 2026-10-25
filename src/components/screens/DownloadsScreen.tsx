@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DownloadItem, SystemStats } from '../../types';
+import type { ScheduledDownload } from '../../services/downloadSchedule';
 import {
   Gauge,
   Download,
@@ -23,6 +24,9 @@ import {
 
 interface DownloadsScreenProps {
   downloads: DownloadItem[];
+  scheduledDownloads: ScheduledDownload[];
+  onRefreshScheduled: () => void;
+  onCancelScheduled: (id: string) => void;
   stats: SystemStats;
   onPlayMedia: (download: DownloadItem) => void;
   onOpenDownloadedFile: (download: DownloadItem) => void;
@@ -38,6 +42,9 @@ interface DownloadsScreenProps {
 
 export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
   downloads,
+  scheduledDownloads,
+  onRefreshScheduled,
+  onCancelScheduled,
   stats,
   onPlayMedia,
   onOpenDownloadedFile,
@@ -505,6 +512,32 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
           <span>Temizle</span>
         </button>
       </div>
+
+      {/* Native Android scheduled queue (separate from immediate download manager). */}
+      <section className="bg-[#1d2329] rounded-2xl border border-[#00f0ff]/20 p-3 space-y-3">
+        <div className="flex justify-between items-center gap-2">
+          <div><h3 className="text-sm font-bold flex items-center gap-2"><Clock className="h-4 w-4 text-[#00f0ff]"/> ⏰ Planlananlar</h3>
+            <p className="text-[11px] text-[#b9cacb]">{scheduledDownloads.length} gece/saatli görev · Android arka plan kuyruğu</p>
+          </div>
+          <button onClick={onRefreshScheduled} className="rounded-xl px-3 py-2 bg-[#303136] text-xs font-semibold">Yenile</button>
+        </div>
+        {scheduledDownloads.length===0?<p className="text-xs text-[#b9cacb]">Planlanmış indirme yok. Film kartındaki saat simgesinden veya dizi ekranındaki Sezonu Zamanla düğmesinden ekleyebilirsin.</p>:
+          <div className="max-h-72 overflow-y-auto space-y-2">
+            {scheduledDownloads.map(job=><div key={job.id} className="flex gap-3 rounded-xl bg-[#282b31] p-2.5 items-center">
+              {job.poster&&<img src={job.poster} alt="" className="rounded-lg w-12 h-14 object-cover shrink-0"/>}
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold line-clamp-2">{job.title}</p>
+                <p className="text-[11px] text-[#b9cacb]">{job.mode==='night'?'🌙 '+[Math.floor(job.fromMinute/60),job.fromMinute%60].map(x=>String(x).padStart(2,'0')).join(':')+'–'+[Math.floor(job.toMinute/60),job.toMinute%60].map(x=>String(x).padStart(2,'0')).join(':'):new Date(job.startAt).toLocaleString('tr-TR')}</p>
+                <p className="text-[11px] text-[#00f0ff]">{({scheduled:'⏳ Planlandı',downloading:'⬇️ İndiriliyor',completed:'✅ Tamamlandı',paused:'⏸️ Gece/Koşul Bekliyor',error:'⚠️ Hata',cancelled:'✕ İptal'} as Record<string,string>)[job.status]||job.status}
+                  {job.bytes>0?' · '+(job.bytes/1e6).toFixed(1)+' MB':''}
+                  {job.error?' · '+job.error:''}
+                </p>
+                {job.total>0&&<div className="h-1 mt-1 rounded bg-white/10"><div className="h-full bg-[#00f0ff] rounded" style={{width:Math.min(100,100*job.bytes/job.total)+'%'}}/></div>}
+              </div>
+              {job.status!=='completed'&&<button aria-label="Planı iptal et" title="Planı iptal et" onClick={()=>onCancelScheduled(job.id)} className="p-2 rounded-lg bg-[#423035] text-[#ffb4ab]"><X className="w-4 h-4"/></button>}
+            </div>)}
+          </div>}
+      </section>
 
       {/* Queue Header */}
       <div className="flex items-center justify-between px-1">
