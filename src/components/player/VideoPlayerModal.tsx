@@ -41,6 +41,7 @@ const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 const NativeMediaPlayer = registerPlugin<{
   play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string; offlineEpisodeQueue?: Array<{uri: string; title: string}> }): Promise<{ started: boolean }>;
   stop(): Promise<void>;
+  isActive(): Promise<{ active: boolean }>;
 }>('NativeMediaPlayer');
 
 // 4 Kademeli Otomatik Kurtarma (Auto-Fallback) Seviyeleri:
@@ -62,6 +63,31 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const hlsRef = useRef<Hls | null>(null);
   const nativeLaunchKeyRef = useRef<string | null>(null);
   const nativeResumePositionRef = useRef(0);
+  // PiP penceresi sistemin X butonuyla kapatildiginda native Activity sonucu
+  // gecikebilir. Uygulama yeniden odaga gelince eski modal perde olmasin.
+  useEffect(() => {
+    if (!isOpen || Capacitor.getPlatform() !== 'android') return;
+    let cancelled = false;
+    const checkNativePlayer = () => {
+      if (document.visibilityState === 'hidden') return;
+      if (!nativeLaunchKeyRef.current || nativePlayerUnavailable) return;
+      void NativeMediaPlayer.isActive().then(status => {
+        if (!cancelled && !status.active && nativeLaunchKeyRef.current) {
+          nativeLaunchKeyRef.current = null;
+          if (videoRef.current) videoRef.current.pause();
+          onClose();
+        }
+      }).catch(() => { /* Eski native surumlerde bu kontrol olmayabilir. */ });
+    };
+    document.addEventListener('visibilitychange', checkNativePlayer);
+    window.addEventListener('focus', checkNativePlayer);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', checkNativePlayer);
+      window.removeEventListener('focus', checkNativePlayer);
+    };
+  }, [isOpen, onClose, nativePlayerUnavailable]);
+
 
   const handleClosePlayer = () => {
     if (Capacitor.getPlatform() === 'android') {
@@ -357,6 +383,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       : null;
     // Never let the fallback/proxy URL replace a verified offline file URI.
     const playbackUrl = localFileUri || effectiveUrl;
+    // HTML5 goruntusu arkada ses uretmesin; tek ses kaynagi native oynatici.
+    if (videoRef.current) videoRef.current.pause();
     NativeMediaPlayer.play({
       url: playbackUrl,
       isLocalFile: !!localFileUri,
