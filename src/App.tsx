@@ -16,6 +16,8 @@ import { SettingsScreen } from './components/screens/SettingsScreen';
 import { SeriesDetailModal } from './components/screens/SeriesDetailModal';
 import { TmdbInfoModal } from './components/screens/TmdbInfoModal';
 import { EpgGuideModal } from './components/screens/EpgGuideModal';
+import { FamilyProfilesModal } from './components/screens/FamilyProfilesModal';
+import { FamilyConfiguration, FamilyProfile, FamilyProfilesService } from './services/familyProfiles';
 import { VideoPlayerModal } from './components/player/VideoPlayerModal';
 import { PrdHub } from './components/prd/PrdHub';
 import { Info, Cast as CastIcon, Tv as TvIcon, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
@@ -55,6 +57,42 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [globalSearchTerm, setGlobalSearchTerm] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [familyConfiguration, setFamilyConfiguration] = useState<FamilyConfiguration | null>(() => FamilyProfilesService.get());
+  // Every app restart requires profile selection after family protection has been configured.
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(() => FamilyProfilesService.get() ? null : 'parent');
+  const [familyDialogMode, setFamilyDialogMode] = useState<'setup' | 'manage' | null>(null);
+  const [childFavoriteItems, setChildFavoriteItems] = useState<MediaItem[]>(() => {
+    try { const raw = JSON.parse(localStorage.getItem('xiptvplay_child_favorite_items_v1') || '[]'); return Array.isArray(raw) ? raw : []; }
+    catch { return []; }
+  });
+  const activeFamilyProfile = familyConfiguration?.profiles.find(p => p.id === currentProfileId) || null;
+  const isChildProfile = activeFamilyProfile?.kind === 'child';
+  const canAccessMedia = (item: MediaItem): boolean => !isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, item);
+  const activeFavoriteItems = isChildProfile ? childFavoriteItems : favoriteItems;
+  const childVisibleCatalog = useMemo(() => isChildProfile
+    ? catalogItems.filter(item => FamilyProfilesService.allows(activeFamilyProfile, item))
+    : catalogItems, [catalogItems, currentProfileId, familyConfiguration]);
+  const selectFamilyProfile = (profile: FamilyProfile) => {
+    setActivePlayerMedia(null);
+    setSelectedSeriesItem(null);
+    setTmdbInfoItem(null);
+    setEpgGuideItem(null);
+    setIsSearchOpen(false);
+    setIsAddModalOpen(false);
+    setIsProfileOpen(false);
+    setAppMode('app');
+    setCurrentScreen(profile.kind === 'child' ? 'catalog' : 'playlists');
+    setCurrentProfileId(profile.id);
+    setFamilyDialogMode(null);
+  };
+  const startFamilySetup = () => {
+    setIsProfileOpen(false);
+    setFamilyDialogMode(familyConfiguration ? 'manage' : 'setup');
+  };
+  const safePlay = (item: MediaItem) => {
+    if (canAccessMedia(item)) setActivePlayerMedia(item);
+    else showToast('Bu içerik çocuk profili için izinli değil.');
+  };
 
   // Toast System
   const [toast, setToast] = useState<string | null>(null);
@@ -114,6 +152,10 @@ export default function App() {
       if (listener) void listener.remove();
     };
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('xiptvplay_child_favorite_items_v1', JSON.stringify(childFavoriteItems));
+  }, [childFavoriteItems]);
 
   // Sync playlists to persistent storage whenever modified
   useEffect(() => {
@@ -346,7 +388,10 @@ export default function App() {
 
   // Favorites Toggle
   const handleToggleFavorite = (mediaId: string) => {
-    setFavoriteItems((prev) => {
+    const currentItem = catalogItems.find(item => item.id === mediaId);
+    if (isChildProfile && (!currentItem || !canAccessMedia(currentItem))) return;
+    const setter = isChildProfile ? setChildFavoriteItems : setFavoriteItems;
+    setter((prev) => {
       const exists = prev.find(item => item.id === mediaId);
       const next = exists 
         ? prev.filter((item) => item.id !== mediaId) 
@@ -358,6 +403,7 @@ export default function App() {
 
   // Download Media Handler
   const handleDownloadMedia = (item: MediaItem) => {
+    if (isChildProfile) { showToast('Çocuk profilinde indirme kapalı.'); return; }
     const existing = downloads.find((d) => d.mediaId === item.id);
     if (existing) {
       showToast(`"${item.title}" zaten indirme listesinde mevcut.`);
@@ -836,11 +882,24 @@ export default function App() {
 
   // 1- Rozet Sayısı Hesaplaması: Sadece mevcut katalogda gerçekten eşleşen favorileri say
   const allFavoritesList = useMemo(() => {
-    return favoriteItems;
-  }, [favoriteItems]);
+    return isChildProfile
+      ? childFavoriteItems.filter(item => FamilyProfilesService.allows(activeFamilyProfile, item))
+      : favoriteItems;
+  }, [isChildProfile, childFavoriteItems, favoriteItems, familyConfiguration]);
   const activeDownloadsCount = downloads.filter(
     (d) => d.status === 'downloading' || d.status === 'queued'
   ).length;
+
+  if (familyConfiguration && currentProfileId === null) {
+    return <FamilyProfilesModal
+      mode="choose"
+      configuration={familyConfiguration}
+      catalog={[]}
+      onCreate={() => {}}
+      onSave={() => {}}
+      onSelect={selectFamilyProfile}
+    />;
+  }
 
   return (
     <div className="min-h-screen bg-[#131315] text-[#e5e1e4] flex flex-col font-body selection:bg-[#00f0ff] selection:text-[#00363a]">
@@ -854,8 +913,12 @@ export default function App() {
         </div>
       )}
 
-      {/* Top Header */}
-      <Header
+      {/* Children only see a restricted header without global search or settings. */}
+      {isChildProfile && <header className="fixed inset-x-0 top-0 z-40 bg-[#1d1d20] border-b border-white/10 px-4 h-14 flex items-center justify-between">
+        <span className="font-bold text-sm text-[#00f0ff]">XIPTV Play · {activeFamilyProfile?.name}</span>
+        <button onClick={() => { setActivePlayerMedia(null); setCurrentProfileId(null); }} className="bg-[#29292c] rounded-xl border border-white/10 px-3 py-2 text-xs">Profil Değiştir</button>
+      </header>}
+      {!isChildProfile && <Header
         currentScreen={currentScreen}
         appMode={appMode}
         setAppMode={setAppMode}
@@ -864,15 +927,15 @@ export default function App() {
         isCastConnected={isCastConnected}
         userEmail={userEmail}
         onOpenProfile={() => setIsProfileOpen(true)}
-      />
+      />}
 
       {/* Main View Port */}
       <main className="flex-1 w-full pt-16 flex flex-col">
-        {appMode === 'prd' ? (
+        {appMode === 'prd' && !isChildProfile ? (
           <PrdHub onBackToApp={() => setAppMode('app')} />
         ) : (
           <>
-            {currentScreen === 'onboarding' && (
+            {!isChildProfile && currentScreen === 'onboarding' && (
               <OnboardingScreen
                 onContinueAsGuest={() => {
                   setCurrentScreen('playlists');
@@ -886,7 +949,7 @@ export default function App() {
               />
             )}
 
-            {currentScreen === 'playlists' && (
+            {!isChildProfile && currentScreen === 'playlists' && (
               <PlaylistsScreen
                 playlists={playlists}
                 stats={stats}
@@ -900,23 +963,24 @@ export default function App() {
 
             {currentScreen === 'catalog' && (
               <CatalogScreen
-                catalog={catalogItems.map((c) => ({
+                catalog={childVisibleCatalog.map((c) => ({
                   ...c,
-                  isFavorite: favoriteItems.some(f => f.id === c.id),
+                  isFavorite: activeFavoriteItems.some(f => f.id === c.id),
                 }))}
+                isChildMode={Boolean(isChildProfile)}
                 activePlaylist={activePlaylist}
-                onBackToPlaylists={() => setCurrentScreen('playlists')}
-                onPlayMedia={(item) => setActivePlayerMedia(item)}
+                onBackToPlaylists={() => { if (!isChildProfile) setCurrentScreen('playlists'); }}
+                onPlayMedia={safePlay}
                 onDownloadMedia={handleDownloadMedia}
                 onToggleFavorite={handleToggleFavorite}
-                onOpenSeriesDetail={(item) => { setCatalogTargetSeason(undefined); setSelectedSeriesItem(item); }}
-                onOpenTmdbInfo={setTmdbInfoItem}
-                onOpenEpgGuide={setEpgGuideItem}
+                onOpenSeriesDetail={(item) => { if (canAccessMedia(item)) { setCatalogTargetSeason(undefined); setSelectedSeriesItem(item); } }}
+                onOpenTmdbInfo={(item) => { if (canAccessMedia(item)) setTmdbInfoItem(item); }}
+                onOpenEpgGuide={(item) => { if (canAccessMedia(item)) setEpgGuideItem(item); }}
                 isCatalogLoading={isCatalogLoading}
               />
             )}
 
-            {currentScreen === 'downloads' && (
+            {!isChildProfile && currentScreen === 'downloads' && (
               <DownloadsScreen
                 downloads={downloads}
                 stats={stats}
@@ -933,7 +997,7 @@ export default function App() {
               />
             )}
 
-            {currentScreen === 'favorites' && (
+            {!isChildProfile && currentScreen === 'favorites' && (
               <FavoritesScreen
                 favorites={allFavoritesList}
                 onPlayMedia={(item) => {
@@ -948,7 +1012,7 @@ export default function App() {
               />
             )}
 
-            {currentScreen === 'settings' && (
+            {!isChildProfile && currentScreen === 'settings' && (
               <SettingsScreen
                 stats={stats}
                 onClearCache={handleClearCache}
@@ -960,7 +1024,7 @@ export default function App() {
       </main>
 
       {/* Bottom Nav: Only visible when in 'app' mode and not in onboarding */}
-      {appMode === 'app' && currentScreen !== 'onboarding' && (
+      {appMode === 'app' && !isChildProfile && currentScreen !== 'onboarding' && (
         <BottomNav
           currentScreen={currentScreen}
           onSelectScreen={(s) => {
@@ -973,24 +1037,24 @@ export default function App() {
       )}
 
       {/* Add Playlist Modal */}
-      <AddPlaylistModal
+      {!isChildProfile && <AddPlaylistModal
         initialType={addModalType}
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddPlaylist={handleAddPlaylist}
-      />
+      />}
 
       <EpgGuideModal
         channel={epgGuideItem}
         playlist={activePlaylist}
         onClose={() => setEpgGuideItem(null)}
-        onPlay={item => setActivePlayerMedia(item)}
+        onPlay={safePlay}
       />
 
       <TmdbInfoModal
         media={tmdbInfoItem}
         onClose={() => setTmdbInfoItem(null)}
-        onPlay={(item) => setActivePlayerMedia(item)}
+        onPlay={safePlay}
         onDownload={handleDownloadMedia}
         onOpenSeries={(item) => { setCatalogTargetSeason(undefined); setSelectedSeriesItem(item); }}
       />
@@ -1001,7 +1065,7 @@ export default function App() {
         activePlaylist={activePlaylist}
         isOpen={!!selectedSeriesItem}
         onClose={() => { setSelectedSeriesItem(null); setCatalogTargetSeason(undefined); }}
-        onPlayEpisode={handlePlayEpisode}
+        onPlayEpisode={(episode, seriesItem, nextEpisode, nextNextEpisode) => { if (canAccessMedia(seriesItem)) handlePlayEpisode(episode, seriesItem, nextEpisode, nextNextEpisode); }}
         onDownloadEpisode={handleDownloadEpisode}
         initialSeason={catalogTargetSeason}
       />
@@ -1012,6 +1076,17 @@ export default function App() {
         isOpen={!!activePlayerMedia}
         onClose={() => setActivePlayerMedia(null)}
       />
+
+      {familyDialogMode && !isChildProfile && <FamilyProfilesModal
+        mode={familyDialogMode}
+        configuration={familyConfiguration}
+        catalog={catalogItems}
+        activePlaylistName={activePlaylist?.name}
+        onCreate={(config) => { setFamilyConfiguration(config); setCurrentProfileId('parent'); setFamilyDialogMode('manage'); showToast('Çocuk profili hazır. Şimdi erişim kategorilerini seç.'); }}
+        onSave={(config) => { FamilyProfilesService.save(config); setFamilyConfiguration(config); setFamilyDialogMode(null); showToast('Çocuk profilinin izinleri kaydedildi.'); }}
+        onSelect={selectFamilyProfile}
+        onClose={() => setFamilyDialogMode(null)}
+      />}
 
       {/* Chromecast Simulation Modal */}
       {isCastOpen && (
@@ -1127,7 +1202,7 @@ export default function App() {
       )}
 
       {/* Profile Dialog */}
-      {isProfileOpen && (
+      {isProfileOpen && !isChildProfile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-[#1c1b1d] rounded-3xl p-5 border border-white/10 shadow-2xl flex flex-col gap-4 text-center items-center">
             <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#0566d9] to-[#00f0ff] flex items-center justify-center text-white text-2xl font-bold shadow-lg">
@@ -1155,6 +1230,14 @@ export default function App() {
               </div>
             </div>
             <div className="flex flex-col gap-2 w-full pt-1">
+              <button onClick={startFamilySetup}
+                className="w-full py-3 rounded-xl bg-[#00f0ff] text-[#00363a] text-sm font-bold">
+                {familyConfiguration ? 'Çocuk Profilini Yönet' : 'Çocuk Profili ve PIN Oluştur'}
+              </button>
+              {familyConfiguration && <button onClick={() => { setIsProfileOpen(false); setActivePlayerMedia(null); setCurrentProfileId(null); }}
+                className="w-full py-2.5 rounded-xl bg-[#26262a] text-white text-xs font-semibold border border-white/10">
+                Profil Değiştir
+              </button>}
               <button
                 onClick={() => {
                   setCurrentScreen('onboarding');
