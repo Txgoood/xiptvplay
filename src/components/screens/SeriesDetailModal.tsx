@@ -24,6 +24,7 @@ interface SeriesDetailModalProps {
   onClose: () => void;
   onPlayEpisode: (episode: SeriesEpisode, seriesItem: MediaItem, nextEpisode?: SeriesEpisode, nextNextEpisode?: SeriesEpisode) => void;
   onDownloadEpisode: (episode: SeriesEpisode, seriesItem: MediaItem) => void;
+  onScheduleEpisodes: (episodes: SeriesEpisode[], seriesItem: MediaItem) => void;
   initialSeason?: number;
 }
 
@@ -34,6 +35,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   onClose,
   onPlayEpisode,
   onDownloadEpisode,
+  onScheduleEpisodes,
   initialSeason,
 }) => {
   const [loading, setLoading] = useState(false);
@@ -239,6 +241,11 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                     <Download className="w-3.5 h-3.5 text-[#adc6ff]" />
                     <span>Sezonu İndir ({currentEpisodes.length})</span>
                   </button>
+                  <button
+                    onClick={() => onScheduleEpisodes(currentEpisodes, seriesItem)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0b4249] text-[#baf6ff] font-headline text-xs font-semibold border border-[#00f0ff]/30"
+                    title="Bu sezonun bölümlerini gece indirme kuyruğuna ekle"
+                  ><Calendar className="w-3.5 h-3.5"/> Sezonu Zamanla</button>
                 )}
               </div>
 
