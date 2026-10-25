@@ -80,7 +80,8 @@ public class ScheduledDownloadStore {
             if("completed".equals(status)||"cancelled".equals(status))continue;
             if("error".equals(status))continue; // errors require manual retry
             long candidate=nextWindowStart(job,now);
-            if(candidate<=now)candidate=now+15000L;
+            candidate=Math.max(candidate,job.optLong("retryAt",0));
+            if(candidate<=now)candidate=now+60000L;
             next=Math.min(next,candidate);
         }
         if(next==Long.MAX_VALUE)return;
