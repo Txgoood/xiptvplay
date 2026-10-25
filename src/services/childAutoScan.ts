@@ -6,6 +6,7 @@ import { FamilyProfilesService } from './familyProfiles';
 export interface AutoChildScan {
   suggestedCategoryKeys: string[];
   suggestedItemIds: string[];
+  scannedItemIds: string[];
   checkedMovies: number;
   acceptedMovies: number;
   unknownMovies: number;
@@ -30,7 +31,7 @@ export class ChildAutoScanService {
     alreadyCheckedIds: string[] = [],
   ): Promise<AutoChildScan> {
     const result: AutoChildScan = {
-      suggestedCategoryKeys: [], suggestedItemIds: [],
+      suggestedCategoryKeys: [], suggestedItemIds: [], scannedItemIds: [],
       checkedMovies: 0, acceptedMovies: 0, unknownMovies: 0, unscannedMovies: 0,
       suggestedChannelCount: 0, scannedChannels: 0, rejectedChannels: 0,
     };
@@ -43,10 +44,12 @@ export class ChildAutoScanService {
     result.rejectedChannels = live.length - trustedChannels.length;
     onProgress?.(`${live.length} TR canlı kanal değerlendirildi. Film ve diziler kontrol ediliyor...`);
 
+    const alreadyChecked = new Set(alreadyCheckedIds);
     const candidates = allTr.filter(item => item.type !== 'live'
       && !isSensitiveCategory(item.category || '')
-      && !alreadyCheckedIds.includes(item.id));
+      && !alreadyChecked.has(item.id));
     const scan = candidates.slice(0, SCAN_BATCH_LIMIT);
+    result.scannedItemIds = scan.map(item => item.id);
     result.unscannedMovies = Math.max(0, candidates.length - scan.length);
     for (let i = 0; i < scan.length; i += CHECK_BATCH_SIZE) {
       const batch = scan.slice(i, i + CHECK_BATCH_SIZE);
