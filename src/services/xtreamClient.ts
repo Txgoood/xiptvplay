@@ -234,7 +234,7 @@ export class XtreamClientService {
             poster: stream.stream_icon || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80',
             streamUrl: this.getSafeStreamUrl(rawStreamUrl),
             rawStreamUrl,
-            epgCurrent: stream.epg_channel_id ? `Yayın: ${stream.name}` : undefined,
+            // Actual EPG is fetched on demand by EpgService; no placeholder programme names.
             channelNumber: idx + 1,
             audioTracks: ['Ana Yayın'],
             subtitles: ['Kapalı'],
