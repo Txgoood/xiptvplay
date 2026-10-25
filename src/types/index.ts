@@ -1,4 +1,4 @@
-export type ScreenType = 'onboarding' | 'playlists' | 'catalog' | 'downloads' | 'favorites' | 'settings';
+export type ScreenType = 'onboarding' | 'playlists' | 'catalog' | 'downloads' | 'favorites' | 'history' | 'settings';
 export type AppMode = 'app' | 'prd';
 
 export interface Playlist {
