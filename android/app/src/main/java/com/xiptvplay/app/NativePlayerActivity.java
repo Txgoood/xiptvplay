@@ -70,7 +70,6 @@ public class NativePlayerActivity extends Activity {
         }
     }
 
-    private boolean stoppedForPiPClosure = false;
     private ExoPlayer player;
     private PlayerView playerView;
     private FrameLayout root;
@@ -818,21 +817,21 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (!stoppedForPiPClosure && player != null && !isFinishing()) player.play();
+        if (player != null) player.play();
     }
 
     @Override
     protected void onStop() {
         savePlaybackPosition();
-        // Normal PiP modunda onStop cagrilmaz; PiP X ile kaldirildiginda
-        // Activity durur. Player'i birakip Activity sonucunu WebView'e dondur.
-        stoppedForPiPClosure = true;
-        releasePlayer();
-        controlsHandler.removeCallbacks(hideControlsRunnable);
-        controlsHandler.removeCallbacks(progressUpdater);
-        if (orientationListener != null) orientationListener.disable();
+        // PiP'ye geciste Activity durabilir: pencere yasarken oynaticiyi
+        // kapatmak mini pencerenin tamamen kaybolmasina yol aciyordu.
+        if (!isInPictureInPictureMode()) {
+            releasePlayer();
+            controlsHandler.removeCallbacks(hideControlsRunnable);
+            controlsHandler.removeCallbacks(progressUpdater);
+            if (orientationListener != null) orientationListener.disable();
+        }
         super.onStop();
-        if (!isFinishing()) finish();
     }
 
     private void releasePlayer() {
