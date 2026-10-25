@@ -196,6 +196,8 @@ public class NativePlayerActivity extends Activity {
         player.setTrackSelectionParameters(
             player.getTrackSelectionParameters().buildUpon()
                 .setPreferredAudioLanguage("tr")
+                // Altyazilar yeni bir video basladiginda her zaman kapali.
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                 .build()
         );
         playerView.setPlayer(player);
@@ -546,13 +548,36 @@ public class NativePlayerActivity extends Activity {
                 hasTextTracks = true;
                 break;
             }
-        }        if (!hasTextTracks) {
-            Toast.makeText(this, "Bu yayında seçilebilir altyazı izi bulunamadı.", Toast.LENGTH_SHORT).show();
-            return;
         }
-        new TrackSelectionDialogBuilder(this, "Altyazı seçimi", player, C.TRACK_TYPE_TEXT)
-            .setAllowAdaptiveSelections(false)
-            .build()
+        final boolean subtitleAvailable = hasTextTracks;
+        final String[] choices = { "Kapalı", "Altyazı seç" };
+        new AlertDialog.Builder(this)
+            .setTitle("Altyazı")
+            .setSingleChoiceItems(choices,
+                player.getTrackSelectionParameters().disabledTrackTypes.contains(C.TRACK_TYPE_TEXT) ? 0 : 1,
+                (dialog, which) -> {
+                    dialog.dismiss();
+                    if (which == 0) {
+                        player.setTrackSelectionParameters(
+                            player.getTrackSelectionParameters().buildUpon()
+                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                                .build());
+                        if (subtitleButton != null) subtitleButton.setContentDescription("Altyazı: Kapalı");
+                    } else if (subtitleAvailable) {
+                        player.setTrackSelectionParameters(
+                            player.getTrackSelectionParameters().buildUpon()
+                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                                .build());
+                        new TrackSelectionDialogBuilder(this, "Altyazı seçimi", player, C.TRACK_TYPE_TEXT)
+                            .setAllowAdaptiveSelections(false)
+                            .setShowDisableOption(true)
+                            .build()
+                            .show();
+                    } else {
+                        Toast.makeText(this, "Bu yayında seçilebilir altyazı izi bulunamadı.", Toast.LENGTH_SHORT).show();
+                    }
+                })
+            .setNegativeButton("Vazgeç", null)
             .show();
     }
 
