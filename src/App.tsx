@@ -979,6 +979,7 @@ export default function App() {
                   isFavorite: activeFavoriteItems.some(f => f.id === c.id),
                 }))}
                 isChildMode={Boolean(isChildProfile)}
+                continueWatching={watchHistory.filter(e => e.media.type !== 'live' && e.durationSeconds > 0 && e.positionSeconds > 0 && !e.completed && (!isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, e.media as MediaItem)))}
                 activePlaylist={activePlaylist}
                 onBackToPlaylists={() => { if (!isChildProfile) setCurrentScreen('playlists'); }}
                 onPlayMedia={safePlay}
