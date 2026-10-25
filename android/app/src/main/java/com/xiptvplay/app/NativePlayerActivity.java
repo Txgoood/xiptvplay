@@ -55,6 +55,8 @@ import org.json.JSONObject;
 
 public class NativePlayerActivity extends Activity {
     private static volatile NativePlayerActivity activeInstance;
+    private static volatile ExoPlayer activeAudioPlayer;
+    private boolean playerClosing = false;
 
     public static void closeActivePlayer() {
         NativePlayerActivity activity = activeInstance;
@@ -64,6 +66,7 @@ public class NativePlayerActivity extends Activity {
     }
 
     private void closePlayerAndFinish() {
+        playerClosing = true;
         releasePlayer();
         if (!isFinishing()) {
             finishAndRemoveTask();
@@ -116,6 +119,11 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Eski PiP oturumu pencere kapandiktan sonra ses uretiyorsa sonlandir.
+        NativePlayerActivity previousActivity = activeInstance;
+        if (previousActivity != null && previousActivity != this) {
+            previousActivity.runOnUiThread(previousActivity::closePlayerAndFinish);
+        }
         activeInstance = this;
         pipActionReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
@@ -235,6 +243,7 @@ public class NativePlayerActivity extends Activity {
             .setBufferDurationsMs(minBufferMs, maxBufferMs, Math.min(1500, minBufferMs), Math.min(3000, minBufferMs))
             .build();
         player = new ExoPlayer.Builder(this).setLoadControl(loadControl).build();
+        activeAudioPlayer = player;
         // Türkçe izi varsa tercih et; yoksa ExoPlayer varsayılan ses izini seçer.
         player.setTrackSelectionParameters(
             player.getTrackSelectionParameters().buildUpon()
@@ -469,7 +478,7 @@ public class NativePlayerActivity extends Activity {
     @Override
     public void onUserLeaveHint() {
         super.onUserLeaveHint();
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
+        if (!playerClosing && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
                 && player != null && player.isPlaying()) {
             try {
                 PictureInPictureParams params = new PictureInPictureParams.Builder()
@@ -817,11 +826,13 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (player != null) player.play();
+        // Kapatilan mini oynatici yasam dongusu yeniden baslasa da ses acma.
+        if (!playerClosing && player != null && !isFinishing()) player.play();
     }
 
     @Override
     protected void onStop() {
+        playerClosing = true;
         savePlaybackPosition();
         // PiP penceresi sistem tarafından X ile kapatıldığında sesi önce sustur,
         // PlayerView bağlantısını kes ve ardından ExoPlayer'ı serbest bırak.
@@ -835,6 +846,7 @@ public class NativePlayerActivity extends Activity {
     private void releasePlayer() {
         ExoPlayer oldPlayer = player;
         player = null;
+        if (activeAudioPlayer == oldPlayer) activeAudioPlayer = null;
         if (playerView != null) {
             try {
                 playerView.setPlayer(null);
@@ -863,6 +875,7 @@ public class NativePlayerActivity extends Activity {
             pipActionReceiver = null;
         }
 
+        playerClosing = true;
         releasePlayer();
         if (activeInstance == this) activeInstance = null;
         super.onDestroy();
