@@ -1,7 +1,14 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { DownloadItem, MediaItem } from '../types';
 import { DownloadNotifications } from './downloadNotifications';
+type NativeDownloadBridge = {
+  downloadFile(options: { id: string; url: string; path: string }): Promise<{ path: string; fileUri: string; bytes: number }>;
+  cancelDownload(options: { id: string }): Promise<void>;
+  addListener(eventName: 'downloadProgress', listenerFunc: (event: { id: string; bytes: number; contentLength: number }) => void): Promise<{ remove: () => Promise<void> }>;
+};
+const NativeDownload = registerPlugin<NativeDownloadBridge>('NativeDownload');
+
 
 export const isNative = (): boolean => {
   try {
@@ -95,81 +102,49 @@ async function runSingleDownload(
     let progressListener: any = null;
     await DownloadNotifications.startForegroundDownload(item.title);
     try {
-      // ENOENT önlemek için hedef klasörü indirmeden önce oluştur.
-      await Filesystem.mkdir({
-        path: 'downloads',
-        directory: Directory.Data,
-        recursive: true,
-      }).catch(async (mkdirError: any) => {
-        // Bazı sürümlerde klasör zaten varsa mkdir hata verebilir; varlığını kontrol et.
-        try {
-          await Filesystem.stat({ path: 'downloads', directory: Directory.Data });
-        } catch {
-          throw mkdirError;
-        }
+      await Filesystem.mkdir({ path: 'downloads', directory: Directory.Data, recursive: true }).catch(async (mkdirError: any) => {
+        try { await Filesystem.stat({ path: 'downloads', directory: Directory.Data }); }
+        catch { throw mkdirError; }
       });
 
-      progressListener = await Filesystem.addListener('progress', progressHandler);
+      progressListener = await NativeDownload.addListener('downloadProgress', (event) => {
+        if (event.id !== item.id) return;
+        progressHandler(event);
+      });
 
-      // Sezon indirmelerinde sağlayıcı geçici olarak 429/5xx döndürebilir.
-      // Bu tip geçici hatalarda kısmi dosyayı temizleyip artan beklemeyle tekrar dene.
       let result: any;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          result = await Filesystem.downloadFile({
-            url: rawUrl,
-            path: fullPath,
-            directory: Directory.Data,
-            recursive: true,
-            progress: true,
-          });
+          result = await NativeDownload.downloadFile({ id: item.id, url: rawUrl, path: fullPath });
           break;
         } catch (downloadError: any) {
           const message = String(downloadError?.message || downloadError || '');
           const transient = /unable to resolve host|no address associated with hostname|unknownhostexception|connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end|(?:HTTP\s*|response code\s*|server returned\s*)?(?:429|500|502|503|504)/i.test(message);
-          if (attempt >= 2 || !transient) throw downloadError;
-          try {
-            await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data });
-          } catch {
-            // İndirme dosya oluşturmadan hata vermiş olabilir.
-          }
+          if (cancelledDownloadIds.has(item.id) || attempt >= 2 || !transient) throw downloadError;
+          try { await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data }); } catch {}
           const waitMs = 1200 * (attempt + 1);
-          console.warn(`[DownloadManager] Temporary network error; retrying in ${waitMs}ms:`, message);
+          console.warn(`[DownloadManager] Temporary network error; retrying in ${waitMs}ms: `, message);
           await new Promise(resolve => setTimeout(resolve, waitMs));
         }
       }
       if (!result) throw new Error('İndirme tamamlanamadı; bağlantı hatası sonrası tekrar denendi.');
-
       if (progressListener) { try { await progressListener.remove(); } catch {} }
-
-      // Use the requested relative path, not result.path: on some Capacitor versions
-      // result.path can be an absolute native path that Filesystem.stat/getUri cannot
-      // resolve relative to Directory.Data.
-      const savedPath = fullPath;
+      const savedPath = result.path || fullPath;
       const fileInfo = await Filesystem.stat({ path: savedPath, directory: Directory.Data });
-      const actualBytes = Number(fileInfo.size || 0);
-      if (!Number.isFinite(actualBytes) || actualBytes <= 0) {
-        throw new Error('İndirilen dosya boş görünüyor; dosya doğrulanamadı.');
-      }
-      const uri = await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
-      if (!uri.uri || !uri.uri.startsWith('file://')) {
-        throw new Error('Yerel dosya adresi doğrulanamadı.');
-      }
+      const actualBytes = Number(fileInfo.size || result.bytes || 0);
+      if (!Number.isFinite(actualBytes) || actualBytes <= 0) throw new Error('İndirilen dosya boş görünüyor; dosya doğrulanamadı.');
+      const uri = result.fileUri ? { uri: result.fileUri } : await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
+      if (!uri.uri || !uri.uri.startsWith('file://')) throw new Error('Yerel dosya adresi doğrulanamadı.');
       const localUrl = Capacitor.convertFileSrc(uri.uri);
       await DownloadNotifications.stopForegroundDownload();
       onDone(localUrl, savedPath, uri.uri);
     } catch (err: any) {
+      try { await NativeDownload.cancelDownload({ id: item.id }); } catch {}
       await DownloadNotifications.stopForegroundDownload();
       if (progressListener) { try { await progressListener.remove(); } catch {} }
       const message = String(err?.message || err || 'İndirme başarısız');
-      // Android'in bildirimindeki iptal düğmesi Filesystem işlemini JS'den bağımsız
-      // durdurabilir. İptal edilen transferin yarım dosyasını ve kaydını temizle.
-      if (/cancel(?:led|ed)?|canceled|user.?abort|aborted by user|iptal/i.test(message)) {
-        try {
-          await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data });
-        } catch {
-          // Dosya hiç oluşmadıysa temizlenecek bir şey yoktur.
-        }
+      if (/cancel(?:led|ed)?|canceled|user.?abort|aborted by user|iptal/i.test(message) || cancelledDownloadIds.has(item.id)) {
+        try { await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data }); } catch {}
         onError('İndirme iptal edildi.');
         return;
       }
