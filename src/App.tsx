@@ -16,6 +16,8 @@ import { SettingsScreen } from './components/screens/SettingsScreen';
 import { SeriesDetailModal } from './components/screens/SeriesDetailModal';
 import { TmdbInfoModal } from './components/screens/TmdbInfoModal';
 import { EpgGuideModal } from './components/screens/EpgGuideModal';
+import { WatchHistoryScreen } from './components/screens/WatchHistoryScreen';
+import { WatchHistoryEntry, WatchHistoryService } from './services/watchHistory';
 import { FamilyProfilesModal } from './components/screens/FamilyProfilesModal';
 import { FamilyConfiguration, FamilyProfile, FamilyProfilesService } from './services/familyProfiles';
 import { VideoPlayerModal } from './components/player/VideoPlayerModal';
@@ -66,6 +68,11 @@ export default function App() {
     catch { return []; }
   });
   const activeFamilyProfile = familyConfiguration?.profiles.find(p => p.id === currentProfileId) || null;
+  const historyProfileId = currentProfileId || 'parent';
+  const [watchHistory, setWatchHistory] = useState<WatchHistoryEntry[]>(() => WatchHistoryService.read('parent'));
+  const profileRef = useRef(historyProfileId);
+  profileRef.current = historyProfileId;
+  useEffect(() => { setWatchHistory(WatchHistoryService.read(historyProfileId)); }, [historyProfileId]);
   const isChildProfile = activeFamilyProfile?.kind === 'child';
   const canAccessMedia = (item: MediaItem): boolean => !isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, item);
   const activeFavoriteItems = isChildProfile ? childFavoriteItems : favoriteItems;
@@ -90,7 +97,7 @@ export default function App() {
     setFamilyDialogMode(familyConfiguration ? 'manage' : 'setup');
   };
   const safePlay = (item: MediaItem) => {
-    if (canAccessMedia(item)) setActivePlayerMedia(item);
+    if (canAccessMedia(item)) { setWatchHistory(WatchHistoryService.record(historyProfileId, item)); setActivePlayerMedia(item); }
     else showToast('Bu içerik çocuk profili için izinli değil.');
   };
 
@@ -545,6 +552,7 @@ export default function App() {
 
   // Series Episode Play Handler
   const handlePlayEpisode = (episode: SeriesEpisode, seriesItem: MediaItem, nextEpisode?: SeriesEpisode, nextNextEpisode?: SeriesEpisode) => {
+    if (!canAccessMedia(seriesItem)) return;
     const seasonStr = String(episode.seasonNum).padStart(2, '0');
     const epStr = String(episode.episodeNum).padStart(2, '0');
 
@@ -616,6 +624,7 @@ export default function App() {
         episodeMedia.nextNextEpisodeTitle = `${seriesItem.title} - S${nextNextSeasonStr}E${nextNextEpStr}: ${nextNextEpisode.title}`;
       }
     }
+    setWatchHistory(WatchHistoryService.record(historyProfileId, episodeMedia));
     setActivePlayerMedia(episodeMedia);
   };
 
@@ -669,6 +678,7 @@ export default function App() {
   // İndirilen dosyayı oynatmadan önce gerçek dosyanın hâlâ cihazda olduğunu doğrula.
   // Yeni indirmeler Data/downloads altına kaydedilir; eski Documents kayıtları da desteklenir.
   const handlePlayDownloadedItem = async (item: DownloadItem) => {
+    if (isChildProfile) return;
     const relativePath = item.offlinePath;
     if (relativePath) {
       try {
@@ -1001,6 +1011,7 @@ export default function App() {
               <FavoritesScreen
                 favorites={allFavoritesList}
                 onPlayMedia={(item) => {
+                  setWatchHistory(WatchHistoryService.record(historyProfileId, item));
                   if (item.type === 'series') {
                     setSelectedSeriesItem(item);
                   } else {
@@ -1012,6 +1023,21 @@ export default function App() {
               />
             )}
 
+            {currentScreen === 'history' && (
+              <WatchHistoryScreen
+                entries={watchHistory.filter(e => !isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, e.media as MediaItem))}
+                isChildMode={Boolean(isChildProfile)}
+                onPlay={(item) => {
+                  if (isChildProfile && !FamilyProfilesService.allows(activeFamilyProfile, item as MediaItem)) { showToast('Bu içerik çocuk profili için izinli değil.'); return; }
+                  setWatchHistory(WatchHistoryService.record(historyProfileId, item));
+                  setActivePlayerMedia(item);
+                }}
+                onRemove={(id) => setWatchHistory(WatchHistoryService.remove(historyProfileId, id))}
+                onComplete={(id) => setWatchHistory(WatchHistoryService.complete(historyProfileId, id))}
+                onClear={() => setWatchHistory(WatchHistoryService.clear(historyProfileId))}
+                onBack={() => setCurrentScreen('catalog')}
+              />
+            )}
             {!isChildProfile && currentScreen === 'settings' && (
               <SettingsScreen
                 stats={stats}
@@ -1035,6 +1061,11 @@ export default function App() {
           favoritesCount={allFavoritesList.length}
         />
       )}
+
+      {isChildProfile && <button onClick={() => setCurrentScreen(currentScreen === 'history' ? 'catalog' : 'history')}
+        className="fixed bottom-5 right-5 z-40 rounded-full bg-[#00f0ff] text-[#00363a] px-4 py-3 text-xs font-bold shadow-xl">
+        {currentScreen === 'history' ? 'Kataloğa Dön' : '🕘 Geçmiş'}
+      </button>}
 
       {/* Add Playlist Modal */}
       {!isChildProfile && <AddPlaylistModal
@@ -1075,6 +1106,9 @@ export default function App() {
         media={activePlayerMedia}
         isOpen={!!activePlayerMedia}
         onClose={() => setActivePlayerMedia(null)}
+        onProgress={(media, positionSeconds, durationSeconds, completed) => {
+          setWatchHistory(WatchHistoryService.record(profileRef.current, media, positionSeconds, durationSeconds, completed));
+        }}
       />
 
       {familyDialogMode && !isChildProfile && <FamilyProfilesModal
