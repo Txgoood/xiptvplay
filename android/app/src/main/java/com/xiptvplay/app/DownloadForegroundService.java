@@ -68,7 +68,9 @@ public class DownloadForegroundService extends Service {
                     .setCategory(NotificationCompat.CATEGORY_PROGRESS)
                     .setOnlyAlertOnce(true)
                     .setOngoing(!finished)
-                    .setPriority(NotificationCompat.PRIORITY_LOW);
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .addAction(android.R.drawable.ic_menu_close_clear_cancel, "✕ İptal ve sil",
+                        NativeNotificationsPlugin.individualCancelIntent(context, id));
                 if (NotificationManagerCompat.from(context).areNotificationsEnabled()) {
                     NotificationManagerCompat.from(context).notify(id.hashCode() & 0x7fffffff, builder.build());
                 }
