@@ -39,6 +39,9 @@ export const ScheduleDownloadModal: React.FC<Props> = ({items,onClose,onSaved}) 
     const job:ScheduledDownload={
       id:'sched-'+Date.now()+'-'+done+'-'+Math.random().toString(36).slice(2,6),
       title:item.title,mediaId:item.id,url,poster:item.poster,
+      mediaType:item.type==='movie'?'movie':'series',playlistId:item.playlistId,
+      resolution:item.resolution,category:item.category,seriesTitle:item.seriesTitle,
+      seasonNumber:item.seasonNumber,episodeNumber:item.episodeNumber,episodeTitle:item.episodeTitle,
       mode,startAt:mode==='once'?dateMs:Date.now(),
       fromMinute:clockMinutes(start),toMinute:clockMinutes(end),
       wifiOnly,chargingOnly,status:'scheduled',bytes:0,total:0,
