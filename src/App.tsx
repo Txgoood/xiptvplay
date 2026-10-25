@@ -457,9 +457,9 @@ export default function App() {
               setDownloads(prev => prev.map(d => d.id === newDownload.id ? {
                 ...d,
                 status,
-                statusLabel: status === 'downloading' ? 'İniyor' : 'Sırada bekliyor',
+                statusLabel: status === 'downloading' ? 'İniyor' : status === 'paused' ? 'Duraklatıldı' : 'Sırada bekliyor',
                 queueOrder: status === 'queued' ? queueOrder : undefined,
-                speedMbps: status === 'queued' ? 0 : d.speedMbps,
+                speedMbps: status !== 'downloading' ? 0 : d.speedMbps,
               } : d));
             }
         );
@@ -675,13 +675,13 @@ export default function App() {
     }
   };
 
-  // Downloads Batch Actions
+  // Duraklat/devam: gercek native akisi kontrol eder, dosyayi silmez.
   const handlePauseAll = () => {
-    showToast('Gerçek duraklat/devam özelliği bu indirme altyapısında henüz desteklenmiyor. İndirmeyi iptal edip yeniden başlatabilirsiniz.');
+    void import('./services/downloadManager').then(dm => dm.pauseAllDownloads());
   };
 
   const handleResumeAll = () => {
-    showToast('Gerçek kaldığı yerden devam özelliği henüz desteklenmiyor; yanıltıcı durum göstermek yerine indirmeyi yeniden başlatın.');
+    void import('./services/downloadManager').then(dm => dm.resumeAllDownloads());
   };
 
   const handleClearCompleted = () => {
@@ -691,11 +691,13 @@ export default function App() {
 
   const handleTogglePauseItem = (id: string) => {
     const item = downloads.find(d => d.id === id);
-    if (item?.status === 'queued') {
-      handleCancelItem(id);
-      return;
-    }
-    showToast('Gerçek duraklat/devam özelliği henüz desteklenmiyor. Aktif indirme için bu düğme indirmeyi durdurmaz.');
+    if (!item || item.status === 'completed') return;
+    void import('./services/downloadManager').then(async dm => {
+      const success = item.status === 'paused'
+        ? await dm.resumeDownload(id)
+        : await dm.pauseDownload(id);
+      if (!success) showToast('İndirme durumu değiştirilemedi. Tekrar deneyin.');
+    });
   };
 
   const handleDeleteDownload = async (id: string) => {
