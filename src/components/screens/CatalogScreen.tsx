@@ -11,6 +11,7 @@ import {
   Download,
   Layers,
   Film,
+  Info,
   Sparkles,
   ChevronDown,
   ListFilter,
@@ -24,6 +25,7 @@ interface CatalogScreenProps {
   onDownloadMedia: (item: MediaItem) => void;
   onToggleFavorite: (id: string) => void;
   onOpenSeriesDetail: (item: MediaItem) => void;
+  onOpenTmdbInfo: (item: MediaItem) => void;
   isCatalogLoading?: boolean;
 }
 
@@ -37,6 +39,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   onDownloadMedia,
   onToggleFavorite,
   onOpenSeriesDetail,
+  onOpenTmdbInfo,
   isCatalogLoading,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'live' | 'movie' | 'series'>('all');
@@ -385,11 +388,8 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
                   {/* Poster / Thumbnail with click interaction */}
                   <div
                     onClick={() => {
-                      if (isSeries) {
-                        onOpenSeriesDetail(item);
-                      } else {
-                        onPlayMedia(item);
-                      }
+                      if (!isLive) onOpenTmdbInfo(item);
+                      else onPlayMedia(item);
                     }}
                     className="relative aspect-video rounded-xl bg-[#2a2a2c] overflow-hidden cursor-pointer"
                   >
@@ -457,11 +457,8 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
                   <div className="flex flex-col min-w-0">
                     <h4
                       onClick={() => {
-                        if (isSeries) {
-                          onOpenSeriesDetail(item);
-                        } else {
-                          onPlayMedia(item);
-                        }
+                        if (!isLive) onOpenTmdbInfo(item);
+                        else onPlayMedia(item);
                       }}
                       className="font-headline text-[14px] font-bold text-[#e5e1e4] truncate cursor-pointer hover:text-[#00f0ff] transition-colors"
                       title={item.title}
@@ -488,6 +485,11 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                    {!isLive && <button
+                      onClick={() => onOpenTmdbInfo(item)}
+                      className="h-9 px-3 rounded-full bg-[#201f21] text-[#00f0ff] border border-white/10 flex items-center justify-center gap-1 text-xs font-semibold"
+                      title="Film / dizi bilgileri"
+                    ><Info className="w-4 h-4" /><span>Bilgi</span></button>
                     {isSeries ? (
                       <button
                         onClick={() => onOpenSeriesDetail(item)}
