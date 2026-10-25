@@ -15,6 +15,9 @@ interface Props {
 }
 const ages: ChildAge[] = [3, 7, 13, 16];
 const kinds: Record<string, string> = { live: 'Canlı TV', movie: 'Film', series: 'Dizi' };
+// Only Turkish-prefixed IPTV categories are offered in the child approval list.
+// Matching the category itself (not the media title) avoids false positives.
+const isTurkishCategory = (category: string): boolean => /^TR(?:\\b|[\\s:|_\\-])/i.test(category.trim());
 
 export const FamilyProfilesModal: React.FC<Props> = ({
   mode, configuration, catalog, activePlaylistName, onCreate, onSave, onSelect, onClose,
@@ -31,6 +34,7 @@ export const FamilyProfilesModal: React.FC<Props> = ({
   const categories = useMemo(() => {
     const map = new Map<string, { key: string; label: string; count: number }>();
     for (const item of catalog) {
+      if (!isTurkishCategory(item.category || '')) continue;
       const key = FamilyProfilesService.categoryKey(item);
       if (!map.has(key)) map.set(key, { key, label: `${kinds[item.type]} · ${item.category || 'Genel'}`, count: 0 });
       map.get(key)!.count++;
@@ -107,13 +111,16 @@ export const FamilyProfilesModal: React.FC<Props> = ({
           <label className="block text-sm">Çocuk profili adı<input value={childName} onChange={e => setChildName(e.target.value.slice(0,32))} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3"/></label>
           <label className="block text-sm">Yaş tercihi<select value={age} onChange={e => setAge(Number(e.target.value) as ChildAge)} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3">{ages.map(a => <option key={a} value={a}>{a}+ yaş</option>)}</select></label>
           <div><p className="text-sm font-semibold"><Settings2 className="inline mr-1 w-4 h-4"/> İzin verilen kategoriler</p><p className="text-[11px] text-[#b9cacb] mt-1">{activePlaylistName || 'Aktif playlist'} · İzin verilmeyen tüm içerikler gizlenir. Film/dizi kategorilerini açmadan önce uygunluklarını kontrol et.</p></div>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Kategori ara..." className="w-full rounded-xl bg-[#2b2b30] p-3 text-sm outline-none"/>
+          <div className="rounded-xl bg-[#00f0ff]/10 border border-[#00f0ff]/20 p-3 text-xs text-[#c6f8fc]">
+            <strong>🇹🇷 TR kategori filtresi aktif.</strong> Yalnızca adı TR ile başlayan kategoriler listelenir. Bu kategoriler otomatik açılmaz; uygun bulduklarını sen seçersin.
+          </div>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="TR kategorilerinde ara..." className="w-full rounded-xl bg-[#2b2b30] p-3 text-sm outline-none"/>
           <div className="max-h-[35dvh] overflow-y-auto rounded-xl border border-white/10 divide-y divide-white/5">
             {categories.length ? categories.map(row => <button key={row.key} type="button" onClick={() => setAuthorizations(prev => prev.includes(row.key) ? prev.filter(x=>x!==row.key) : [...prev,row.key])}
               className="flex items-center gap-3 w-full px-3 py-3 text-left text-sm bg-[#25252a]">
               <span className={'w-6 h-6 border rounded-md shrink-0 flex items-center justify-center ' + (authorizations.includes(row.key) ? 'bg-[#00f0ff] border-[#00f0ff] text-black' : 'border-white/30')}>{authorizations.includes(row.key) && <Check size={14}/>}</span>
               <span className="flex-1">{row.label}</span><span className="text-xs text-[#aebfc0]">{row.count.toLocaleString('tr-TR')}</span>
-            </button>) : <p className="p-4 text-xs text-[#b9cacb]">Bu playlistte eşleşen kategori yok. Önce playlisti Ana Profil'de aç.</p>}
+            </button>) : <p className="p-4 text-xs text-[#b9cacb]">TR ile başlayan eşleşen kategori bulunamadı. Aktif playlistte TR kategorileri olup olmadığını kontrol et veya aramayı temizle.</p>}
           </div>
           <p className="text-xs text-[#b9cacb]">{authorizations.length} kategoriye izin verildi. Yeni eklenen içerikler, izin verilen kategorideyse otomatik görünür.</p>
           <button onClick={save} className="w-full rounded-xl bg-[#00f0ff] text-[#00363a] p-3 font-bold">İzinleri Kaydet</button>
