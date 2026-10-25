@@ -56,6 +56,7 @@ export interface MediaItem {
   nextNextEpisodeUrl?: string;
   nextNextEpisodeTitle?: string;
   seriesTitle?: string;
+  parentSeriesId?: string;
   seasonNumber?: number;
   episodeNumber?: number;
   episodeTitle?: string;
