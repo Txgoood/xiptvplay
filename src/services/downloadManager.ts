@@ -124,7 +124,7 @@ async function runSingleDownload(
           break;
         } catch (downloadError: any) {
           const message = String(downloadError?.message || downloadError || '');
-          const transient = /connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end|HTTP\\s*(?:429|5\\d\\d)|response code\\s*(?:429|5\\d\\d)|server returned\\s*(?:429|5\\d\\d)/i.test(message);
+          const transient = /connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end|(?:HTTP\s*|response code\s*|server returned\s*)?(?:429|500|502|503|504)/i.test(message);
           if (attempt >= 2 || !transient) throw downloadError;
           try {
             await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data });
