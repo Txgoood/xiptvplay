@@ -77,7 +77,8 @@ async function runSingleDownload(
     const progressHandler = (progress: any) => {
       const bytes = Number(progress.bytes ?? progress.receivedBytes ?? 0);
       const contentLength = Number(progress.contentLength ?? progress.totalBytes ?? 0);
-      const percent = contentLength > 0 ? Math.round((bytes / contentLength) * 100) : 0;
+      // Android bildirimiyle ayni yuzde hesaplama kuralini kullan.
+      const percent = contentLength > 0 ? Math.floor((bytes / contentLength) * 100) : 0;
       const downloadedGb = bytes / 1e9;
 
       const now = Date.now();
@@ -88,7 +89,8 @@ async function runSingleDownload(
       smoothedBytesPerSecond = smoothedBytesPerSecond === 0
         ? instantaneousBps
         : (smoothedBytesPerSecond * 0.72) + (instantaneousBps * 0.28);
-      const speedMbps = (smoothedBytesPerSecond * 8) / 1e6;
+      // Arayuzde MB/sn gosteriliyor: bit/saniye degil, bayt/saniye hesapla.
+      const speedMbps = smoothedBytesPerSecond / 1e6;
       lastBytes = Math.max(lastBytes, bytes);
       lastTime = now;
 
