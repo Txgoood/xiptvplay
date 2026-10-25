@@ -361,7 +361,8 @@ export default function App() {
         dm.startDownload(
             newDownload,
             (progress, downloadedGb, speedMbps, eta, reportedTotalSizeGb) => {
-                void DownloadNotifications.progress(newDownload.id, item.title, progress, `${progress}% • ${speedMbps.toFixed(1)} Mbps`);
+                 // Native Android indirme motoru bildirimin tek ilerleme kaynagidir.
+                 // Geciken JS olaylari daha eski yuzdeyle bildirimi ezmemeli.
                 setDownloads(prev => prev.map(d => {
                   if (d.id !== newDownload.id) return d;
                   const totalSizeGb = reportedTotalSizeGb && reportedTotalSizeGb > 0 ? reportedTotalSizeGb : d.totalSizeGb;
