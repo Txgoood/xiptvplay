@@ -142,7 +142,8 @@ async function runSingleDownload(
       onDone(localUrl, savedPath, uri.uri);
     } catch (err: any) {
       try { await NativeDownload.cancelDownload({ id: item.id }); } catch {}
-      await DownloadNotifications.stopForegroundDownload();
+      // Sirada baska bolum varsa foreground servisini burada kapatma.
+      // Kuyruk tamamen bittiginde processDownloadQueue servisi durdurur.
       if (progressListener) { try { await progressListener.remove(); } catch {} }
       const message = String(err?.message || err || 'İndirme başarısız');
       if (/cancel(?:led|ed)?|canceled|user.?abort|aborted by user|iptal/i.test(message) || cancelledDownloadIds.has(item.id)) {
