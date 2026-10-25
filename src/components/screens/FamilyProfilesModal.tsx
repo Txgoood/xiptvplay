@@ -95,6 +95,9 @@ export const FamilyProfilesModal: React.FC<Props> = ({
 
   // Changing the age threshold invalidates previous automatic suggestions, not manual approvals.
   const changeAge = (value: ChildAge) => {
+    if (value === age) return;
+    // Previously verified titles must not remain approved after changing the age policy.
+    setSelectedItemIds([]);
     setAge(value);
     setAutoSuggestedCategories([]);
     setAutoSuggestedItemIds([]);
