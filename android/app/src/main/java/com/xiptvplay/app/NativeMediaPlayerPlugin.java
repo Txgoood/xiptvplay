@@ -12,6 +12,13 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "NativeMediaPlayer")
 public class NativeMediaPlayerPlugin extends Plugin {
     @PluginMethod
+    public void isActive(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("active", NativePlayerActivity.isActivePlayerPresent());
+        call.resolve(result);
+    }
+
+    @PluginMethod
     public void stop(PluginCall call) {
         NativePlayerActivity.closeActivePlayer();
         call.resolve();
