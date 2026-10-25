@@ -46,7 +46,7 @@ export const FamilyProfilesModal: React.FC<Props> = ({
     for (const item of catalog) {
       if (!isTurkishCategory(item.category || '')) continue;
       const key = FamilyProfilesService.categoryKey(item);
-      if (!map.has(key)) map.set(key, { key, label: \`\${kinds[item.type]} · \${item.category || 'Genel'}\`, count: 0, type: item.type });
+      if (!map.has(key)) map.set(key, { key, label: `${kinds[item.type]} · ${item.category || 'Genel'}`, count: 0, type: item.type });
       map.get(key)!.count++;
     }
     return [...map.values()].filter(row => {
@@ -75,7 +75,7 @@ export const FamilyProfilesModal: React.FC<Props> = ({
         }));
       }
       setLastScan({ checked: result.checkedMovies, approved: result.acceptedMovies, remaining: result.unscannedMovies });
-      setScanMessage(\`Tarama bitti: \${result.acceptedMovies} uygun film/dizi, \${result.suggestedChannelCount} canlı kanal önerildi.\${result.unscannedMovies ? ' Kalanlar için bu kategoriyi tekrar tara.' : ''}\`);
+      setScanMessage(`Tarama bitti: ${result.acceptedMovies} uygun film/dizi, ${result.suggestedChannelCount} canlı kanal önerildi.${result.unscannedMovies ? ' Kalanlar için bu kategoriyi tekrar tara.' : ''}`);
     } catch (err: any) {
       setError('Otomatik tarama tamamlanamadı: ' + (err?.message || 'Bilinmeyen hata'));
     } finally {
