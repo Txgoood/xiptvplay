@@ -25,6 +25,7 @@ interface CatalogScreenProps {
   onBackToPlaylists: () => void;
   onPlayMedia: (item: MediaItem) => void;
   onDownloadMedia: (item: MediaItem) => void;
+  onScheduleMedia: (item: MediaItem) => void;
   onToggleFavorite: (id: string) => void;
   onOpenSeriesDetail: (item: MediaItem) => void;
   onOpenTmdbInfo: (item: MediaItem) => void;
@@ -42,6 +43,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   onBackToPlaylists,
   onPlayMedia,
   onDownloadMedia,
+  onScheduleMedia,
   onToggleFavorite,
   onOpenSeriesDetail,
   onOpenTmdbInfo,
@@ -537,6 +539,11 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
                       </button>
                     )}
 
+                    {!isChildMode && !isSeries && !isLive && <button
+                      onClick={() => onScheduleMedia(item)}
+                      title="Zamanlanmış İndirme"
+                      className="h-9 px-3 rounded-full bg-[#201f21] text-[#00f0ff] border border-white/10 text-xs font-semibold"
+                    ><CalendarDays className="w-4 h-4"/></button>}
                     {!isChildMode && <button
                       onClick={() => {
                         if (isSeries) {
