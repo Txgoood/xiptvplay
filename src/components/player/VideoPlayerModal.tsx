@@ -34,6 +34,7 @@ interface VideoPlayerModalProps {
   media: MediaItem | DownloadItem | null;
   isOpen: boolean;
   onClose: () => void;
+  onProgress?: (media: MediaItem | DownloadItem, positionSeconds: number, durationSeconds: number, completed?: boolean) => void;
 }
 
 const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
@@ -55,6 +56,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   media,
   isOpen,
   onClose,
+  onProgress,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,6 +64,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const hlsRef = useRef<Hls | null>(null);
   const nativeLaunchKeyRef = useRef<string | null>(null);
   const nativeResumePositionRef = useRef(0);
+  const lastHistorySaveRef = useRef(0);
 
   const handleClosePlayer = () => {
     if (Capacitor.getPlatform() === 'android') {
@@ -375,9 +378,11 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       .then((result) => {
         if (result?.returnedToInline) {
           nativeResumePositionRef.current = Math.max(0, Number(result.positionMs || 0) / 1000);
+          if (onProgress && nativeResumePositionRef.current > 0 && media) onProgress(media, nativeResumePositionRef.current, 0);
           setNativePlayerUnavailable(true);
           triggerNotice('Uygulama içi oynatıcıya dönüldü.');
         } else {
+          if (onProgress && media && Number(result?.positionMs || 0) > 0) onProgress(media, Math.max(0, Number(result.positionMs) / 1000), Math.max(0, Number(result.durationMs || 0) / 1000));
           onClose();
         }
       })
@@ -635,6 +640,12 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
+      const now = Date.now();
+      if (onProgress && media && media.type !== 'live' && now - lastHistorySaveRef.current >= 7000
+          && Number.isFinite(videoRef.current.currentTime) && videoRef.current.currentTime > 0) {
+        lastHistorySaveRef.current = now;
+        onProgress(media, videoRef.current.currentTime, Number.isFinite(videoRef.current.duration) ? videoRef.current.duration : 0);
+      }
       if (videoRef.current.duration && !isNaN(videoRef.current.duration)) {
         setDuration(videoRef.current.duration);
       }
@@ -848,7 +859,10 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           key={`${media.id}-${fallbackStage}`}
           poster={media.poster}
           onTimeUpdate={handleTimeUpdate}
-          onEnded={() => setIsPlaying(false)}
+          onEnded={() => {
+            setIsPlaying(false);
+            if (onProgress && media && media.type !== 'live') onProgress(media, videoRef.current?.duration || 0, videoRef.current?.duration || 0, true);
+          }}
           onError={(e) => {
             if (hlsRef.current || !e.currentTarget.currentSrc) return;
             const code = e.currentTarget.error?.code;
