@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScreenType } from '../types';
-import { Tv, Film, Download, Heart, Settings } from 'lucide-react';
+import { Tv, Film, Download, Heart, History, Settings } from 'lucide-react';
 
 interface BottomNavProps {
   currentScreen: ScreenType;
@@ -35,6 +35,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       icon: <Heart className="w-5 h-5" />,
       badge: favoritesCount > 0 ? favoritesCount : undefined,
     },
+    { id: 'history', label: 'Geçmiş', icon: <History className="w-5 h-5" /> },
     { id: 'settings', label: 'Ayarlar', icon: <Settings className="w-5 h-5" /> },
   ];
 
