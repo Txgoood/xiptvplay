@@ -3,7 +3,7 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { DownloadItem, MediaItem } from '../types';
 import { DownloadNotifications } from './downloadNotifications';
 type NativeDownloadBridge = {
-  downloadFile(options: { id: string; url: string; path: string }): Promise<{ path: string; fileUri: string; bytes: number }>;
+  downloadFile(options: { id: string; url: string; path: string; title: string }): Promise<{ path: string; fileUri: string; bytes: number }>;
   cancelDownload(options: { id: string }): Promise<void>;
   addListener(eventName: 'downloadProgress', listenerFunc: (event: { id: string; bytes: number; contentLength: number }) => void): Promise<{ remove: () => Promise<void> }>;
 };
@@ -115,7 +115,7 @@ async function runSingleDownload(
       let result: any;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          result = await NativeDownload.downloadFile({ id: item.id, url: rawUrl, path: fullPath });
+          result = await NativeDownload.downloadFile({ id: item.id, url: rawUrl, path: fullPath, title: item.title });
           break;
         } catch (downloadError: any) {
           const message = String(downloadError?.message || downloadError || '');
