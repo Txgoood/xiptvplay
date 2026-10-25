@@ -50,6 +50,12 @@ export default function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addModalType, setAddModalType] = useState<'xtream' | 'm3u'>('xtream');
   const [activePlayerMedia, setActivePlayerMedia] = useState<MediaItem | DownloadItem | null>(null);
+  // Central history hook also covers TMDB, EPG, offline playback and automatic selections.
+  useEffect(() => {
+    if (!activePlayerMedia) return;
+    const profileId = profileRef.current;
+    setWatchHistory(WatchHistoryService.record(profileId, activePlayerMedia));
+  }, [activePlayerMedia?.id]);
   const [selectedSeriesItem, setSelectedSeriesItem] = useState<MediaItem | null>(null);
   const [catalogTargetSeason, setCatalogTargetSeason] = useState<number | undefined>(undefined);
 
