@@ -40,10 +40,18 @@ public class NativeNotificationsPlugin extends Plugin {
             @Override public void onReceive(Context context, Intent intent) {
                 if ("com.xiptvplay.app.CANCEL_ALL_DOWNLOADS".equals(intent.getAction())) {
                     notifyListeners("cancelAllRequested", new com.getcapacitor.JSObject());
+                } else if (CancelAllDownloadsReceiver.CANCEL_ITEM_EVENT.equals(intent.getAction())) {
+                    String id = intent.getStringExtra("id");
+                    if (id != null) {
+                        com.getcapacitor.JSObject result = new com.getcapacitor.JSObject();
+                        result.put("id", id);
+                        notifyListeners("cancelItemRequested", result);
+                    }
                 }
             }
         };
         IntentFilter filter = new IntentFilter("com.xiptvplay.app.CANCEL_ALL_DOWNLOADS");
+        filter.addAction(CancelAllDownloadsReceiver.CANCEL_ITEM_EVENT);
         if (Build.VERSION.SDK_INT >= 33) getContext().registerReceiver(cancelReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         else getContext().registerReceiver(cancelReceiver, filter);
     }
@@ -88,6 +96,14 @@ public class NativeNotificationsPlugin extends Plugin {
         call.resolve();
     }
 
+    public static PendingIntent individualCancelIntent(Context context, String id) {
+        Intent intent = new Intent(context, CancelAllDownloadsReceiver.class);
+        intent.setAction(CancelAllDownloadsReceiver.CANCEL_ITEM_ACTION);
+        intent.putExtra("id", id);
+        return PendingIntent.getBroadcast(context, id.hashCode() & 0x7fffffff, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
+    }
+
     private void postSummary() {
         if (!NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) return;
         int count = activeTitles.size();
@@ -118,7 +134,8 @@ public class NativeNotificationsPlugin extends Plugin {
             .setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle(call.getString("title", "İndiriliyor"))
             .setContentText(call.getString("detail", "İndirme devam ediyor")).setOnlyAlertOnce(true).setOngoing(true)
             .setGroup(GROUP_KEY).setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            .setProgress(100, progress, false).setPriority(NotificationCompat.PRIORITY_LOW);
+            .setProgress(100, progress, false).setPriority(NotificationCompat.PRIORITY_LOW)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "✕ İptal ve sil", individualCancelIntent(getContext(), id));
         NotificationManagerCompat.from(getContext()).notify(notificationId, builder.build());
         postSummary();
         call.resolve();
@@ -131,7 +148,8 @@ public class NativeNotificationsPlugin extends Plugin {
             NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle(call.getString("title", "İndirme tamamlandı"))
                 .setContentText("Dosya başarıyla indirildi.").setAutoCancel(true).setOngoing(false)
-                .setGroup(GROUP_KEY).setPriority(NotificationCompat.PRIORITY_LOW);
+                .setGroup(GROUP_KEY).setPriority(NotificationCompat.PRIORITY_LOW)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "✕ Sil", individualCancelIntent(getContext(), id));
             NotificationManagerCompat.from(getContext()).notify(notificationId, builder.build());
         }
         postSummary();
