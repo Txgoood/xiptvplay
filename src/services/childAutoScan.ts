@@ -29,13 +29,14 @@ export class ChildAutoScanService {
   static async analyze(
     items: MediaItem[], ageLimit: ChildAge, onProgress?: (message: string) => void,
     alreadyCheckedIds: string[] = [],
+    scopeCategoryKey?: string,
   ): Promise<AutoChildScan> {
     const result: AutoChildScan = {
       suggestedCategoryKeys: [], suggestedItemIds: [], scannedItemIds: [],
       checkedMovies: 0, acceptedMovies: 0, unknownMovies: 0, unscannedMovies: 0,
       suggestedChannelCount: 0, scannedChannels: 0, rejectedChannels: 0,
     };
-    const allTr = items.filter(item => isTr(item.category || ''));
+    const allTr = items.filter(item => isTr(item.category || '') && (!scopeCategoryKey || FamilyProfilesService.categoryKey(item) === scopeCategoryKey));
     const live = allTr.filter(item => item.type === 'live');
     result.scannedChannels = live.length;
     const trustedChannels = live.filter(item => isChildCategory(item.category || '') && !isSensitiveCategory(item.category || ''));
