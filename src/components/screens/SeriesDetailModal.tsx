@@ -234,6 +234,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                 {/* Batch Download Button */}
                 {currentEpisodes.length > 0 && (
                   <div className="flex flex-wrap gap-2">
+                    <button
                     onClick={handleDownloadAllSeason}
                     className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#0566d9]/30 hover:bg-[#0566d9]/50 text-[#adc6ff] font-headline text-xs font-semibold border border-[#0566d9]/40 transition-all cursor-pointer shrink-0"
                     title={`Sezon ${selectedSeason}'in tüm bölümlerini indir`}
