@@ -41,22 +41,32 @@ export const FamilyProfilesModal: React.FC<Props> = ({
   const [scannedIds, setScannedIds] = useState<Record<string, string[]>>({});
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>(configuration?.profiles.find(p => p.kind === 'child')?.allowedItemIds || []);
   const [lastScan, setLastScan] = useState<{ checked: number; approved: number; remaining: number } | null>(null);
-  const categories = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; count: number; type: MediaItem['type'] }>();
+  const categoryItems = useMemo(() => {
+    const groups = new Map<string, MediaItem[]>();
     for (const item of catalog) {
       if (!isTurkishCategory(item.category || '')) continue;
       const key = FamilyProfilesService.categoryKey(item);
-      if (!map.has(key)) map.set(key, { key, label: `${kinds[item.type]} · ${item.category || 'Genel'}`, count: 0, type: item.type });
-      map.get(key)!.count++;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(item);
+    }
+    return groups;
+  }, [catalog]);
+  const suggestedItemSet = useMemo(() => new Set(autoSuggestedItemIds), [autoSuggestedItemIds]);
+  const selectedItemSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
+  const categories = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; count: number; type: MediaItem['type'] }>();
+    for (const [key, items] of categoryItems) {
+      const item = items[0];
+      map.set(key, { key, label: `${kinds[item.type]} · ${item.category || 'Genel'}`, count: items.length, type: item.type });
     }
     return [...map.values()].filter(row => {
       if (selectionMode === 'automatic') {
         if (!autoSuggestedCategories.includes(row.key) &&
-            !catalog.some(item => FamilyProfilesService.categoryKey(item) === row.key && autoSuggestedItemIds.includes(item.id))) return false;
+            !(categoryItems.get(row.key) || []).some(item => suggestedItemSet.has(item.id))) return false;
       }
       return row.label.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR'));
     }).sort((a, b) => a.label.localeCompare(b.label, 'tr'));
-  }, [catalog, search, selectionMode, autoSuggestedCategories, autoSuggestedItemIds]);
+  }, [categoryItems, search, selectionMode, autoSuggestedCategories, suggestedItemSet]);
 
   const runScan = async (categoryKey?: string) => {
     if (scanBusy) return;
@@ -103,8 +113,7 @@ export const FamilyProfilesModal: React.FC<Props> = ({
       setAuthorizations(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
       return;
     }
-    const permitted = new Set(autoSuggestedItemIds);
-    const categoryIds = catalog.filter(item => FamilyProfilesService.categoryKey(item) === key && permitted.has(item.id)).map(item => item.id);
+    const categoryIds = (categoryItems.get(key) || []).filter(item => suggestedItemSet.has(item.id)).map(item => item.id);
     if (categoryIds.length === 0) return;
     const allApproved = categoryIds.every(id => selectedItemIds.includes(id));
     setSelectedItemIds(prev => allApproved ? prev.filter(id => !categoryIds.includes(id)) : [...new Set([...prev, ...categoryIds])]);
@@ -206,10 +215,10 @@ export const FamilyProfilesModal: React.FC<Props> = ({
           <div className="max-h-[38dvh] overflow-y-auto rounded-xl border border-white/10 divide-y divide-white/5">
             {categories.length ? categories.map(row => {
               const suggestedLive = autoSuggestedCategories.includes(row.key);
-              const approvedIds = catalog.filter(item => FamilyProfilesService.categoryKey(item) === row.key && autoSuggestedItemIds.includes(item.id)).map(item => item.id);
+              const approvedIds = (categoryItems.get(row.key) || []).filter(item => suggestedItemSet.has(item.id)).map(item => item.id);
               const manualSelected = authorizations.includes(row.key);
               const autoSelected = row.type === 'live' ? suggestedLive && manualSelected
-                : approvedIds.length > 0 && approvedIds.every(id => selectedItemIds.includes(id));
+                : approvedIds.length > 0 && approvedIds.every(id => selectedItemSet.has(id));
               return <div key={row.key} className="p-3 space-y-2 bg-[#25252a]">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold min-w-0 break-words">{row.label}</span>
