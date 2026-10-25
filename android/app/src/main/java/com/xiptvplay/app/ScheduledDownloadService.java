@@ -44,7 +44,7 @@ public class ScheduledDownloadService extends Service {
             if(Build.VERSION.SDK_INT>=29)ServiceCompat.startForeground(this,NOTICE_ID,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
             else startForeground(NOTICE_ID,n);
         }catch(Exception e){stopSelf();return START_NOT_STICKY;}
-        if(!busy.compareAndSet(false,true)){stopSelf();return START_NOT_STICKY;}
+        if(!busy.compareAndSet(false,true))return START_NOT_STICKY;
         stopped=false;
         new Thread(()->{
             try{processJobs();}
