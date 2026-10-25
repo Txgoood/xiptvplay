@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -38,6 +39,30 @@ public class NativeNotificationsPlugin extends Plugin {
         if (getPermissionState("notifications") == PermissionState.GRANTED) call.resolve();
         else call.reject("Bildirim izni verilmedi.");
     }
+    @PluginMethod public void startForegroundDownload(PluginCall call) {
+        Intent intent = new Intent(getContext(), DownloadForegroundService.class);
+        intent.setAction(DownloadForegroundService.ACTION_START);
+        intent.putExtra("title", call.getString("title", "Dosya"));
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) getContext().startForegroundService(intent);
+            else getContext().startService(intent);
+            call.resolve();
+        } catch (Exception error) {
+            call.reject("Arka plan indirme servisi başlatılamadı: " + error.getMessage(), error);
+        }
+    }
+
+    @PluginMethod public void stopForegroundDownload(PluginCall call) {
+        Intent intent = new Intent(getContext(), DownloadForegroundService.class);
+        intent.setAction(DownloadForegroundService.ACTION_STOP);
+        try {
+            getContext().startService(intent);
+        } catch (Exception ignored) {
+            getContext().stopService(new Intent(getContext(), DownloadForegroundService.class));
+        }
+        call.resolve();
+    }
+
     @PluginMethod public void showProgress(PluginCall call) {
         if (!NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) { call.reject("Bildirim izni kapalı."); return; }
         String id = call.getString("id", "download");
