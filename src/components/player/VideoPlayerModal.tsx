@@ -40,7 +40,7 @@ interface VideoPlayerModalProps {
 const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 
 const NativeMediaPlayer = registerPlugin<{
-  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string; offlineEpisodeQueue?: Array<{uri: string; title: string}> }): Promise<{ started: boolean }>;
+  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string; offlineEpisodeQueue?: Array<{uri: string; title: string}> }): Promise<{ started: boolean; returnedToInline?: boolean; positionMs?: number; durationMs?: number }>;
   stop(): Promise<void>;
 }>('NativeMediaPlayer');
 
