@@ -80,6 +80,6 @@ export const FamilyProfilesService = {
   },
   allows(profile: FamilyProfile | null, item: MediaItem): boolean {
     if (!profile || profile.kind === 'adult') return true;
-    return profile.allowedItemIds.includes(item.id) || profile.allowedCategories.includes(this.categoryKey(item));
+    return profile.allowedItemIds.includes(item.id) || (Boolean(item.parentSeriesId) && profile.allowedItemIds.includes(item.parentSeriesId!)) || profile.allowedCategories.includes(this.categoryKey(item));
   },
 };
