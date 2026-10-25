@@ -1,0 +1,44 @@
+package com.xiptvplay.app;
+
+import android.app.Notification;
+import android.app.Service;
+import android.content.Intent;
+import android.os.Build;
+import android.os.IBinder;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.ServiceCompat;
+import android.content.pm.ServiceInfo;
+
+public class DownloadForegroundService extends Service {
+    public static final String ACTION_START = "com.xiptvplay.app.DOWNLOAD_START";
+    public static final String ACTION_STOP = "com.xiptvplay.app.DOWNLOAD_STOP";
+    private static final int NOTIFICATION_ID = 7319;
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+            stopForeground(STOP_FOREGROUND_REMOVE);
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        String title = intent == null ? "XIPTV Play" : intent.getStringExtra("title");
+        if (title == null || title.trim().isEmpty()) title = "XIPTV Play";
+        Notification notification = new NotificationCompat.Builder(this, "xiptv_downloads")
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle("İndirme arka planda sürüyor")
+            .setContentText(title + " indiriliyor")
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build();
+        if (Build.VERSION.SDK_INT >= 29) {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+        } else {
+            startForeground(NOTIFICATION_ID, notification);
+        }
+        return START_NOT_STICKY;
+    }
+
+    @Override public IBinder onBind(Intent intent) { return null; }
+}
