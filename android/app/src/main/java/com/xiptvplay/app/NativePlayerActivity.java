@@ -43,6 +43,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class NativePlayerActivity extends Activity {
     private static volatile NativePlayerActivity activeInstance;
@@ -94,6 +96,8 @@ public class NativePlayerActivity extends Activity {
     private String nextTitle;
     private String nextNextUrl;
     private String nextNextTitle;
+    private JSONArray offlineEpisodeQueue;
+    private int offlineEpisodeIndex = 0;
     private final Handler controlsHandler = new Handler(Looper.getMainLooper());
     private boolean controlsVisible = true;
     private final Runnable hideControlsRunnable = () -> setControlsVisible(false);
@@ -183,6 +187,13 @@ public class NativePlayerActivity extends Activity {
         nextTitle = getIntent().getStringExtra("nextTitle");
         nextNextUrl = getIntent().getStringExtra("nextNextUrl");
         nextNextTitle = getIntent().getStringExtra("nextNextTitle");
+        String offlineQueueData = getIntent().getStringExtra("offlineEpisodeQueue");
+        if (offlineQueueData != null) {
+            try {
+                offlineEpisodeQueue = new JSONArray(offlineQueueData);
+                setOfflineNextFromQueue();
+            } catch (Exception ignored) { offlineEpisodeQueue = null; }
+        }
         nextButton.setVisibility(nextUrl == null || nextUrl.trim().isEmpty() ? View.GONE : View.VISIBLE);
 
         int bufferSeconds = Math.max(3, Math.min(45, getIntent().getIntExtra("bufferSeconds", 15)));
@@ -689,6 +700,16 @@ public class NativePlayerActivity extends Activity {
             }).setNegativeButton("Kapat", null).show();
     }
 
+    private void setOfflineNextFromQueue() {
+        if (offlineEpisodeQueue == null) return;
+        JSONObject first = offlineEpisodeQueue.optJSONObject(offlineEpisodeIndex);
+        JSONObject second = offlineEpisodeQueue.optJSONObject(offlineEpisodeIndex + 1);
+        nextUrl = first == null ? null : first.optString("uri", null);
+        nextTitle = first == null ? null : first.optString("title", null);
+        nextNextUrl = second == null ? null : second.optString("uri", null);
+        nextNextTitle = second == null ? null : second.optString("title", null);
+    }
+
     private void playNextEpisode() {
         if (player == null || nextUrl == null || nextUrl.trim().isEmpty()) {
             Toast.makeText(this, "Sonraki bölüm bilgisi bulunamadı.", Toast.LENGTH_SHORT).show();
@@ -700,11 +721,17 @@ public class NativePlayerActivity extends Activity {
         nextTitle = nextNextTitle;
         nextNextUrl = null;
         nextNextTitle = null;
+        if (offlineEpisodeQueue != null) {
+            offlineEpisodeIndex++;
+            setOfflineNextFromQueue();
+        }
         nextButton.setVisibility(nextUrl == null || nextUrl.trim().isEmpty() ? View.GONE : View.VISIBLE);
         MediaItem next = new MediaItem.Builder()
             .setUri(Uri.parse(urlToPlay))
             .setMediaId(titleToPlay == null ? "Sonraki bölüm" : titleToPlay)
             .build();
+        currentUrl = urlToPlay;
+        progressPreferenceKey = "native_player_position_" + Integer.toHexString(urlToPlay.hashCode());
         player.setMediaItem(next);
         player.prepare();
         player.play();
