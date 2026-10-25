@@ -79,11 +79,13 @@ public class BackgroundDownloadService extends Service {
             String id=intent.getStringExtra(EXTRA_ID), url=intent.getStringExtra(EXTRA_URL);
             String path=intent.getStringExtra(EXTRA_PATH), title=intent.getStringExtra(EXTRA_TITLE);
             if (id != null && url != null && path != null) {
-                synchronized (queue) { queue.add(new Task(id,url,path,title == null ? "İndiriliyor" : title)); }
-                startForeground(NOTIFICATION_ID, buildNotification("İndirme kuyruğa eklendi", 0, false));
-                if (!working) {
-                    working = true;
-                    worker.execute(this::runQueue);
+                synchronized (queue) {
+                    queue.add(new Task(id,url,path,title == null ? "İndiriliyor" : title));
+                    startForeground(NOTIFICATION_ID, buildNotification("İndirme kuyruğa eklendi", 0, false));
+                    if (!working) {
+                        working = true;
+                        worker.execute(this::runQueue);
+                    }
                 }
             }
         }
@@ -104,10 +106,16 @@ public class BackgroundDownloadService extends Service {
                 cancelCurrent.set(false);
             }
         } finally {
-            working=false;
-            if (cancelAll.get() || queue.isEmpty()) {
-                stopForeground(true);
-                stopSelf();
+            // An enqueue arriving as the last episode finishes must not be stranded.
+            synchronized (queue) {
+                working = false;
+                if (!cancelAll.get() && !queue.isEmpty()) {
+                    working = true;
+                    worker.execute(this::runQueue);
+                } else {
+                    stopForeground(true);
+                    stopSelf();
+                }
             }
         }
     }
