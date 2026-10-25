@@ -681,6 +681,7 @@ export default function App() {
           nextEpisodeTitle: offlineNext[0]?.title,
           nextNextEpisodeUrl: offlineNext[1]?.uri,
           nextNextEpisodeTitle: offlineNext[1]?.title,
+          offlineEpisodeQueue: offlineNext,
           ...(actualSizeGb > 0 ? { totalSizeGb: actualSizeGb, downloadedGb: actualSizeGb } : {}),
         });
         showToast('İndirilen dosya telefondan açılıyor; internetten yeniden indirilmeyecek.');
