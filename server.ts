@@ -868,6 +868,100 @@ async function startServer() {
     }
   });
 
+
+  // Family safety: bounded TMDB certification checks. Missing or ambiguous data is never approved.
+  const childAgeCache = new Map<string, { expires: number; minimumAge: number | null; confident: boolean }>();
+  app.post('/api/tmdb/age-check', async (req: Request, res: Response) => {
+    const token = process.env.TMDB_API_READ_ACCESS_TOKEN || process.env.TMDB_API_KEY;
+    if (!token) return res.status(503).json({ error: 'TMDB sunucuda yapılandırılmamış.' });
+    const entries = req.body?.items;
+    if (!Array.isArray(entries) || entries.length > 15 || entries.length === 0) {
+      return res.status(400).json({ error: 'Bir kerede en fazla 15 içerik doğrulanabilir.' });
+    }
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (token.startsWith('eyJ')) headers.Authorization = 'Bearer ' + token;
+    const extra = token.startsWith('eyJ') ? '' : '&api_key=' + encodeURIComponent(token);
+    const getTmdb = async (path: string) => {
+      const response = await fetch('https://api.themoviedb.org/3' + path + (path.includes('?') ? '&' : '?') + 'language=tr-TR' + extra, {
+        headers, signal: AbortSignal.timeout(9000),
+      });
+      if (!response.ok) throw new Error('TMDB ' + response.status);
+      return response.json() as Promise<any>;
+    };
+    const clean = (value: string) => value
+      .replace(/\b(19|20)\d{2}\b/g, ' ')
+      .replace(/\b(4k|uhd|1080p|720p|fhd|hdr|hevc|x265|x264|multi|dual|tr dublaj|altyazılı)\b/gi, ' ')
+      .replace(/[\[\]{}()|._-]+/g, ' ').replace(/\bTR\b/gi, ' ')
+      .replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR');
+    const usAge = (cert: string): number | null => {
+      const c = cert.toUpperCase().replace(/\s+/g, '');
+      const map: Record<string, number> = {
+        'G': 0, 'TV-Y': 0, 'TV-Y7': 7, 'TV-G': 0, 'PG': 7, 'TV-PG': 10,
+        'PG-13': 13, 'TV-14': 14, 'R': 17, 'NC-17': 18, 'TV-MA': 18,
+      };
+      return Object.prototype.hasOwnProperty.call(map, c) ? map[c] : null;
+    };
+    const trAge = (cert: string): number | null => {
+      const c = cert.toUpperCase().replace(/\s+/g, '');
+      if (c === 'GENELİZLEYİCİ' || c === 'GENELIZLEYICI' || c === 'G') return 0;
+      const match = c.match(/^(?:YAŞ)?(7|10|13|15|16|18)\+?$/);
+      return match ? Number(match[1]) : null;
+    };
+    const getCertification = (details: any, isSeries: boolean): number | null => {
+      const source = isSeries ? details.content_ratings?.results : details.release_dates?.results;
+      if (!Array.isArray(source)) return null;
+      const find = (country: string): number | null => {
+        const entry = source.find((v: any) => v.iso_3166_1 === country);
+        if (!entry) return null;
+        const values = isSeries ? [entry.rating] : (entry.release_dates || [])
+          .filter((d: any) => d.certification).map((d: any) => d.certification);
+        const parsed = values.map((v: string) => country === 'TR' ? trAge(v) : usAge(v))
+          .filter((v: number | null): v is number => v !== null);
+        return parsed.length ? Math.max(...parsed) : null; // Always prefer the stricter known rating.
+      };
+      return find('TR') ?? find('US');
+    };
+    const results: Array<{ id: string; minimumAge: number | null; confident: boolean }> = [];
+    for (const row of entries) {
+      const id = typeof row?.id === 'string' ? row.id.slice(0, 180) : '';
+      const title = typeof row?.title === 'string' ? clean(row.title).slice(0, 110) : '';
+      const isSeries = row?.type === 'series';
+      const type = isSeries ? 'tv' : 'movie';
+      const year = Number(row?.year) || 0;
+      const key = type + ':' + title + ':' + year;
+      const unknown = { id, minimumAge: null, confident: false };
+      if (!id || title.length < 2 || (row.type !== 'movie' && row.type !== 'series')) { results.push(unknown); continue; }
+      const cached = childAgeCache.get(key);
+      if (cached && cached.expires > Date.now()) { results.push({ id, minimumAge: cached.minimumAge, confident: cached.confident }); continue; }
+      try {
+        const search = await getTmdb('/search/' + type + '?query=' + encodeURIComponent(title) + '&include_adult=false');
+        const normalized = (value: string) => clean(value || '').replace(/[^a-z0-9çğıöşü]/gi, '');
+        const titleKey = normalized(title);
+        const matches = (search.results || []).filter((v: any) => {
+          const sameName = [v.title, v.name, v.original_title, v.original_name]
+            .some(candidate => normalized(String(candidate || '')) === titleKey);
+          const date = String(v.release_date || v.first_air_date || '');
+          return sameName && (!year || date.startsWith(String(year)));
+        });
+        if (matches.length !== 1 || matches[0].adult === true) {
+          results.push(unknown);
+          childAgeCache.set(key, { expires: Date.now() + 6 * 3600000, minimumAge: null, confident: false });
+          continue;
+        }
+        const details = await getTmdb('/' + type + '/' + matches[0].id + '?append_to_response=' + (isSeries ? 'content_ratings' : 'release_dates'));
+        const minimumAge = getCertification(details, isSeries);
+        const confident = minimumAge !== null && details.adult !== true;
+        const outcome = { id, minimumAge, confident };
+        results.push(outcome);
+        childAgeCache.set(key, { expires: Date.now() + 24 * 3600000, minimumAge, confident });
+        if (childAgeCache.size > 6000) childAgeCache.delete(childAgeCache.keys().next().value as string);
+      } catch {
+        results.push(unknown);
+      }
+    }
+    return res.json({ results });
+  });
+
   // Vite middleware in dev or static serving in prod
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
