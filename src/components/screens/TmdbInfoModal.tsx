@@ -31,7 +31,7 @@ export const TmdbInfoModal: React.FC<Props> = ({ media, onClose, onPlay, onDownl
     fetch(buildApiUrl('/api/tmdb/details?' + params.toString()), { signal: controller.signal })
       .then(async response => {
         const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) throw new Error('TMDB servisine ulaşılamadı.');
+        if (!contentType.includes('application/json')) throw new Error('TMDB servisi Render sunucusunda henüz etkin değil. Sunucunun güncellenmesi gerekiyor.');
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'Film bilgisi bulunamadı.');
         return payload as TmdbDetails;
