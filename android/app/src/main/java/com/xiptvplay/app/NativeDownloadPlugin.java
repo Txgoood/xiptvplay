@@ -2,8 +2,6 @@ package com.xiptvplay.app;
 
 import android.os.Handler;
 import android.os.Looper;
-import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -69,26 +67,16 @@ public class NativeDownloadPlugin extends Plugin {
                 byte[] buffer = new byte[256 * 1024];
                 long received = 0;
                 long lastEmit = 0;
-                long lastNotificationBytes = 0;
-                long lastNotificationTime = 0;
-                double smoothedBytesPerSecond = 0;
                 int count;
                 while ((count = input.read(buffer)) != -1) {
                     if (cancelled.get()) throw new InterruptedException("İndirme kullanıcı tarafından iptal edildi.");
                     output.write(buffer, 0, count);
                     received += count;
+                    DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, received, total, false);
                     long now = System.currentTimeMillis();
                     if (now - lastEmit >= 150) {
-                        if (lastNotificationTime > 0 && now > lastNotificationTime) {
-                            double currentBps = (received - lastNotificationBytes) * 1000.0 / (now - lastNotificationTime);
-                            smoothedBytesPerSecond = smoothedBytesPerSecond <= 0 ? currentBps
-                                : (smoothedBytesPerSecond * 0.35 + currentBps * 0.65);
-                        }
-                        lastNotificationBytes = received;
-                        lastNotificationTime = now;
                         final long current = received;
                         final long length = total;
-                        postProgressNotification(id, downloadTitle, current, length, smoothedBytesPerSecond);
                         JSObject event = new JSObject();
                         event.put("id", id);
                         event.put("bytes", current);
@@ -102,6 +90,7 @@ public class NativeDownloadPlugin extends Plugin {
                 input.close(); input = null;
                 if (cancelled.get()) throw new InterruptedException("İndirme kullanıcı tarafından iptal edildi.");
                 if (target.length() <= 0) throw new Exception("İndirilen dosya boş.");
+                DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, target.length(), total > 0 ? total : target.length(), true);
                 JSObject result = new JSObject();
                 result.put("path", "downloads/" + safeName);
                 result.put("fileUri", "file://" + target.getAbsolutePath());
@@ -117,35 +106,9 @@ public class NativeDownloadPlugin extends Plugin {
                 HttpURLConnection connection = connections.remove(id);
                 if (connection != null) connection.disconnect();
                 cancellations.remove(id);
+                DownloadForegroundService.clearDownloadProgress(id);
             }
         });
-    }
-
-    // Bildirimi doğrudan indirme motorundan güncelle: JS ekranı veya listener gecikse bile yüzde ilerler.
-    private void postProgressNotification(String id, String title, long received, long total, double bytesPerSecond) {
-        try {
-            if (!NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) return;
-            int notificationId = id.hashCode() & 0x7fffffff;
-            int progress = total > 0 ? (int) Math.min(100, Math.max(0, (received * 100L) / total)) : 0;
-            String speed = String.format(java.util.Locale.getDefault(), "%.1f MB/sn", bytesPerSecond / 1_000_000.0);
-            String detail = total > 0
-                ? progress + "% indirildi • " + speed
-                : String.format(java.util.Locale.getDefault(), "%.1f MB indirildi • %s", received / 1_000_000.0, speed);
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), "xiptv_downloads")
-                .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle(title)
-                .setContentText(detail)
-                .setSubText(speed)
-                .setOnlyAlertOnce(true)
-                .setOngoing(true)
-                .setGroup("com.xiptvplay.app.DOWNLOAD_GROUP")
-                .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-                .setProgress(100, progress, total <= 0)
-                .setPriority(NotificationCompat.PRIORITY_LOW);
-            NotificationManagerCompat.from(getContext()).notify(notificationId, builder.build());
-        } catch (Exception ignored) {
-            // Bildirim başarısızlığı indirme akışını durdurmamalı.
-        }
     }
 
     @PluginMethod
