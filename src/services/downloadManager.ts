@@ -155,7 +155,18 @@ async function runSingleDownload(
       onDone(localUrl, savedPath, uri.uri);
     } catch (err: any) {
       if (progressListener) { try { await progressListener.remove(); } catch {} }
-      const message = err?.message || String(err) || 'İndirme başarısız';
+      const message = String(err?.message || err || 'İndirme başarısız');
+      // Android'in bildirimindeki iptal düğmesi Filesystem işlemini JS'den bağımsız
+      // durdurabilir. İptal edilen transferin yarım dosyasını ve kaydını temizle.
+      if (/cancel(?:led|ed)?|canceled|user.?abort|aborted by user|iptal/i.test(message)) {
+        try {
+          await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data });
+        } catch {
+          // Dosya hiç oluşmadıysa temizlenecek bir şey yoktur.
+        }
+        onError('İndirme iptal edildi.');
+        return;
+      }
       onError(`İndirme başarısız: ${message}`);
     }
   } else {
