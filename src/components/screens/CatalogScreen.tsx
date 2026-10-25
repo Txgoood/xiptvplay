@@ -12,6 +12,7 @@ import {
   Layers,
   Film,
   Info,
+  CalendarDays,
   Sparkles,
   ChevronDown,
   ListFilter,
@@ -26,6 +27,7 @@ interface CatalogScreenProps {
   onToggleFavorite: (id: string) => void;
   onOpenSeriesDetail: (item: MediaItem) => void;
   onOpenTmdbInfo: (item: MediaItem) => void;
+  onOpenEpgGuide: (item: MediaItem) => void;
   isCatalogLoading?: boolean;
 }
 
@@ -40,6 +42,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   onToggleFavorite,
   onOpenSeriesDetail,
   onOpenTmdbInfo,
+  onOpenEpgGuide,
   isCatalogLoading,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'live' | 'movie' | 'series'>('all');
@@ -485,6 +488,11 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                    {isLive && <button
+                      onClick={() => onOpenEpgGuide(item)}
+                      className="h-9 px-3 rounded-full bg-[#201f21] text-[#00f0ff] border border-white/10 flex items-center justify-center gap-1 text-xs font-semibold"
+                      title="TV Yayın Rehberi"
+                    ><CalendarDays className="w-4 h-4" /><span>Rehber</span></button>}
                     {!isLive && <button
                       onClick={() => onOpenTmdbInfo(item)}
                       className="h-9 px-3 rounded-full bg-[#201f21] text-[#00f0ff] border border-white/10 flex items-center justify-center gap-1 text-xs font-semibold"
