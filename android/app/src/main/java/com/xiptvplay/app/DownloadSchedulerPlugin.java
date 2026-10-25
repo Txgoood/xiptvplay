@@ -32,7 +32,14 @@ public class DownloadSchedulerPlugin extends Plugin {
         call.resolve(response);
     }
     @PluginMethod public void cancel(PluginCall call){
-        ScheduledDownloadStore.remove(getContext(),call.getString("id",""));
+        String id=call.getString("id","");
+        ScheduledDownloadStore.remove(getContext(),id);
+        String safe=id.replaceAll("[^a-zA-Z0-9_-]","_");
+        java.io.File directory=new java.io.File(getContext().getFilesDir(),"downloads");
+        for(String ext:new String[]{"mp4","mkv","ts"}){
+            java.io.File partial=new java.io.File(directory,"scheduled_"+safe+"."+ext);
+            if(partial.exists())partial.delete();
+        }
         call.resolve();
     }
     @PluginMethod public void checkNow(PluginCall call){
