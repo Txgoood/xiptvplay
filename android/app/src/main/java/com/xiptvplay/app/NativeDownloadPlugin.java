@@ -27,6 +27,16 @@ public class NativeDownloadPlugin extends Plugin {
     private static final ConcurrentHashMap<String, AtomicBoolean> cancellations = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, HttpURLConnection> connections = new ConcurrentHashMap<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private static final ConcurrentHashMap<String, PauseGate> pauseGates = new ConcurrentHashMap<>();
+
+    private static final class PauseGate {
+        volatile boolean paused;
+        synchronized void pause() { paused = true; }
+        synchronized void resume() { paused = false; notifyAll(); }
+        synchronized void awaitResume(AtomicBoolean cancelled) throws InterruptedException {
+            while (paused && !cancelled.get()) wait(250L);
+        }
+    }
 
     @PluginMethod
     public void downloadFile(PluginCall call) {
@@ -40,6 +50,8 @@ public class NativeDownloadPlugin extends Plugin {
         }
         final AtomicBoolean cancelled = new AtomicBoolean(false);
         cancellations.put(id, cancelled);
+        final PauseGate pauseGate = new PauseGate();
+        pauseGates.put(id, pauseGate);
         executor.execute(() -> {
             OutputStream output = null;
             InputStream input = null;
@@ -68,7 +80,11 @@ public class NativeDownloadPlugin extends Plugin {
                 long received = 0;
                 long lastEmit = 0;
                 int count;
-                while ((count = input.read(buffer)) != -1) {
+                while (true) {
+                    pauseGate.awaitResume(cancelled);
+                    if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
+                    count = input.read(buffer);
+                    if (count == -1) break;
                     if (cancelled.get()) throw new InterruptedException("İndirme kullanıcı tarafından iptal edildi.");
                     output.write(buffer, 0, count);
                     received += count;
@@ -90,6 +106,7 @@ public class NativeDownloadPlugin extends Plugin {
                 input.close(); input = null;
                 if (cancelled.get()) throw new InterruptedException("İndirme kullanıcı tarafından iptal edildi.");
                 if (target.length() <= 0) throw new Exception("İndirilen dosya boş.");
+                if (total > 0 && target.length() < total) throw new Exception("İndirme eksik kaldı; sunucu bağlantıyı erken kapattı.");
                 DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, target.length(), total > 0 ? total : target.length(), true);
                 JSObject result = new JSObject();
                 result.put("path", "downloads/" + safeName);
@@ -106,6 +123,7 @@ public class NativeDownloadPlugin extends Plugin {
                 HttpURLConnection connection = connections.remove(id);
                 if (connection != null) connection.disconnect();
                 cancellations.remove(id);
+                pauseGates.remove(id);
                 DownloadForegroundService.clearDownloadProgress(id);
             }
         });
@@ -115,8 +133,28 @@ public class NativeDownloadPlugin extends Plugin {
         if (id == null) return;
         AtomicBoolean flag = cancellations.get(id);
         if (flag != null) flag.set(true);
+        PauseGate gate = pauseGates.get(id);
+        if (gate != null) gate.resume();
         HttpURLConnection connection = connections.get(id);
         if (connection != null) connection.disconnect();
+    }
+
+    @PluginMethod
+    public void pauseDownload(PluginCall call) {
+        String id = call.getString("id");
+        PauseGate gate = id == null ? null : pauseGates.get(id);
+        if (gate == null) { call.reject("Aktif indirme bulunamadı."); return; }
+        gate.pause();
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void resumeDownload(PluginCall call) {
+        String id = call.getString("id");
+        PauseGate gate = id == null ? null : pauseGates.get(id);
+        if (gate == null) { call.reject("Devam ettirilecek indirme bulunamadı."); return; }
+        gate.resume();
+        call.resolve();
     }
 
     @PluginMethod
