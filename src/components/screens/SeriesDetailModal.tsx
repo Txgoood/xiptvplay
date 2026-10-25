@@ -233,7 +233,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
 
                 {/* Batch Download Button */}
                 {currentEpisodes.length > 0 && (
-                  <button
+                  <div className="flex flex-wrap gap-2">
                     onClick={handleDownloadAllSeason}
                     className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#0566d9]/30 hover:bg-[#0566d9]/50 text-[#adc6ff] font-headline text-xs font-semibold border border-[#0566d9]/40 transition-all cursor-pointer shrink-0"
                     title={`Sezon ${selectedSeason}'in tüm bölümlerini indir`}
@@ -246,6 +246,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                     className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0b4249] text-[#baf6ff] font-headline text-xs font-semibold border border-[#00f0ff]/30"
                     title="Bu sezonun bölümlerini gece indirme kuyruğuna ekle"
                   ><Calendar className="w-3.5 h-3.5"/> Sezonu Zamanla</button>
+                  </div>
                 )}
               </div>
 
