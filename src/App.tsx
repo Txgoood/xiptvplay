@@ -15,6 +15,7 @@ import { FavoritesScreen } from './components/screens/FavoritesScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { SeriesDetailModal } from './components/screens/SeriesDetailModal';
 import { TmdbInfoModal } from './components/screens/TmdbInfoModal';
+import { EpgGuideModal } from './components/screens/EpgGuideModal';
 import { VideoPlayerModal } from './components/player/VideoPlayerModal';
 import { PrdHub } from './components/prd/PrdHub';
 import { Info, Cast as CastIcon, Tv as TvIcon, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
@@ -37,6 +38,7 @@ export default function App() {
   const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
   const [catalogItems, setCatalogItems] = useState<MediaItem[]>([]);
   const [tmdbInfoItem, setTmdbInfoItem] = useState<MediaItem | null>(null);
+  const [epgGuideItem, setEpgGuideItem] = useState<MediaItem | null>(null);
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const autoRefreshAttemptedRef = useRef<Set<string>>(new Set());
 
@@ -909,6 +911,7 @@ export default function App() {
                 onToggleFavorite={handleToggleFavorite}
                 onOpenSeriesDetail={(item) => { setCatalogTargetSeason(undefined); setSelectedSeriesItem(item); }}
                 onOpenTmdbInfo={setTmdbInfoItem}
+                onOpenEpgGuide={setEpgGuideItem}
                 isCatalogLoading={isCatalogLoading}
               />
             )}
@@ -975,6 +978,13 @@ export default function App() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddPlaylist={handleAddPlaylist}
+      />
+
+      <EpgGuideModal
+        channel={epgGuideItem}
+        playlist={activePlaylist}
+        onClose={() => setEpgGuideItem(null)}
+        onPlay={item => setActivePlayerMedia(item)}
       />
 
       <TmdbInfoModal
