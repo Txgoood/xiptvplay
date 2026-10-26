@@ -405,6 +405,19 @@ export default function App() {
     if(!target)return;
     refreshingPlaylistIdsRef.current.add(id);
     const isSelected=()=>activePlaylistRef.current?.id===id;
+    // Every catalog rebuild must end in success or a visible error. Network
+    // stalls and a frozen WebView bridge must not leave "downloading" forever.
+    const withDeadline = async <T,>(work:Promise<T>, timeoutMs:number):Promise<T> => {
+      let deadline:ReturnType<typeof setTimeout>|undefined;
+      try {
+        return await Promise.race([
+          work,
+          new Promise<T>((_,reject)=>{
+            deadline=setTimeout(()=>reject(new Error('IPTV sunucusu zamanında yanıt vermedi. Ağ bağlantısını kontrol edip tekrar deneyin.')),timeoutMs);
+          })
+        ]);
+      }finally{if(deadline)clearTimeout(deadline);}
+    };
     if(isSelected())setIsCatalogLoading(true);
     setPlaylists(prev=>prev.map(p=>p.id===id?{...p,lastSync:'Yenileniyor',statusLabel:'Katalog indiriliyor...'}:p));
     try {
@@ -417,11 +430,11 @@ export default function App() {
       if(target.type==='xtream'){
         if(!target.serverUrl || !target.username || !target.password)
           throw Error('Aktarılan Xtream bağlantısında sunucu adresi, kullanıcı adı veya parola eksik.');
-        const verify=await XtreamClientService.verifyConnection(target.serverUrl,target.username,target.password);
+        const verify=await withDeadline(XtreamClientService.verifyConnection(target.serverUrl,target.username,target.password),35000);
         if(!verify.success)
           throw Error('IPTV bağlantısı doğrulanamadı: '+(verify.error || 'Sunucu yanıt vermedi.'));
-        const result=await XtreamClientService.fetchCatalog(
-          verify.effectiveServerUrl||target.serverUrl,target.username,target.password,target.id);
+        const result=await withDeadline(XtreamClientService.fetchCatalog(
+          verify.effectiveServerUrl||target.serverUrl,target.username,target.password,target.id),180000);
         items=result.items;counts=result.counts;
         workingServer=result.workingServer || verify.effectiveServerUrl || target.serverUrl;
         expiryDays=verify.expiryDays??expiryDays;
@@ -430,7 +443,7 @@ export default function App() {
       }else if(target.type==='m3u'){
         let content=target.m3uContent;
         if(target.m3uUrl){
-          const fetched=await M3UParserService.fetchM3U(target.m3uUrl);
+          const fetched=await withDeadline(M3UParserService.fetchM3U(target.m3uUrl),90000);
           if(!fetched.success || !fetched.content)
             throw Error('M3U indirilemedi: '+(fetched.error||'Sunucu boş yanıt verdi.'));
           content=fetched.content;
@@ -470,7 +483,10 @@ export default function App() {
         ...p,status:'error' as const,statusLabel:'Katalog yüklenemedi',
         lastSync:'Hata',errorMessage:message
       }:p));
-      if(isSelected())setIsCatalogLoading(false);
+      if(isSelected()){
+        setIsCatalogLoading(false);
+        setActivePlaylist(prev=>prev?.id===id?{...prev,status:'error',statusLabel:'Katalog yüklenemedi',lastSync:'Hata',errorMessage:message}:prev);
+      }
       showToast(`"${target.name}" katalog hatası: ${message}`);
     }finally{
       refreshingPlaylistIdsRef.current.delete(id);
