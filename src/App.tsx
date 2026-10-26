@@ -158,6 +158,11 @@ export default function App() {
       setFavoriteItems(StorageService.getFavoriteItems());
       setProfileFavorites(historyProfileId === 'parent' ? [] : readProfileFavorites(historyProfileId));
       setWatchHistory(WatchHistoryService.read(historyProfileId));
+      const syncedPlaylists = StorageService.getPlaylists();
+      setPlaylists(syncedPlaylists);
+      setActivePlaylist(prev => prev ? (syncedPlaylists.find(p => p.id === prev.id) || prev) : syncedPlaylists[0] || null);
+      const syncedFamily = FamilyProfilesService.get();
+      setFamilyConfiguration(syncedFamily);
     };
     window.addEventListener('xiptv-cloud-data-changed', onCloudChange);
     return () => window.removeEventListener('xiptv-cloud-data-changed', onCloudChange);
