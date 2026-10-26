@@ -109,6 +109,13 @@ export default function App() {
   const [epgGuideItem, setEpgGuideItem] = useState<MediaItem | null>(null);
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const autoRefreshAttemptedRef = useRef<Set<string>>(new Set());
+  const refreshingPlaylistIdsRef = useRef<Set<string>>(new Set());
+  // The Drive merge can import a playlist between React renders. Always
+  // resolve refresh actions from the latest local source of truth.
+  const playlistsRef = useRef(playlists);
+  playlistsRef.current = playlists;
+  const activePlaylistRef = useRef(activePlaylist);
+  activePlaylistRef.current = activePlaylist;
 
   // Modals & Player State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -155,6 +162,7 @@ export default function App() {
   // Refresh the visible profile after remote events have been merged.
   useEffect(() => {
     const onCloudChange = () => {
+      playlistsRef.current = StorageService.getPlaylists();
       setFavoriteItems(StorageService.getFavoriteItems());
       setProfileFavorites(historyProfileId === 'parent' ? [] : readProfileFavorites(historyProfileId));
       setWatchHistory(WatchHistoryService.read(historyProfileId));
@@ -294,38 +302,42 @@ export default function App() {
     }
   }, []);
 
-  // When active playlist changes, load its items from storage
+  // Every imported or selected playlist must be rebuilt on this device:
+  // Drive sync intentionally copies credentials, NOT the enormous catalog.
   useEffect(() => {
-    if (activePlaylist) {
-      setIsCatalogLoading(true);
-      // 1. Fast load (localStorage)
-      const items = StorageService.getPlaylistItems(activePlaylist.id);
-      setCatalogItems(items);
-
-      // 2. Slow load (IndexedDB)
-      StorageService.loadPlaylistItemsPersistent(activePlaylist.id).then(persistentItems => {
-        if (persistentItems && persistentItems.length > items.length) {
-          setCatalogItems(persistentItems);
-        }
-        setIsCatalogLoading(false);
-        
-        // Auto-refresh logic:
-        // check total > 0 and no movie/series in catalog
-        const totalItems = (activePlaylist.liveCount || 0) + (activePlaylist.movieCount || 0) + (activePlaylist.seriesCount || 0);
-        const hasMovieOrSeries = persistentItems ? persistentItems.some(i => i.type === 'movie' || i.type === 'series') : false;
-        
-        if ((totalItems === 0 && items.length === 0 || totalItems > 0 && !hasMovieOrSeries) && !autoRefreshAttemptedRef.current.has(activePlaylist.id)) {
-            autoRefreshAttemptedRef.current.add(activePlaylist.id);
-            handleRefreshPlaylist(activePlaylist.id);
-        }
-      });
-    } else {
+    if (!activePlaylist) {
       setCatalogItems([]);
       setIsCatalogLoading(false);
+      return;
     }
-  }, [activePlaylist]);
-
-
+    const selectedId = activePlaylist.id;
+    let cancelled = false;
+    const cached = StorageService.getPlaylistItems(selectedId);
+    setCatalogItems(cached);
+    setIsCatalogLoading(cached.length === 0);
+    void StorageService.loadPlaylistItemsPersistent(selectedId).then(persistent => {
+      if(cancelled || activePlaylistRef.current?.id !== selectedId)return;
+      const effective = persistent && persistent.length > cached.length ? persistent : cached;
+      if(persistent && persistent.length > cached.length)setCatalogItems(persistent);
+      if(effective.length) { setIsCatalogLoading(false); return; }
+      if (!refreshingPlaylistIdsRef.current.has(selectedId) &&
+          !autoRefreshAttemptedRef.current.has(selectedId)) {
+        autoRefreshAttemptedRef.current.add(selectedId);
+        void handleRefreshPlaylist(selectedId);
+      } else if (!refreshingPlaylistIdsRef.current.has(selectedId)) {
+        setIsCatalogLoading(false);
+      }
+    }).catch(() => {
+      if(!cancelled && activePlaylistRef.current?.id === selectedId) {
+        setIsCatalogLoading(false);
+        if(!autoRefreshAttemptedRef.current.has(selectedId)){
+          autoRefreshAttemptedRef.current.add(selectedId);
+          void handleRefreshPlaylist(selectedId);
+        }
+      }
+    });
+    return () => { cancelled = true; };
+  }, [activePlaylist?.id]);
 
   // Add Playlist Handler
   const handleOpenAddModal = (type: 'xtream' | 'm3u' = 'xtream') => {
@@ -372,100 +384,77 @@ export default function App() {
     showToast(`"${updated.name}" başarıyla güncellendi ve kaydedildi.`);
   };
 
-  // Real Refresh / Sync Handler
+  // New devices receive connection details from Drive, then rebuild the
+  // actual live/movie/series catalog from the IPTV source. Do not mistake
+  // empty API responses for successful 70,000-item imports.
   const handleRefreshPlaylist = async (id: string) => {
-    const target = playlists.find((p) => p.id === id);
-    if (!target) return;
+    if(refreshingPlaylistIdsRef.current.has(id))return;
+    const target = playlistsRef.current.find(p=>p.id===id) || StorageService.getPlaylists().find(p=>p.id===id);
+    if(!target)return;
+    refreshingPlaylistIdsRef.current.add(id);
+    const isSelected=()=>activePlaylistRef.current?.id===id;
+    if(isSelected())setIsCatalogLoading(true);
+    setPlaylists(prev=>prev.map(p=>p.id===id?{...p,lastSync:'Yenileniyor',statusLabel:'Katalog indiriliyor...'}:p));
+    try {
+      let items:MediaItem[]=[];
+      let counts:{live:number;movie:number;series:number};
+      let workingServer=target.serverUrl;
+      let expiryDays=target.expiryDays, expiryDateStr=target.expiryDateStr;
+      let pingMs=target.pingMs, newM3uUrl=target.m3uUrl;
 
-    if (target.type === 'xtream' && target.serverUrl && target.username && target.password) {
-      const verifyRes = await XtreamClientService.verifyConnection(
-        target.serverUrl,
-        target.username,
-        target.password
-      );
-
-      if (!verifyRes.success) {
-        setPlaylists((prev) =>
-          prev.map((p) =>
-            p.id === id
-              ? {
-                  ...p,
-                  status: 'error',
-                  statusLabel: 'Bağlantı Hatası',
-                  errorMessage: verifyRes.error,
-                  lastSync: 'Hata',
-                }
-              : p
-          )
-        );
-        showToast(`Yenileme başarısız: ${verifyRes.error || 'Sunucu hatası'}`);
-        return;
-      }
-
-      const catalogRes = await XtreamClientService.fetchCatalog(
-        target.serverUrl,
-        target.username,
-        target.password,
-        target.id
-      );
-
-      StorageService.savePlaylistItems(target.id, catalogRes.items);
-      setPlaylists((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? {
-                ...p,
-                status: 'active',
-                statusLabel: 'Bağlı (Aktif)',
-                liveCount: catalogRes.counts.live,
-                movieCount: catalogRes.counts.movie,
-                seriesCount: catalogRes.counts.series,
-                expiryDays: verifyRes.expiryDays || p.expiryDays,
-                expiryDateStr: verifyRes.expiryDateStr || p.expiryDateStr,
-                pingMs: verifyRes.pingMs || p.pingMs,
-                lastSync: 'Şimdi',
-                errorMessage: undefined,
-              }
-            : p
-        )
-      );
-
-      if (activePlaylist?.id === id) {
-        setCatalogItems(catalogRes.items);
-      }
-      showToast(`"${target.name}" yenilendi (${catalogRes.items.length} içerik güncel).`);
-    } else if (target.type === 'm3u' && target.m3uUrl) {
-      try {
-        const fetchRes = await M3UParserService.fetchM3U(target.m3uUrl);
-        if (!fetchRes.success || !fetchRes.content) {
-          showToast(`M3U senkronizasyonu başarısız: ${fetchRes.error || 'İçerik alınamadı'}`);
-          return;
+      if(target.type==='xtream'){
+        if(!target.serverUrl || !target.username || !target.password)
+          throw Error('Aktarılan Xtream bağlantısında sunucu adresi, kullanıcı adı veya parola eksik.');
+        const verify=await XtreamClientService.verifyConnection(target.serverUrl,target.username,target.password);
+        if(!verify.success)
+          throw Error('IPTV bağlantısı doğrulanamadı: '+(verify.error || 'Sunucu yanıt vermedi.'));
+        const result=await XtreamClientService.fetchCatalog(
+          verify.effectiveServerUrl||target.serverUrl,target.username,target.password,target.id);
+        items=result.items;counts=result.counts;
+        workingServer=result.workingServer || verify.effectiveServerUrl || target.serverUrl;
+        expiryDays=verify.expiryDays??expiryDays;
+        expiryDateStr=verify.expiryDateStr??expiryDateStr;
+        pingMs=verify.pingMs??pingMs;
+      }else if(target.type==='m3u'){
+        let content=target.m3uContent;
+        if(target.m3uUrl){
+          const fetched=await M3UParserService.fetchM3U(target.m3uUrl);
+          if(!fetched.success || !fetched.content)
+            throw Error('M3U indirilemedi: '+(fetched.error||'Sunucu boş yanıt verdi.'));
+          content=fetched.content;
+          newM3uUrl=fetched.effectiveUrl||target.m3uUrl;
         }
-        const parsed = M3UParserService.parse(fetchRes.content, target.id);
-        StorageService.savePlaylistItems(target.id, parsed.items);
-        setPlaylists((prev) =>
-          prev.map((p) =>
-            p.id === id
-              ? {
-                  ...p,
-                  m3uUrl: fetchRes.effectiveUrl || p.m3uUrl,
-                  liveCount: parsed.counts.live,
-                  movieCount: parsed.counts.movie,
-                  seriesCount: parsed.counts.series,
-                  lastSync: 'Şimdi',
-                }
-              : p
-          )
-        );
-        if (activePlaylist?.id === id) {
-          setCatalogItems(parsed.items);
-        }
-        showToast(`M3U listesi güncellendi (${parsed.items.length} kanal).`);
-      } catch (err: any) {
-        showToast(`M3U senkronizasyonu başarısız: ${err.message}`);
-      }
-    } else {
-      showToast(`"${target.name}" önbellekten güncellendi.`);
+        if(!content)throw Error('Bu M3U listesi dosyadan eklenmiş, URL bulunamadı. Büyük M3U dosyaları buluta yüklenmez; kaynak dosyayı bu telefona aktarman gerekiyor.');
+        const parsed=M3UParserService.parse(content,target.id);
+        items=parsed.items;counts=parsed.counts;
+      }else throw Error('Playlist türü desteklenmiyor.');
+
+      if(!items.length || (counts.live+counts.movie+counts.series)===0)
+        throw Error('IPTV sunucusu boş katalog döndürdü. Eski kanal/film/dizi kayıtları korunuyor.');
+      StorageService.savePlaylistItems(id,items);
+      setPlaylists(prev=>{
+        const updated=prev.map(p=>p.id===id?{
+          ...p,status:'active' as const,statusLabel:'Bağlı (Aktif)',
+          serverUrl:workingServer||p.serverUrl,m3uUrl:newM3uUrl,
+          liveCount:counts.live,movieCount:counts.movie,seriesCount:counts.series,
+          expiryDays,expiryDateStr,pingMs,lastSync:'Şimdi',errorMessage:undefined,
+          isCached:true
+        }:p);
+        playlistsRef.current=updated;
+        return updated;
+      });
+      if(isSelected()){setCatalogItems(items);setIsCatalogLoading(false);}
+      showToast(`"${target.name}" kataloğu yüklendi: ${counts.live} canlı, ${counts.movie} film, ${counts.series} dizi.`);
+    }catch(e:any){
+      const message=e?.message||'Katalog indirme hatası';
+      setPlaylists(prev=>prev.map(p=>p.id===id?{
+        ...p,status:'error' as const,statusLabel:'Katalog yüklenemedi',
+        lastSync:'Hata',errorMessage:message
+      }:p));
+      if(isSelected())setIsCatalogLoading(false);
+      showToast(`"${target.name}" katalog hatası: ${message}`);
+    }finally{
+      refreshingPlaylistIdsRef.current.delete(id);
     }
   };
 
