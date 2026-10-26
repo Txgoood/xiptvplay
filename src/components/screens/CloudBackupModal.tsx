@@ -31,8 +31,8 @@ export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
       setRemoteExists(true);setMessage('Şifreli yedek kendi Google Drive hesabına kaydedildi.');
     }else if(action==='inspect'){
       const snapshot=await CloudDriveService.inspectBackup(session,password);
-      setMessage('Yedek tarihi: '+new Date(snapshot.createdAt).toLocaleString('tr-TR')+
-        ' · '+(snapshot.profiles?.profiles.length||0)+' profil · '+snapshot.playlists.length+' liste.');
+      setMessage('Yedek doğrulandı ✓ · Tarih: '+new Date(snapshot.createdAt).toLocaleString('tr-TR')+
+        ' · '+(snapshot.profiles?.profiles.length||1)+' profil (Ana Profil dahil) · '+snapshot.playlists.length+' playlist.');
       setConfirmRestore(true);
     }else if(action==='restore'){
       const snapshot=await CloudDriveService.inspectBackup(session,password);
