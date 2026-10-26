@@ -78,8 +78,8 @@ export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
     <p className="text-[11px] text-amber-200">Bu parola Google şifren değildir. Google'a veya sunucumuza gönderilmez. Unutursan şifreli yedeği geri açamayız.</p>
     <div className="rounded-xl border border-[#00f0ff]/20 bg-[#10242a] p-3 space-y-2">
       <p className="text-sm font-bold text-[#bafaff]">🔄 Cihazlar Arası Otomatik Eşitleme</p>
-      <p className="text-xs text-[#d0e3e5]">Favoriler ve izleme geçmişi aynı Google hesabındaki cihazlarda birleştirilir. İndirilen video dosyaları aktarılmaz.</p>
-      <p className="text-[11px] text-amber-200">İlk sürümde profillerin diğer cihazda da oluşturulmuş olması gerekir. Playlistleri ve profil ayarlarını önce manuel yedekten aktar. Yedekleme parolan tüm cihazlarda aynı olmalı.</p>
+      <p className="text-xs text-[#d0e3e5]">Favoriler, izleme geçmişi, profil tanımları ve IPTV bağlantıları aynı Google hesabındaki cihazlarda birleştirilir. İndirilen video dosyaları ve büyük katalog önbelleği aktarılmaz.</p>
+      <p className="text-[11px] text-amber-200">Playlist bağlantıları ve aile profilleri de şifreli eşitlenir. Çocuk erişimlerini genişleten değişiklikler güvenlik için otomatik uygulanmaz. Tüm cihazlarda aynı eşitleme parolasını kullan.</p>
       {syncStatus.active ? <>
         <p className="text-xs text-green-300">● Otomatik eşitleme açık{syncStatus.lastSync?' · Son: '+new Date(syncStatus.lastSync).toLocaleString('tr-TR'):''}</p>
         <div className="grid grid-cols-2 gap-2">
@@ -101,7 +101,7 @@ export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
    {busy&&<p className="text-xs text-[#00f0ff] flex gap-2 items-center"><RefreshCcw size={14} className="animate-spin"/> Google Drive işlemi sürüyor...</p>}
    <div className="bg-[#242c30] rounded-xl p-3 text-xs text-[#c8d7d9] space-y-1">
     <p className="font-bold flex gap-2 items-center"><ShieldCheck size={15}/> Güvenlik ve senkronizasyon</p>
-    <p>Manuel şifreli yedekleme korunur. Otomatik eşitleme bu ilk sürümde yalnızca favori ve izleme geçmişi değişiklik günlüklerini birleştirir; profiller ve playlistler için manuel yedek kullanılır.</p>
+    <p>Şifreli manuel yedekleme korunur. Otomatik eşitleme favori, geçmiş, profil ve playlist bağlantılarını cihazların ayrı günlüklerinden birleştirir. Cihazdaki mevcut yönetici PIN'i değiştirilmez; profil/listenin otomatik silinmesi desteklenmez.</p>
    </div>
   </section>
  </div>;
