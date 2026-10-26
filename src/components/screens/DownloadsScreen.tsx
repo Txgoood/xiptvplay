@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DownloadItem, SystemStats } from '../../types';
 import type { ScheduledDownload } from '../../services/downloadSchedule';
 import {
@@ -57,8 +57,35 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
   onDeleteItem,
   onPromoteItem,
 }) => {
-  const isAnyDownloading = downloads.some((d) => d.status === 'downloading');
-  const liveSpeed = downloads.filter(d => d.status === 'downloading').reduce((sum, d) => sum + (d.speedMbps || 0), 0).toFixed(1);
+  const hasManualDownload = downloads.some(d => d.status === 'downloading');
+  const scheduledActive = scheduledDownloads.filter(j => j.status === 'downloading');
+  const isAnyDownloading = hasManualDownload || scheduledActive.length > 0;
+  // Estimate scheduled MB/s from bytes returned by the Android worker on each
+  // foreground refresh. Manual downloads already report their own live speeds.
+  const [nativeSpeed, setNativeSpeed] = useState(0);
+  const lastNativeSample = useRef(new Map<string, { bytes: number; time: number }>());
+  useEffect(() => {
+    const now = Date.now();
+    let totalDelta = 0;
+    let totalTime = 0;
+    const currentIds = new Set<string>();
+    for (const job of scheduledActive) {
+      currentIds.add(job.id);
+      const previous = lastNativeSample.current.get(job.id);
+      if (previous && job.bytes >= previous.bytes && now > previous.time) {
+        totalDelta += job.bytes - previous.bytes;
+        totalTime = Math.max(totalTime, now - previous.time);
+      }
+      if (!previous || job.bytes !== previous.bytes) {
+        lastNativeSample.current.set(job.id, { bytes: job.bytes, time: now });
+      }
+    }
+    for (const id of lastNativeSample.current.keys()) {
+      if (!currentIds.has(id)) lastNativeSample.current.delete(id);
+    }
+    setNativeSpeed(totalTime > 0 ? totalDelta / totalTime / 1000 : 0);
+  }, [scheduledDownloads]);
+  const liveSpeed = (downloads.filter(d => d.status === 'downloading').reduce((sum, d) => sum + (d.speedMbps || 0), 0) + nativeSpeed).toFixed(1);
   const [shareSuccess, setShareSuccess] = useState<string | null>(null);
   const [sourceHelp, setSourceHelp] = useState<'scheduled' | 'manual' | null>(null);
   const [showAllScheduled, setShowAllScheduled] = useState(false);
@@ -480,11 +507,11 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                 <span className="font-headline text-[14px] font-bold text-[#00f0ff]">
                   {liveSpeed} MB/s
                 </span>
-                <span className="text-[11px] text-[#b9cacb] truncate">(Turbo Motor)</span>
+                <span className="text-[11px] text-[#b9cacb] truncate">{scheduledActive.length ? '(Zamanlı + Normal)' : '(Turbo Motor)'}</span>
               </div>
               <span className="text-[11px] text-[#4edea3] flex items-center gap-1 truncate font-medium">
                 <span className={`w-1.5 h-1.5 rounded-full ${isAnyDownloading ? 'bg-[#4edea3] animate-pulse' : 'bg-[#849495]'}`}></span>
-                {isAnyDownloading ? `${stats.parallelSockets} paralel soket hattı stabil` : 'Kuyruk beklemede'}
+                {scheduledActive.length > 0 ? `${scheduledActive.length} zamanlı indirme sürüyor` : hasManualDownload ? `${stats.parallelSockets} paralel soket hattı stabil` : 'Kuyruk beklemede'}
               </span>
             </div>
           </div>
