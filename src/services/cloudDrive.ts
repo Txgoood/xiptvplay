@@ -41,15 +41,39 @@ async function encrypt(snapshot: CloudSnapshot, password: string): Promise<Cloud
   return {schema:1,salt:encode(salt),nonce:encode(nonce),payload:encode(new Uint8Array(cipher)),createdAt:snapshot.createdAt};
 }
 async function decrypt(envelope: CloudEnvelope, password: string): Promise<CloudSnapshot> {
-  if(envelope.schema!==1)throw Error('Yedek sürümü desteklenmiyor.');
+  if (!envelope || envelope.schema !== 1) throw Error('Yedek dosyasının sürümü veya biçimi desteklenmiyor.');
+  if (typeof envelope.salt !== 'string' || typeof envelope.nonce !== 'string' || typeof envelope.payload !== 'string') {
+    throw Error('Drive üzerindeki yedek eksik veya geçersiz.');
+  }
+  let decrypted: ArrayBuffer;
   try {
-    const key=await encryptionKey(password,decode(envelope.salt));
-    const data=await crypto.subtle.decrypt({name:'AES-GCM',iv:decode(envelope.nonce) as BufferSource},
-      key,decode(envelope.payload) as BufferSource);
-    const parsed=JSON.parse(new TextDecoder().decode(data));
-    if(parsed.schema!==1||!parsed.profiles||!Array.isArray(parsed.playlists))throw Error('Yedek içeriği geçersiz.');
-    return parsed as CloudSnapshot;
-  }catch(e){throw Error('Yedek şifresi yanlış ya da dosya bozuk.');}
+    const key = await encryptionKey(password, decode(envelope.salt));
+    decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: decode(envelope.nonce) as BufferSource },
+      key, decode(envelope.payload) as BufferSource,
+    );
+  } catch {
+    throw Error('Şifreli yedek açılamadı. Parola farklı olabilir veya şifreli içerik zarar görmüş olabilir.');
+  }
+  let parsed: unknown;
+  try { parsed = JSON.parse(new TextDecoder().decode(decrypted)); }
+  catch { throw Error('Yedeğin şifresi çözüldü ancak içindeki JSON okunamadı.'); }
+  if (!isValidSnapshot(parsed)) throw Error('Yedeğin şifresi doğru, ancak içerik biçimi geçersiz.');
+  return parsed;
+}
+
+function isValidSnapshot(value: unknown): value is CloudSnapshot {
+  if (!value || typeof value !== 'object') return false;
+  const snapshot = value as Record<string, unknown>;
+  const profiles = snapshot.profiles;
+  // No child/family profile has been configured yet: null is valid.
+  const validProfiles = profiles === null ||
+    (typeof profiles === 'object' && profiles !== null &&
+      Array.isArray((profiles as { profiles?: unknown }).profiles));
+  return snapshot.schema === 1 && typeof snapshot.createdAt === 'string' &&
+    Array.isArray(snapshot.playlists) && validProfiles &&
+    typeof snapshot.favorites === 'object' && snapshot.favorites !== null &&
+    typeof snapshot.history === 'object' && snapshot.history !== null;
 }
 const call = async (url:string, token:string, init:RequestInit={}) => {
   const response=await fetch(url,{...init,headers:{Authorization:'Bearer '+token,...(init.headers||{})}});
@@ -97,7 +121,13 @@ export const CloudDriveService={
     // Never upload data created by another signed-in Drive account.
     if(owner && owner!==session.accountId)throw Error('Bu cihazdaki veriler başka bir Google hesabına bağlı. Önce o hesaba dön veya yeni hesap için ayrı kurulum yap.');
     const fileId=await findFile(session.accessToken);
-    const payload=JSON.stringify(await encrypt(collect(),password));
+    const snapshot = collect();
+    const encrypted = await encrypt(snapshot, password);
+    // Check the encrypted payload locally before uploading anything to Drive.
+    // This also covers accounts that have not created any family profiles.
+    const checked = await decrypt(encrypted, password);
+    if (!isValidSnapshot(checked)) throw Error('Yedekleme doğrulaması başarısız oldu.');
+    const payload=JSON.stringify(encrypted);
     if(fileId){
       await call(UPLOAD+'/files/'+encodeURIComponent(fileId)+'?uploadType=media',session.accessToken,
         {method:'PATCH',headers:{'Content-Type':'application/json'},body:payload});
@@ -119,7 +149,7 @@ export const CloudDriveService={
     return decrypt(envelope,password);
   },
   restore(session:GoogleDriveSession,snapshot:CloudSnapshot):void {
-    if(snapshot.schema!==1||!snapshot.profiles||!Array.isArray(snapshot.playlists))throw Error('Yedek geçersiz.');
+    if (!isValidSnapshot(snapshot)) throw Error('Yedek geçersiz.');
     const owner=this.linkedOwner();
     if(owner && owner!==session.accountId)throw Error('Bu cihaz başka bir Google hesabına bağlı. Hesap verilerini karıştırmamak için geri yükleme engellendi.');
     // Keep original downloaded files and native schedules local. Import only
