@@ -33,7 +33,7 @@ import { DownloadNotifications } from './services/downloadNotifications';
 export default function App() {
   const [appMode, setAppMode] = useState<AppMode>('app');
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('playlists');
-  const [userEmail, setUserEmail] = useState<string | null>('bahritugtekin@gmail.com');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Persistent Application Data States (Clean Empty Initial States)
   const [stats, setStats] = useState(INITIAL_STATS);
