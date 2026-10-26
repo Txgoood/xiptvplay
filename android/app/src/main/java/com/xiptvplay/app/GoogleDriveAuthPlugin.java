@@ -46,7 +46,8 @@ public class GoogleDriveAuthPlugin extends Plugin {
     @PluginMethod public void authorize(PluginCall call) {
         if(pending!=null){call.reject("Google bağlantısı zaten açılıyor.");return;}
         List<Scope> scopes=Arrays.asList(new Scope(APPDATA),new Scope("openid"),new Scope("email"));
-        AuthorizationRequest request=AuthorizationRequest.builder().setRequestedScopes(scopes).build();
+        AuthorizationRequest request=AuthorizationRequest.builder().setRequestedScopes(scopes)
+            .setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT).build();
         Identity.getAuthorizationClient(getActivity()).authorize(request)
             .addOnSuccessListener(result -> {
                 if(result.hasResolution()){
