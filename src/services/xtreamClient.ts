@@ -160,19 +160,24 @@ export class XtreamClientService {
 
     if (isNative()) {
       try {
-        const fetchNativeAction = async (action: string) => {
+        const fetchNativeAction = async (action: string): Promise<any[]> => {
           const url = `${cleanUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=${action}`;
-          return (await httpGetJson(url)) || [];
+          const result = await httpGetJson(url);
+          if (Array.isArray(result)) return result;
+          if (result === null || result === undefined || (typeof result === 'object' && result?.error)) {
+            throw new Error(`IPTV sunucusu ${action} isteğine geçerli yanıt vermedi.`);
+          }
+          throw new Error(`IPTV sunucusu ${action} için beklenmeyen veri döndürdü.`);
         };
 
-        const [liveCategories, liveStreams, vodCategories, vodStreams, seriesCategories, seriesList] = await Promise.all([
-          fetchNativeAction('get_live_categories'),
-          fetchNativeAction('get_live_streams'),
-          fetchNativeAction('get_vod_categories'),
-          fetchNativeAction('get_vod_streams'),
-          fetchNativeAction('get_series_categories'),
-          fetchNativeAction('get_series'),
-        ]);
+        // 70k+ IPTV archives may exhaust the Android WebView bridge when all six
+        // large JSON responses are transferred simultaneously. Read one by one.
+        const liveCategories = await fetchNativeAction('get_live_categories');
+        const liveStreams = await fetchNativeAction('get_live_streams');
+        const vodCategories = await fetchNativeAction('get_vod_categories');
+        const vodStreams = await fetchNativeAction('get_vod_streams');
+        const seriesCategories = await fetchNativeAction('get_series_categories');
+        const seriesList = await fetchNativeAction('get_series');
 
         const data = {
           liveCategories,
