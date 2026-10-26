@@ -90,7 +90,7 @@ export const FamilyProfilesService = {
   },
   async verifyProfilePin(pin: string, profile: FamilyProfile, config: FamilyConfiguration): Promise<boolean> {
     if (profile.id === 'parent') return this.verifyPin(pin, config);
-    if (!profile.pinHash || !profile.pinSalt) return true;
+    if (!profile.pinHash || !profile.pinSalt) return this.verifyPin(pin, config);
     return this.verifyPin(pin, { ...config, pinHash: profile.pinHash, pinSalt: profile.pinSalt });
   },
   async verifyPin(pin: string, config: FamilyConfiguration): Promise<boolean> {
