@@ -22,6 +22,22 @@ public class ScheduledDownloadService extends Service {
     private static final String CHANNEL="xiptv_scheduled_downloads";
     private static final int NOTICE_ID=7337;
     private static final AtomicBoolean busy=new AtomicBoolean(false);
+    private static final java.util.concurrent.ConcurrentHashMap<String, HttpURLConnection> activeConnections = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ConcurrentHashMap<String, Thread> activeThreads = new java.util.concurrent.ConcurrentHashMap<>();
+    static void cancelActive(String id) {
+        HttpURLConnection connection = activeConnections.remove(id);
+        if(connection!=null)connection.disconnect();
+        Thread worker = activeThreads.get(id);
+        if(worker!=null)worker.interrupt();
+    }
+    static void deletePartial(Context context,String id) {
+        String safe=id.replaceAll("[^a-zA-Z0-9_-]","_");
+        File base=new File(context.getFilesDir(),"downloads");
+        for(String ext:new String[]{"mp4","mkv","ts"}){
+            File partial=new File(base,"scheduled_"+safe+"."+ext);
+            if(partial.isFile())partial.delete();
+        }
+    }
     private PowerManager.WakeLock lock;
     private volatile boolean stopped=false;
     @Override public void onCreate(){
@@ -57,7 +73,8 @@ public class ScheduledDownloadService extends Service {
         },"ScheduledIPTVDownloads").start();
         return START_NOT_STICKY;
     }
-    private void persist(JSONObject job)throws Exception{ScheduledDownloadStore.upsert(this,job);}
+    private boolean persist(JSONObject job) { return ScheduledDownloadStore.updateIfPresent(this,job); }
+    private boolean cancelled(String id) { return ScheduledDownloadStore.isCancelled(this,id) || find(id)==null; }
     private void processJobs(){
         try{
             PowerManager pm=(PowerManager)getSystemService(POWER_SERVICE);
@@ -74,6 +91,7 @@ public class ScheduledDownloadService extends Service {
                     persist(job);continue;
                 }
                 try{download(job);}catch(Exception e){
+                    if(cancelled(job.optString("id")))continue;
                     if("paused".equals(job.optString("status")))continue;
                     int retries=job.optInt("retryCount",0)+1;
                     job.put("retryCount",retries);
@@ -88,6 +106,8 @@ public class ScheduledDownloadService extends Service {
     }
     private void download(JSONObject job)throws Exception{
         String id=job.getString("id"),title=job.optString("title","İçerik");
+        if(cancelled(id))return;
+        activeThreads.put(id,Thread.currentThread());
         String url=job.getString("url");
         if(!url.startsWith("http://")&&!url.startsWith("https://"))throw new IOException("Yalnızca HTTP/HTTPS adresleri desteklenir.");
         File base=new File(getFilesDir(),"downloads");if(!base.exists()&&!base.mkdirs())throw new IOException("İndirme klasörü oluşturulamadı");
@@ -101,6 +121,8 @@ public class ScheduledDownloadService extends Service {
         HttpURLConnection connection=null;
         try{
             connection=(HttpURLConnection)new URL(url).openConnection();
+            activeConnections.put(id,connection);
+            if(cancelled(id))return;
             connection.setInstanceFollowRedirects(true);
             connection.setConnectTimeout(30000);
             connection.setReadTimeout(30000);
@@ -114,7 +136,8 @@ public class ScheduledDownloadService extends Service {
             if(total>0&&append)total+=saved;
             long free=base.getUsableSpace();
             if(free<300L*1024*1024||(total>0&&free<Math.max(0,total-saved)+150L*1024*1024))throw new IOException("Yetersiz boş depolama alanı");
-            job.put("status","downloading");job.put("error","");persist(job);
+            job.put("status","downloading");job.put("error","");
+            if(!persist(job))return;
             NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
             long read=saved,lastUpdate=0;
             try(InputStream input=new BufferedInputStream(connection.getInputStream(),128*1024);
@@ -122,23 +145,23 @@ public class ScheduledDownloadService extends Service {
                 byte[] buffer=new byte[128*1024];
                 int count;
                 while((count=input.read(buffer))!=-1){
-                    if(stopped)break;
-                    JSONObject latest=find(id);
-                    if(latest==null||"cancelled".equals(latest.optString("status")))break;
+                    if(stopped || Thread.currentThread().isInterrupted() || cancelled(id))break;
                     if(!ScheduledDownloadStore.inWindow(job,System.currentTimeMillis())||!ScheduledDownloadStore.conditions(this,job))break;
                     output.write(buffer,0,count);
                     read+=count;
                     long now=System.currentTimeMillis();
                     if(now-lastUpdate>=1800){
                         job.put("bytes",read);job.put("total",total);
-                        persist(job);lastUpdate=now;
+                        if(!persist(job))break;
+                        lastUpdate=now;
                         int percent=total>0?(int)Math.min(100,read*100/total):0;
                         if(nm!=null)nm.notify(NOTICE_ID,notice(title+" · "+percent+"%",percent,total>0));
                     }
                 }
                 output.flush();
                 job.put("bytes",read);job.put("total",total);
-                if(!stopped&&ScheduledDownloadStore.inWindow(job,System.currentTimeMillis())
+                if(!stopped && !Thread.currentThread().isInterrupted() && !cancelled(id)
+                    && ScheduledDownloadStore.inWindow(job,System.currentTimeMillis())
                     && ScheduledDownloadStore.conditions(this,job)
                     && (total<=0||read>=total) && find(id)!=null){
                     job.put("status","completed");job.put("retryCount",0);job.put("path","downloads/"+target.getName());
@@ -146,9 +169,16 @@ public class ScheduledDownloadService extends Service {
                     job.put("status","paused");
                     job.put("retryAt",System.currentTimeMillis()+15*60000L);
                 }
-                if(find(id)!=null)persist(job);
+                if(!cancelled(id))persist(job);
             }
-        }finally{if(connection!=null)connection.disconnect();}
+        }finally{
+            activeConnections.remove(id);
+            if(connection!=null)connection.disconnect();
+            activeThreads.remove(id);
+            if(cancelled(id))deletePartial(this,id);
+            // An interrupt used to cancel this task must not poison the next task.
+            Thread.interrupted();
+        }
     }
     private JSONObject find(String id){
         JSONArray jobs=ScheduledDownloadStore.read(this);
