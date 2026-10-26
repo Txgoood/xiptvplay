@@ -145,7 +145,6 @@ export const CloudSyncService={
    const own=files.find(f=>f.name===ownName);
    const journal:Journal={version:1,device:deviceId(),events:events()};
    const payload=JSON.stringify(await seal(journal,password));
-   await uploadOwn(session.accessToken,own,payload);
    const all=new Map<string,Event>();
    for(const file of files.filter(f=>f.name!==ownName)){
     let data:Envelope;
@@ -157,9 +156,48 @@ export const CloudSyncService={
     for(const e of remote.events)all.set(e.id,e);
    }
    for(const e of journal.events)all.set(e.id,e);
+   // Verify every remote journal before writing anything to Drive.
+   await uploadOwn(session.accessToken,own,payload);
    const changed=applyRemote([...all.values()]);
    localStorage.setItem(OWNER_KEY,session.accountId);
    return {devices:files.length+(own?0:1),records:all.size,changed};
   }finally{running=false;}
  }
 };
+
+// Credentials and the encryption passphrase stay in memory, never localStorage.
+// Automatic sync pauses after an app restart until the user unlocks it again.
+let timer:number|null=null;
+let current:{session:GoogleDriveSession;password:string}|null=null;
+let lastError:string|null=null;
+let latest:string|null=null;
+async function tick(){
+ if(!current || document.visibilityState!=='visible' || !navigator.onLine)return;
+ try{
+  await CloudSyncService.sync(current.session,current.password);
+  latest=new Date().toISOString();lastError=null;
+  window.dispatchEvent(new Event('xiptv-cloud-sync-status'));
+ }catch(e){
+  lastError=e instanceof Error?e.message:String(e);
+  if(/HTTP 401|HTTP 403|parolası farklı|Başka Google hesabına/.test(lastError))CloudSyncController.stop();
+  window.dispatchEvent(new Event('xiptv-cloud-sync-status'));
+ }
+}
+const onForeground=()=>{if(document.visibilityState==='visible')void tick();};
+export const CloudSyncController={
+ start(session:GoogleDriveSession,password:string){
+  if(password.length<10)throw Error('Senkronizasyon parolası en az 10 karakter olmalı.');
+  this.stop();current={session,password};lastError=null;
+  timer=window.setInterval(()=>void tick(),90000);
+  document.addEventListener('visibilitychange',onForeground);
+  void tick();
+ },
+ stop(){
+  current=null;
+  if(timer!==null){window.clearInterval(timer);timer=null;}
+  document.removeEventListener('visibilitychange',onForeground);
+ },
+ status(){return {active:current!==null,lastError,lastSync:latest};},
+ async now(){if(!current)throw Error('Önce otomatik senkronizasyonu aç.');await tick();}
+};
+
