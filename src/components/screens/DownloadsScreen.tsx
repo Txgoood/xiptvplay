@@ -568,11 +568,13 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold line-clamp-2">{job.title}</p>
                 <p className="text-[11px] text-[#b9cacb]">{job.mode==='night'?'🌙 '+[Math.floor(job.fromMinute/60),job.fromMinute%60].map(x=>String(x).padStart(2,'0')).join(':')+'–'+[Math.floor(job.toMinute/60),job.toMinute%60].map(x=>String(x).padStart(2,'0')).join(':'):new Date(job.startAt).toLocaleString('tr-TR')}</p>
-                <p className="text-[11px] text-[#00f0ff]">{({scheduled:'⏳ Planlandı',downloading:'⬇️ İndiriliyor',completed:'✅ Tamamlandı',paused:'⏸️ Gece/Koşul Bekliyor',error:'⚠️ Hata',cancelled:'✕ İptal'} as Record<string,string>)[job.status]||job.status}
-                  {job.bytes>0?' · '+(job.bytes/1e6).toFixed(1)+' MB':''}
-                  {job.error?' · '+job.error:''}
+                <p className="text-[11px] text-[#00f0ff] flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span>{({scheduled:'⏳ Planlandı',downloading:'⬇️ İndiriliyor',completed:'✅ Tamamlandı',paused:'⏸️ Gece/Koşul Bekliyor',error:'⚠️ Hata',cancelled:'✕ İptal'} as Record<string,string>)[job.status]||job.status}</span>
+                  {job.total>0 && <strong className="text-[#bafaff] text-xs">%{Math.min(100, Math.max(0, Math.floor(100 * job.bytes / job.total)))}</strong>}
+                  {job.bytes>0 && <span>{(job.bytes/1e6).toFixed(1)} MB{job.total>0 ? ' / '+(job.total/1e6).toFixed(1)+' MB' : ''}</span>}
+                  {job.error&&<span className="text-[#ffb4ab]">{job.error}</span>}
                 </p>
-                {job.total>0&&<div className="h-1 mt-1 rounded bg-white/10"><div className="h-full bg-[#00f0ff] rounded" style={{width:Math.min(100,100*job.bytes/job.total)+'%'}}/></div>}
+                {job.total>0&&<div role="progressbar" aria-label={job.title+' indirme ilerlemesi'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100,Math.max(0,Math.floor(100*job.bytes/job.total)))} className="h-1.5 mt-1 rounded bg-white/10 overflow-hidden"><div className="h-full bg-[#00f0ff] rounded transition-[width] duration-300" style={{width:Math.min(100,Math.max(0,100*job.bytes/job.total))+'%'}}/></div>}
               </div>
               {job.status!=='completed'&&<button aria-label="Planı iptal et" title="Planı iptal et" onClick={()=>onCancelScheduled(job.id)} className="p-2 rounded-lg bg-[#423035] text-[#ffb4ab]"><X className="w-4 h-4"/></button>}
             </div>)}
