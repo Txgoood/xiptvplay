@@ -23,6 +23,25 @@ function saveEvents(v:Event[]){localStorage.setItem(EVENT_KEY,JSON.stringify(v))
 function profileIds(){return [...new Set(['parent',...(FamilyProfilesService.get()?.profiles||[]).map(p=>p.id)])];}
 const favKey=(p:string)=>p==='parent'?'xiptvplay_favorite_items_v1':'xiptvplay_profile_favorites_v1_'+p;
 const histKey=(p:string)=>'xiptvplay_watch_history_v1_'+p;
+// Sync connection definitions, not the large 70,000-item catalog cache,
+// changing ping measurements, progress counters, or downloaded media.
+function portablePlaylist(p:Playlist):Playlist {
+ const canInline=(!p.m3uUrl && p.m3uContent && p.m3uContent.length<1024*1024);
+ return {
+  id:p.id,name:p.name,type:p.type,serverUrl:p.serverUrl,
+  username:p.username,password:p.password,m3uUrl:p.m3uUrl,
+  m3uContent:canInline?p.m3uContent:undefined,
+  status:'active',statusLabel:'Buluttan aktarıldı',expiryDays:0,
+  expiryDateStr:'',liveCount:0,movieCount:0,seriesCount:0,
+  isCached:false,lastSync:''
+ };
+}
+function portableSignature(p:Playlist){
+ const normalized=portablePlaylist(p);
+ return JSON.stringify([normalized.id,normalized.name,normalized.type,
+  normalized.serverUrl,normalized.username,normalized.password,
+  normalized.m3uUrl,normalized.m3uContent]);
+}
 function readItems<T>(key:string):T[]{try{const d=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(d)?d:[];}catch{return [];}}
 function snapshots(): Snapshot {
  const fav:Record<string,MediaItem[]>={},hist:Record<string,WatchHistoryEntry[]>={};
@@ -60,8 +79,11 @@ function captureLocalChanges(){
  const prevPlaylists = new Map((old?.playlists||[]).map(x=>[x.id,x]));
  for(const item of now.playlists){
   const previousItem=prevPlaylists.get(item.id);
-  if(!previousItem || JSON.stringify(previousItem)!==JSON.stringify(item))
-   add({kind:'playlist',profile:'shared',mediaId:item.id,playlist:item});
+  if(!previousItem || portableSignature(previousItem)!==portableSignature(item)){
+   if(item.type==='m3u' && !item.m3uUrl && (item.m3uContent?.length||0)>=1024*1024)
+    continue; // Large, inline-only M3U: manually transfer rather than flood Drive.
+   add({kind:'playlist',profile:'shared',mediaId:item.id,playlist:portablePlaylist(item)});
+  }
  }
  // An account-wide parental PIN is copied only to devices that do not yet
  // have a family configuration. Profile permissions are versioned per ID.
@@ -163,7 +185,16 @@ function applyRemote(entries:Event[]){
  // A remote empty list is never treated as a delete request.
  const playlistMap=new Map(current.playlists.map(p=>[p.id,p]));
  for(const e of recentPlaylist.values()){
-  if(e.playlist && e.playlist.id===e.mediaId)playlistMap.set(e.mediaId,e.playlist);
+  if(e.playlist && e.playlist.id===e.mediaId){
+   const existing=playlistMap.get(e.mediaId);
+   playlistMap.set(e.mediaId,existing
+     ? {...existing,...e.playlist,status:existing.status,statusLabel:existing.statusLabel,
+         expiryDays:existing.expiryDays,expiryDateStr:existing.expiryDateStr,
+         liveCount:existing.liveCount,movieCount:existing.movieCount,
+         seriesCount:existing.seriesCount,isCached:existing.isCached,
+         lastSync:existing.lastSync,m3uContent:e.playlist.m3uContent??existing.m3uContent}
+     :e.playlist);
+  }
  }
  const mergedPlaylists=[...playlistMap.values()];
  if(JSON.stringify(mergedPlaylists)!==JSON.stringify(current.playlists)){
