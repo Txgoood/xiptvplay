@@ -151,6 +151,17 @@ export default function App() {
   const profileRef = useRef(historyProfileId);
   profileRef.current = historyProfileId;
   useEffect(() => { setWatchHistory(WatchHistoryService.read(historyProfileId)); }, [historyProfileId]);
+  // Drive synchronization changes persistent records outside the React state.
+  // Refresh the visible profile after remote events have been merged.
+  useEffect(() => {
+    const onCloudChange = () => {
+      setFavoriteItems(StorageService.getFavoriteItems());
+      setProfileFavorites(historyProfileId === 'parent' ? [] : readProfileFavorites(historyProfileId));
+      setWatchHistory(WatchHistoryService.read(historyProfileId));
+    };
+    window.addEventListener('xiptv-cloud-data-changed', onCloudChange);
+    return () => window.removeEventListener('xiptv-cloud-data-changed', onCloudChange);
+  }, [historyProfileId]);
   const isChildProfile = activeFamilyProfile?.kind === 'child';
   const isAdminProfile = !familyConfiguration || historyProfileId === 'parent';
   const canAccessMedia = (item: MediaItem): boolean => !isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, item);
