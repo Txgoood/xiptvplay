@@ -65,7 +65,6 @@ export const FamilyProfilesService = {
   async add(config: FamilyConfiguration, options: { name: string; kind: 'adult' | 'child'; ageLimit?: ChildAge; pin?: string; copyFromId?: string }): Promise<FamilyConfiguration> {
     const name = options.name.trim().slice(0, 32);
     if (!name) throw new Error('Profil adı gerekli.');
-    if (config.profiles.length >= 100) throw new Error('Cihaz güvenliği için 100 profil sınırı uygulandı.');
     if (options.pin && !/^\\d{4,6}$/.test(options.pin)) throw new Error('PIN 4–6 rakam olmalı.');
     const template = options.copyFromId ? config.profiles.find(p => p.id === options.copyFromId && p.kind === 'child') : null;
     const profile: FamilyProfile = {
