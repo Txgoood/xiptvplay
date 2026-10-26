@@ -183,17 +183,6 @@ export const FamilyProfilesModal: React.FC<Props> = ({
         </div>
         {mode === 'setup' && <>
           <p className="text-sm text-[#b9cacb]">Mevcut playlist ve favorilerin Ana Profil'de kalır. Çocuk profili ilk açılışta boş ve kilitlidir; yalnızca senin izin verdiğin kategoriler gösterilir.</p>
-          {(configuration?.profiles.some(p=>p.kind==='child')) && <label className="block text-sm">Filtreleri yönetilecek çocuk profili
-            <select value={editingChildId} onChange={e=>{
-              const profile=configuration?.profiles.find(p=>p.id===e.target.value);
-              if(!profile)return;
-              setEditingChildId(profile.id);setChildName(profile.name);setAge(profile.ageLimit||7);
-              setAuthorizations([...profile.allowedCategories]);setSelectedItemIds([...profile.allowedItemIds]);
-              setAutoSuggestedCategories([]);setAutoSuggestedItemIds([]);setScannedIds({});setLastScan(null);
-            }} className="w-full mt-2 rounded-xl bg-[#2b2b30] p-3">
-              {configuration?.profiles.filter(p=>p.kind==='child').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </label>}
           <label className="block text-sm">Çocuk profili adı<input value={childName} onChange={e => setChildName(e.target.value.slice(0, 32))} maxLength={32} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3 outline-none"/></label>
           <label className="block text-sm">Çocuk için yaş sınırı<select value={age} onChange={e => setAge(Number(e.target.value) as ChildAge)} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3">{ages.map(a => <option key={a} value={a}>{a}+ yaş</option>)}</select></label>
           <label className="block text-sm">Ebeveyn PIN'i (4–6 rakam)<input aria-label="Ebeveyn PIN'i" type="password" inputMode="numeric" autoComplete="new-password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3"/></label>
@@ -258,6 +247,17 @@ export const FamilyProfilesModal: React.FC<Props> = ({
           <div className="rounded-xl bg-[#29292d] border border-white/10 p-3 text-xs text-[#d6d6d6]">
             Çocuk profili varsayılan olarak kapalıdır: sadece kaydettiğin izinler geçerlidir. Otomatik kontrol TMDB yaş etiketlerine bakar; manuel seçimde bir kategorinin tamamı açılır. İki yöntem birlikte kullanılabilir.
           </div>
+          {(configuration?.profiles.some(p=>p.kind==='child')) && <label className="block text-sm">Filtreleri yönetilecek çocuk profili
+            <select value={editingChildId} onChange={e=>{
+              const profile=configuration?.profiles.find(p=>p.id===e.target.value);
+              if(!profile)return;
+              setEditingChildId(profile.id);setChildName(profile.name);setAge(profile.ageLimit||7);
+              setAuthorizations([...profile.allowedCategories]);setSelectedItemIds([...profile.allowedItemIds]);
+              setAutoSuggestedCategories([]);setAutoSuggestedItemIds([]);setScannedIds({});setLastScan(null);
+            }} className="w-full mt-2 rounded-xl bg-[#2b2b30] p-3">
+              {configuration?.profiles.filter(p=>p.kind==='child').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>}
           <label className="block text-sm">Çocuk profili adı<input value={childName} onChange={e => setChildName(e.target.value.slice(0,32))} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3"/></label>
           <label className="block text-sm">Yaş tercihi<select value={age} onChange={e => changeAge(Number(e.target.value) as ChildAge)} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3">{ages.map(a => <option key={a} value={a}>{a}+ yaş</option>)}</select></label>
           <div className="grid grid-cols-3 gap-2" role="group" aria-label="İçerik seçim yöntemi">
