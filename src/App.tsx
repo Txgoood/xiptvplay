@@ -152,6 +152,7 @@ export default function App() {
   profileRef.current = historyProfileId;
   useEffect(() => { setWatchHistory(WatchHistoryService.read(historyProfileId)); }, [historyProfileId]);
   const isChildProfile = activeFamilyProfile?.kind === 'child';
+  const isAdminProfile = !familyConfiguration || historyProfileId === 'parent';
   const canAccessMedia = (item: MediaItem): boolean => !isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, item);
   const activeFavoriteItems = historyProfileId === 'parent' ? favoriteItems : profileFavorites;
   useEffect(() => {
@@ -174,6 +175,7 @@ export default function App() {
     setFamilyDialogMode(null);
   };
   const startFamilySetup = () => {
+    if (!isAdminProfile) return;
     setIsProfileOpen(false);
     setFamilyDialogMode(familyConfiguration ? 'manage' : 'setup');
   };
@@ -1148,7 +1150,7 @@ export default function App() {
                 onBack={() => setCurrentScreen('catalog')}
               />
             )}
-            {!isChildProfile && currentScreen === 'settings' && (
+            {isAdminProfile && currentScreen === 'settings' && (
               <SettingsScreen
                 stats={stats}
                 onClearCache={handleClearCache}
@@ -1178,7 +1180,7 @@ export default function App() {
       </button>}
 
       {/* Add Playlist Modal */}
-      {!isChildProfile && <AddPlaylistModal
+      {isAdminProfile && <AddPlaylistModal
         initialType={addModalType}
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -1233,7 +1235,7 @@ export default function App() {
         }}
       />
 
-      {familyDialogMode && !isChildProfile && <FamilyProfilesModal
+      {familyDialogMode && isAdminProfile && <FamilyProfilesModal
         mode={familyDialogMode}
         configuration={familyConfiguration}
         catalog={catalogItems}
@@ -1244,7 +1246,7 @@ export default function App() {
         onClose={() => setFamilyDialogMode(null)}
       />}
 
-      {isCloudBackupOpen && !isChildProfile && <CloudBackupModal
+      {isCloudBackupOpen && isAdminProfile && <CloudBackupModal
         onClose={() => setIsCloudBackupOpen(false)}
         onRestored={() => {
           setIsCloudBackupOpen(false);
@@ -1394,14 +1396,14 @@ export default function App() {
               </div>
             </div>
             <div className="flex flex-col gap-2 w-full pt-1">
-              <button onClick={() => { setIsProfileOpen(false); setIsCloudBackupOpen(true); }}
+              {isAdminProfile && <button onClick={() => { setIsProfileOpen(false); setIsCloudBackupOpen(true); }}
                 className="w-full py-3 rounded-xl bg-[#28333a] text-[#bafaff] border border-[#00f0ff]/20 text-sm font-bold">
                 ☁️ Google Drive · Yedekle ve Geri Yükle
-              </button>
-              <button onClick={startFamilySetup}
+              </button>}
+              {isAdminProfile && <button onClick={startFamilySetup}
                 className="w-full py-3 rounded-xl bg-[#00f0ff] text-[#00363a] text-sm font-bold">
                 {familyConfiguration ? 'Aile Profillerini Yönet' : 'Çocuk Profili ve PIN Oluştur'}
-              </button>
+              </button>}
               {familyConfiguration && <button onClick={() => { setIsProfileOpen(false); setActivePlayerMedia(null); setCurrentProfileId(null); }}
                 className="w-full py-2.5 rounded-xl bg-[#26262a] text-white text-xs font-semibold border border-white/10">
                 Profil Değiştir
