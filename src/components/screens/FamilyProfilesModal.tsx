@@ -28,6 +28,13 @@ export const FamilyProfilesModal: React.FC<Props> = ({
   const [childName, setChildName] = useState(configuration?.profiles.find(p => p.kind === 'child')?.name || 'Çocuk');
   const [age, setAge] = useState<ChildAge>(configuration?.profiles.find(p => p.kind === 'child')?.ageLimit || 7);
   const [selected, setSelected] = useState<FamilyProfile | null>(null);
+  const [editingChildId, setEditingChildId] = useState<string>(configuration?.profiles.find(p => p.kind === 'child')?.id || 'child');
+  const [newName, setNewName] = useState('');
+  const [newKind, setNewKind] = useState<'adult' | 'child'>('adult');
+  const [newAge, setNewAge] = useState<ChildAge>(7);
+  const [newPin, setNewPin] = useState('');
+  const [copyChildId, setCopyChildId] = useState('');
+  const [creatingProfile, setCreatingProfile] = useState(false);
   const [authorizations, setAuthorizations] = useState<string[]>(configuration?.profiles.find(p => p.kind === 'child')?.allowedCategories || []);
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
@@ -131,11 +138,25 @@ export const FamilyProfilesModal: React.FC<Props> = ({
     catch (err: any) { setError(err.message || 'Profil kurulamadı.'); }
     finally { setBusy(false); }
   };
+  const addNewProfile = async () => {
+    if (!configuration) return;
+    setBusy(true); setError('');
+    try {
+      const next = await FamilyProfilesService.add(configuration, {
+        name: newName, kind: newKind, ageLimit: newAge,
+        pin: newKind === 'adult' ? newPin : undefined,
+        copyFromId: newKind === 'child' ? copyChildId : undefined,
+      });
+      onSave(next);
+      setNewName(''); setNewPin(''); setCreatingProfile(false);
+    } catch(err: any) { setError(err.message || 'Yeni profil oluşturulamadı.'); }
+    finally { setBusy(false); }
+  };
   const unlock = async () => {
     if (!configuration || !selected) return;
     setBusy(true); setError('');
     try {
-      if (await FamilyProfilesService.verifyPin(pin, configuration)) {
+      if (await FamilyProfilesService.verifyProfilePin(pin, selected, configuration)) {
         onSelect(selected);
       } else { setError('PIN yanlış.'); setPin(''); }
     } catch (err: any) { setError(err.message || 'PIN kontrol edilemedi.'); setPin(''); }
@@ -143,7 +164,7 @@ export const FamilyProfilesModal: React.FC<Props> = ({
   };
   const save = () => {
     if (!configuration) return;
-    const next = { ...configuration, profiles: configuration.profiles.map(p => p.kind === 'child'
+    const next = { ...configuration, profiles: configuration.profiles.map(p => p.id === editingChildId && p.kind === 'child'
       ? { ...p, name: childName.trim() || 'Çocuk', ageLimit: age, allowedCategories: authorizations, allowedItemIds: selectedItemIds }
       : p) };
     onSave(next);
@@ -162,6 +183,17 @@ export const FamilyProfilesModal: React.FC<Props> = ({
         </div>
         {mode === 'setup' && <>
           <p className="text-sm text-[#b9cacb]">Mevcut playlist ve favorilerin Ana Profil'de kalır. Çocuk profili ilk açılışta boş ve kilitlidir; yalnızca senin izin verdiğin kategoriler gösterilir.</p>
+          {(configuration?.profiles.some(p=>p.kind==='child')) && <label className="block text-sm">Filtreleri yönetilecek çocuk profili
+            <select value={editingChildId} onChange={e=>{
+              const profile=configuration?.profiles.find(p=>p.id===e.target.value);
+              if(!profile)return;
+              setEditingChildId(profile.id);setChildName(profile.name);setAge(profile.ageLimit||7);
+              setAuthorizations([...profile.allowedCategories]);setSelectedItemIds([...profile.allowedItemIds]);
+              setAutoSuggestedCategories([]);setAutoSuggestedItemIds([]);setScannedIds({});setLastScan(null);
+            }} className="w-full mt-2 rounded-xl bg-[#2b2b30] p-3">
+              {configuration?.profiles.filter(p=>p.kind==='child').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>}
           <label className="block text-sm">Çocuk profili adı<input value={childName} onChange={e => setChildName(e.target.value.slice(0, 32))} maxLength={32} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3 outline-none"/></label>
           <label className="block text-sm">Çocuk için yaş sınırı<select value={age} onChange={e => setAge(Number(e.target.value) as ChildAge)} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3">{ages.map(a => <option key={a} value={a}>{a}+ yaş</option>)}</select></label>
           <label className="block text-sm">Ebeveyn PIN'i (4–6 rakam)<input aria-label="Ebeveyn PIN'i" type="password" inputMode="numeric" autoComplete="new-password" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} className="block w-full mt-2 rounded-xl bg-[#2b2b30] p-3"/></label>
@@ -184,6 +216,45 @@ export const FamilyProfilesModal: React.FC<Props> = ({
           </div>}
         </>}
         {mode === 'manage' && <>
+          <div className="space-y-3 p-3 rounded-xl bg-[#262a30] border border-white/10">
+            <h3 className="text-sm font-bold">Aile Profilleri ({configuration?.profiles.length || 0})</h3>
+            <div className="flex flex-wrap gap-2">
+              {configuration?.profiles.map(profile => <div key={profile.id} className="flex items-center gap-1 rounded-xl bg-[#353840] px-3 py-2 text-xs">
+                <span>{profile.kind === 'child' ? '👧' : '👤'} {profile.name}</span>
+                {profile.id !== 'parent' && <button type="button" aria-label={profile.name + ' profilini sil'} title="Profili Sil"
+                  className="ml-2 text-[#ffb4ab]" onClick={() => {
+                    if (!window.confirm(profile.name + ' profili ve bu cihaza kaydedilmiş kişisel verileri silinsin mi?')) return;
+                    const next = FamilyProfilesService.delete(configuration, profile.id);
+                    localStorage.removeItem('xiptvplay_profile_favorites_v1_' + profile.id);
+                    localStorage.removeItem('xiptvplay_watch_history_v1_' + profile.id);
+                    if (editingChildId === profile.id) {
+                      const first = next.profiles.find(p => p.kind === 'child');
+                      if (first) setEditingChildId(first.id);
+                    }
+                    onSave(next);
+                  }}>✕</button>}
+              </div>)}
+            </div>
+            <button type="button" onClick={() => setCreatingProfile(v => !v)} className="px-3 py-2 bg-[#00f0ff] text-black rounded-xl text-xs font-bold">➕ Profil Ekle</button>
+            {creatingProfile && <div className="space-y-2">
+              <input aria-label="Yeni profil adı" value={newName} maxLength={32} onChange={e => setNewName(e.target.value)} placeholder="Profil adı" className="w-full bg-[#34363b] rounded-lg p-2.5 text-sm"/>
+              <select aria-label="Profil türü" value={newKind} onChange={e => setNewKind(e.target.value as 'adult'|'child')} className="w-full bg-[#34363b] rounded-lg p-2.5 text-sm">
+                <option value="adult">Yetişkin</option><option value="child">Çocuk</option>
+              </select>
+              {newKind === 'adult' ? <label className="text-xs block">İsteğe bağlı profil PIN'i (boş bırakırsan yönetici PIN'i gerekir)
+                <input type="password" inputMode="numeric" value={newPin} onChange={e=>setNewPin(e.target.value.replace(/\D/g,'').slice(0,6))} className="w-full bg-[#34363b] rounded-lg p-2.5 mt-1"/>
+              </label> : <>
+                <select aria-label="Çocuk yaş sınırı" value={newAge} onChange={e=>setNewAge(Number(e.target.value) as ChildAge)} className="w-full bg-[#34363b] rounded-lg p-2.5 text-sm">
+                  {ages.map(a=><option key={a} value={a}>{a}+ yaş</option>)}
+                </select>
+                <select aria-label="Çocuk izinlerini kopyala" value={copyChildId} onChange={e=>setCopyChildId(e.target.value)} className="w-full bg-[#34363b] rounded-lg p-2.5 text-sm">
+                  <option value="">Boş ve güvenli başlat</option>
+                  {configuration?.profiles.filter(p=>p.kind==='child').map(p=><option key={p.id} value={p.id}>{p.name} izinlerini kopyala</option>)}
+                </select>
+              </>}
+              <button type="button" disabled={busy || !newName.trim()} onClick={() => void addNewProfile()} className="w-full bg-[#00f0ff] text-black rounded-lg p-2.5 font-bold disabled:opacity-40">Yeni Profili Kaydet</button>
+            </div>}
+          </div>
           <div className="rounded-xl bg-[#29292d] border border-white/10 p-3 text-xs text-[#d6d6d6]">
             Çocuk profili varsayılan olarak kapalıdır: sadece kaydettiğin izinler geçerlidir. Otomatik kontrol TMDB yaş etiketlerine bakar; manuel seçimde bir kategorinin tamamı açılır. İki yöntem birlikte kullanılabilir.
           </div>
