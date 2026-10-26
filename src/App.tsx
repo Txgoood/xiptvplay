@@ -169,6 +169,18 @@ export default function App() {
       const syncedPlaylists = StorageService.getPlaylists();
       setPlaylists(syncedPlaylists);
       setActivePlaylist(prev => prev ? (syncedPlaylists.find(p => p.id === prev.id) || prev) : syncedPlaylists[0] || null);
+      // Newly imported connections need a local catalog fetch. Process one
+      // at a time instead of flooding the IPTV provider with many requests.
+      void (async () => {
+        for (const imported of syncedPlaylists) {
+          if (StorageService.getPlaylistItems(imported.id).length ||
+              autoRefreshAttemptedRef.current.has(imported.id)) continue;
+          const persisted = await StorageService.loadPlaylistItemsPersistent(imported.id);
+          if (persisted?.length) continue;
+          autoRefreshAttemptedRef.current.add(imported.id);
+          await handleRefreshPlaylist(imported.id);
+        }
+      })();
       const syncedFamily = FamilyProfilesService.get();
       setFamilyConfiguration(syncedFamily);
     };
@@ -443,7 +455,14 @@ export default function App() {
         playlistsRef.current=updated;
         return updated;
       });
-      if(isSelected()){setCatalogItems(items);setIsCatalogLoading(false);}
+      if(isSelected()){
+        setActivePlaylist(prev => prev?.id===id ? {
+          ...prev,status:'active',statusLabel:'Bağlı (Aktif)',
+          liveCount:counts.live,movieCount:counts.movie,seriesCount:counts.series,
+          lastSync:'Şimdi',isCached:true,errorMessage:undefined
+        } : prev);
+        setCatalogItems(items);setIsCatalogLoading(false);
+      }
       showToast(`"${target.name}" kataloğu yüklendi: ${counts.live} canlı, ${counts.movie} film, ${counts.series} dizi.`);
     }catch(e:any){
       const message=e?.message||'Katalog indirme hatası';
