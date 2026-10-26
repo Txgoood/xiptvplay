@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Cloud, LockKeyhole, ShieldCheck, X, RefreshCcw } from 'lucide-react';
 import { CloudDriveService, GoogleDriveSession } from '../../services/cloudDrive';
+import { CloudSyncController } from '../../services/cloudSync';
 
 interface Props { onClose:()=>void; onRestored:()=>void; }
 export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
@@ -10,6 +11,20 @@ export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
  const [message,setMessage]=useState('');
  const [confirmRestore,setConfirmRestore]=useState(false);
  const [remoteExists,setRemoteExists]=useState<boolean|null>(null);
+ const [syncStatus,setSyncStatus]=useState(CloudSyncController.status());
+ useEffect(()=>{
+  const update=()=>setSyncStatus(CloudSyncController.status());
+  window.addEventListener('xiptv-cloud-sync-status',update);
+  return ()=>window.removeEventListener('xiptv-cloud-sync-status',update);
+ },[]);
+ const enableAutoSync=()=>{
+  if(!session){setMessage('Önce Google hesabına bağlan.');return;}
+  if(password.length<10){setMessage('Senkronizasyon şifresi en az 10 karakter olmalı.');return;}
+  if(mismatch){setMessage('Bu cihaz başka bir Google hesabına bağlı.');return;}
+  CloudSyncController.start(session,password);
+  setSyncStatus(CloudSyncController.status());
+  setMessage('Otomatik eşitleme açıldı. Uygulama açıkken yaklaşık 90 saniyede bir ve tekrar ön plana geldiğinde eşitlenecek. Şifre yalnızca uygulama belleğinde tutulur.');
+ };
  const perform=async(action:'connect'|'backup'|'inspect'|'restore')=>{
   setBusy(true);setMessage('');
   try{
@@ -53,7 +68,7 @@ export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
    : <div className="bg-[#26333a] p-3 rounded-xl text-sm">
       <p className="font-bold text-[#00f0ff]">✓ {session.email}</p>
       <p className="text-[11px] text-[#b9cacb]">Bağlantı bu oturum boyunca geçerli. Başka hesaba geçmek için bağlantıyı kesip yeniden seç.</p>
-      <button onClick={()=>{setSession(null);setPassword('');setRemoteExists(null);void CloudDriveService.disconnect();}} className="mt-2 px-3 py-1.5 rounded-lg bg-white/10 text-xs">Bağlantıyı Kes</button>
+      <button onClick={()=>{CloudSyncController.stop();setSyncStatus(CloudSyncController.status());setSession(null);setPassword('');setRemoteExists(null);void CloudDriveService.disconnect();}} className="mt-2 px-3 py-1.5 rounded-lg bg-white/10 text-xs">Bağlantıyı Kes</button>
     </div>}
    {session&&<div className="space-y-3">
     <label className="block text-sm"><LockKeyhole className="w-4 h-4 inline mr-1"/> Şifreli yedek parolası
@@ -61,6 +76,20 @@ export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
         placeholder="En az 10 karakter · unutma!" className="block w-full mt-2 p-3 rounded-xl bg-[#343840] outline-none"/>
     </label>
     <p className="text-[11px] text-amber-200">Bu parola Google şifren değildir. Google'a veya sunucumuza gönderilmez. Unutursan şifreli yedeği geri açamayız.</p>
+    <div className="rounded-xl border border-[#00f0ff]/20 bg-[#10242a] p-3 space-y-2">
+      <p className="text-sm font-bold text-[#bafaff]">🔄 Cihazlar Arası Otomatik Eşitleme</p>
+      <p className="text-xs text-[#d0e3e5]">Favoriler ve izleme geçmişi aynı Google hesabındaki cihazlarda birleştirilir. İndirilen video dosyaları aktarılmaz.</p>
+      <p className="text-[11px] text-amber-200">İlk sürümde profillerin diğer cihazda da oluşturulmuş olması gerekir. Playlistleri ve profil ayarlarını önce manuel yedekten aktar. Yedekleme parolan tüm cihazlarda aynı olmalı.</p>
+      {syncStatus.active ? <>
+        <p className="text-xs text-green-300">● Otomatik eşitleme açık{syncStatus.lastSync?' · Son: '+new Date(syncStatus.lastSync).toLocaleString('tr-TR'):''}</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={()=>void CloudSyncController.now()} className="rounded-lg bg-[#00f0ff] p-2.5 text-black text-xs font-bold">Şimdi Eşitle</button>
+          <button type="button" onClick={()=>{CloudSyncController.stop();setSyncStatus(CloudSyncController.status());}} className="rounded-lg bg-white/10 p-2.5 text-xs">Otomatiği Kapat</button>
+        </div>
+      </> : <button type="button" disabled={busy||mismatch} onClick={enableAutoSync} className="w-full rounded-lg bg-[#00f0ff] p-3 font-bold text-black disabled:opacity-40">Otomatik Eşitlemeyi Aç</button>}
+      {syncStatus.lastError&&<p className="text-xs text-[#ffb4ab]">⚠️ {syncStatus.lastError}</p>}
+      <p className="text-[11px] text-[#a1c3c6]">Uygulama tamamen kapalıyken veya internet yokken eşitleme bekler. Uygulamayı yeniden açınca parolayla tekrar etkinleştirmen gerekir.</p>
+    </div>
     <button disabled={busy||mismatch} onClick={()=>void perform('backup')} className="w-full p-3 rounded-xl bg-[#00f0ff] text-black font-bold disabled:opacity-40">☁️ Şimdi Şifreli Yedekle</button>
     <button disabled={busy||mismatch||!remoteExists} onClick={()=>void perform('inspect')} className="w-full p-3 rounded-xl bg-white/10 font-semibold disabled:opacity-40">♻️ Yedeği İncele ve Geri Yükle</button>
     {confirmRestore&&<div className="bg-[#403226] border border-amber-300/30 rounded-xl p-3 space-y-2">
@@ -72,7 +101,7 @@ export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
    {busy&&<p className="text-xs text-[#00f0ff] flex gap-2 items-center"><RefreshCcw size={14} className="animate-spin"/> Google Drive işlemi sürüyor...</p>}
    <div className="bg-[#242c30] rounded-xl p-3 text-xs text-[#c8d7d9] space-y-1">
     <p className="font-bold flex gap-2 items-center"><ShieldCheck size={15}/> Güvenlik ve senkronizasyon</p>
-    <p>İlk sürümde güvenli manuel yedekleme ve geri yükleme bulunur. İki cihazın aynı anda değiştirdiği kayıtların otomatik birleştirilmesi henüz etkin değildir; eski verinin üzerine otomatik yazmayız.</p>
+    <p>Manuel şifreli yedekleme korunur. Otomatik eşitleme bu ilk sürümde yalnızca favori ve izleme geçmişi değişiklik günlüklerini birleştirir; profiller ve playlistler için manuel yedek kullanılır.</p>
    </div>
   </section>
  </div>;
