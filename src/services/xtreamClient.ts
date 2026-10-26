@@ -190,8 +190,8 @@ export class XtreamClientService {
         };
         return this.processCatalogData(data, cleanUrl, username, password, playlistId);
       } catch (err: any) {
-        console.warn('[XtreamClient] Native catalog fetch failed:', err);
-        return { items: [], counts: { live: 0, movie: 0, series: 0 } };
+        console.warn('[XtreamClient] Native catalog fetch failed:', err?.message || 'unknown');
+        throw new Error(err?.message || 'IPTV kataloğu alınamadı. Sunucu ya da ağ bağlantısını kontrol edin.');
       }
     }
 
