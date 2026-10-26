@@ -1,4 +1,5 @@
 name: Build Android APK
+# Stable signing verification after GitHub repository secret registration.
 
 on:
   workflow_dispatch:
