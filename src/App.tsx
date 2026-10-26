@@ -40,12 +40,21 @@ export default function App() {
   const [downloads, setDownloads] = useState<DownloadItem[]>(() => StorageService.getDownloads());
   const [scheduledDownloads, setScheduledDownloads] = useState<ScheduledDownload[]>([]);
   const [scheduleSelection, setScheduleSelection] = useState<MediaItem[]>([]);
+  // Track imported IDs so frequent UI polling never rechecks or resurrects
+  // already imported/deleted native scheduled downloads.
+  const importedScheduledIdsRef = useRef<Set<string>>(
+    new Set(StorageService.getDownloads().filter(d => d.id.startsWith('sched-')).map(d => d.id))
+  );
+  const scheduleRefreshBusyRef = useRef(false);
   const refreshScheduled = async () => {
+    if (scheduleRefreshBusyRef.current) return;
+    scheduleRefreshBusyRef.current = true;
+    try {
     const jobs = await ScheduleService.list();
-    setScheduledDownloads(jobs);
+    setScheduledDownloads(prev => JSON.stringify(prev) === JSON.stringify(jobs) ? prev : jobs);
     // A completed native job is also a regular offline item, even if the
     // app was closed during the scheduled download.
-    const completed = jobs.filter(j => j.status === 'completed' && j.path);
+    const completed = jobs.filter(j => j.status === 'completed' && j.path && !importedScheduledIdsRef.current.has(j.id));
     if (!completed.length) return;
     const resolved = await Promise.all(completed.map(async job => {
       try {
@@ -70,16 +79,25 @@ export default function App() {
           seriesTitle: job.seriesTitle, seasonNumber: job.seasonNumber,
           episodeNumber: job.episodeNumber, episodeTitle: job.episodeTitle,
         }));
+      // Import exactly once, even when completed tasks stay in native storage.
+      for (const row of resolved) if (row) importedScheduledIdsRef.current.add(row.job.id);
       return additions.length ? [...additions, ...prev] : prev;
     });
+    } finally {
+      scheduleRefreshBusyRef.current = false;
+    }
   };
   useEffect(() => {
-    void refreshScheduled();
-    const id = setInterval(() => void refreshScheduled(), 30000);
+    if (document.visibilityState === 'visible') void refreshScheduled();
+    // Foreground Downloads screen follows the native background worker live.
+    // Other screens only need occasional synchronization.
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshScheduled();
+    }, currentScreen === 'downloads' ? 2000 : 15000);
     const onVisible = () => { if (document.visibilityState === 'visible') void refreshScheduled(); };
     document.addEventListener('visibilitychange', onVisible);
-    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
-  }, []);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
+  }, [currentScreen]);
 
   const [favoriteItems, setFavoriteItems] = useState<MediaItem[]>(() => StorageService.getFavoriteItems());
 
