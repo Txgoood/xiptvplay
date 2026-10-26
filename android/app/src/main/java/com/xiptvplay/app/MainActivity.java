@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativeNotificationsPlugin.class);
         registerPlugin(DownloadFilesPlugin.class);
         registerPlugin(DownloadSchedulerPlugin.class);
+        registerPlugin(GoogleDriveAuthPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
