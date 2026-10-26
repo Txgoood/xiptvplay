@@ -314,7 +314,7 @@ export default function App() {
         const totalItems = (activePlaylist.liveCount || 0) + (activePlaylist.movieCount || 0) + (activePlaylist.seriesCount || 0);
         const hasMovieOrSeries = persistentItems ? persistentItems.some(i => i.type === 'movie' || i.type === 'series') : false;
         
-        if (totalItems > 0 && !hasMovieOrSeries && !autoRefreshAttemptedRef.current.has(activePlaylist.id)) {
+        if ((totalItems === 0 && items.length === 0 || totalItems > 0 && !hasMovieOrSeries) && !autoRefreshAttemptedRef.current.has(activePlaylist.id)) {
             autoRefreshAttemptedRef.current.add(activePlaylist.id);
             handleRefreshPlaylist(activePlaylist.id);
         }
