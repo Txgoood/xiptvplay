@@ -79,7 +79,7 @@ export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
     <div className="rounded-xl border border-[#00f0ff]/20 bg-[#10242a] p-3 space-y-2">
       <p className="text-sm font-bold text-[#bafaff]">🔄 Cihazlar Arası Otomatik Eşitleme</p>
       <p className="text-xs text-[#d0e3e5]">Favoriler, izleme geçmişi, profil tanımları ve IPTV bağlantıları aynı Google hesabındaki cihazlarda birleştirilir. İndirilen video dosyaları ve büyük katalog önbelleği aktarılmaz.</p>
-      <p className="text-[11px] text-amber-200">Playlist bağlantıları ve aile profilleri de şifreli eşitlenir. Çocuk erişimlerini genişleten değişiklikler güvenlik için otomatik uygulanmaz. Tüm cihazlarda aynı eşitleme parolasını kullan.</p>
+      <p className="text-[11px] text-amber-200">Playlist bağlantıları ve aile profilleri de şifreli eşitlenir. 1 MB üzeri, URL içermeyen M3U dosyaları otomatik aktarılmaz; bunları manuel yedekten taşı. Çocuk erişimlerini genişleten değişiklikler otomatik uygulanmaz. Tüm cihazlarda aynı eşitleme parolasını kullan.</p>
       {syncStatus.active ? <>
         <p className="text-xs text-green-300">● Otomatik eşitleme açık{syncStatus.lastSync?' · Son: '+new Date(syncStatus.lastSync).toLocaleString('tr-TR'):''}</p>
         <div className="grid grid-cols-2 gap-2">
