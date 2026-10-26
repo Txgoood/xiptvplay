@@ -21,6 +21,7 @@ import { ScheduleDownloadModal } from './components/screens/ScheduleDownloadModa
 import { ScheduleService, ScheduledDownload } from './services/downloadSchedule';
 import { WatchHistoryEntry, WatchHistoryService } from './services/watchHistory';
 import { FamilyProfilesModal } from './components/screens/FamilyProfilesModal';
+import { CloudBackupModal } from './components/screens/CloudBackupModal';
 import { FamilyConfiguration, FamilyProfile, FamilyProfilesService } from './services/familyProfiles';
 import { VideoPlayerModal } from './components/player/VideoPlayerModal';
 import { PrdHub } from './components/prd/PrdHub';
@@ -128,6 +129,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [globalSearchTerm, setGlobalSearchTerm] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isCloudBackupOpen, setIsCloudBackupOpen] = useState(false);
   const [familyConfiguration, setFamilyConfiguration] = useState<FamilyConfiguration | null>(() => FamilyProfilesService.get());
   // Every app restart requires profile selection after family protection has been configured.
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(() => FamilyProfilesService.get() ? null : 'parent');
@@ -1242,6 +1244,14 @@ export default function App() {
         onClose={() => setFamilyDialogMode(null)}
       />}
 
+      {isCloudBackupOpen && !isChildProfile && <CloudBackupModal
+        onClose={() => setIsCloudBackupOpen(false)}
+        onRestored={() => {
+          setIsCloudBackupOpen(false);
+          window.location.reload();
+        }}
+      />}
+
       {/* Chromecast Simulation Modal */}
       {isCastOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -1384,6 +1394,10 @@ export default function App() {
               </div>
             </div>
             <div className="flex flex-col gap-2 w-full pt-1">
+              <button onClick={() => { setIsProfileOpen(false); setIsCloudBackupOpen(true); }}
+                className="w-full py-3 rounded-xl bg-[#28333a] text-[#bafaff] border border-[#00f0ff]/20 text-sm font-bold">
+                ☁️ Google Drive · Yedekle ve Geri Yükle
+              </button>
               <button onClick={startFamilySetup}
                 className="w-full py-3 rounded-xl bg-[#00f0ff] text-[#00363a] text-sm font-bold">
                 {familyConfiguration ? 'Aile Profillerini Yönet' : 'Çocuk Profili ve PIN Oluştur'}
