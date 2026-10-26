@@ -22,13 +22,39 @@ public class ScheduledDownloadStore {
         context.getSharedPreferences("xiptv_schedule",0).edit().putString(KEY,items.toString()).apply();
         scheduleNext(context);
     }
+    // New jobs are inserted only from the UI; worker status updates must never
+    // recreate an item which the user already cancelled.
     static synchronized void upsert(Context context, JSONObject job) throws Exception {
         JSONArray old=read(context), next=new JSONArray();
         for(int i=0;i<old.length();i++){JSONObject row=old.optJSONObject(i);if(row!=null&&!row.optString("id").equals(job.optString("id")))next.put(row);}
+        context.getSharedPreferences("xiptv_schedule_cancelled",0).edit().remove(job.getString("id")).commit();
         next.put(job);
         save(context,next);
     }
+    static synchronized boolean updateIfPresent(Context context, JSONObject job) {
+        String id=job.optString("id","");
+        if(id.isEmpty() || isCancelled(context,id))return false;
+        JSONArray old=read(context),next=new JSONArray();
+        boolean found=false;
+        for(int i=0;i<old.length();i++){
+            JSONObject row=old.optJSONObject(i);
+            if(row==null)continue;
+            if(id.equals(row.optString("id"))){
+                if("cancelled".equals(row.optString("status")))return false;
+                next.put(job);found=true;
+            } else next.put(row);
+        }
+        if(!found)return false;
+        save(context,next);
+        return true;
+    }
+    static boolean isCancelled(Context context,String id){
+        return context.getSharedPreferences("xiptv_schedule_cancelled",0).getBoolean(id,false);
+    }
     static synchronized void remove(Context context,String id) {
+        // The marker outlives the worker's local JSONObject. Even an in-flight
+        // status update cannot bring a cancelled job back into the list.
+        context.getSharedPreferences("xiptv_schedule_cancelled",0).edit().putBoolean(id,true).commit();
         JSONArray old=read(context), next=new JSONArray();
         for(int i=0;i<old.length();i++){JSONObject row=old.optJSONObject(i);if(row!=null&&!row.optString("id").equals(id))next.put(row);}
         save(context,next);
