@@ -239,11 +239,7 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (historyProfileId !== 'parent') {
-      localStorage.setItem('xiptvplay_profile_favorites_v1_' + historyProfileId, JSON.stringify(profileFavorites));
-    }
-  }, [profileFavorites, historyProfileId]);
+
 
   // Sync playlists to persistent storage whenever modified
   useEffect(() => {
@@ -478,13 +474,15 @@ export default function App() {
   const handleToggleFavorite = (mediaId: string) => {
     const currentItem = catalogItems.find(item => item.id === mediaId);
     if (isChildProfile && (!currentItem || !canAccessMedia(currentItem))) return;
-    const setter = historyProfileId === 'parent' ? setFavoriteItems : setProfileFavorites;
+    const profileId = historyProfileId;
+    const setter = profileId === 'parent' ? setFavoriteItems : setProfileFavorites;
     setter((prev) => {
       const exists = prev.find(item => item.id === mediaId);
       const next = exists 
         ? prev.filter((item) => item.id !== mediaId) 
         : [...prev, catalogItems.find(item => item.id === mediaId) || { id: mediaId, title: 'Bilinmiyor', category: 'Genel', type: 'movie', resolution: 'HD', poster: '', streamUrl: '' } as MediaItem];
       showToast(exists ? 'Favorilerden çıkarıldı' : 'Favorilere eklendi');
+      if (profileId !== 'parent') localStorage.setItem('xiptvplay_profile_favorites_v1_' + profileId, JSON.stringify(next));
       return next;
     });
   };
