@@ -132,10 +132,17 @@ export default function App() {
   // Every app restart requires profile selection after family protection has been configured.
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(() => FamilyProfilesService.get() ? null : 'parent');
   const [familyDialogMode, setFamilyDialogMode] = useState<'setup' | 'manage' | null>(null);
-  const [childFavoriteItems, setChildFavoriteItems] = useState<MediaItem[]>(() => {
-    try { const raw = JSON.parse(localStorage.getItem('xiptvplay_child_favorite_items_v1') || '[]'); return Array.isArray(raw) ? raw : []; }
-    catch { return []; }
-  });
+  const [profileFavorites, setProfileFavorites] = useState<MediaItem[]>([]);
+  const readProfileFavorites = (profileId: string): MediaItem[] => {
+    if (profileId === 'parent') return StorageService.getFavoriteItems();
+    try {
+      const primary = localStorage.getItem('xiptvplay_profile_favorites_v1_' + profileId);
+      // Preserve existing child favorites when migrating the original 'child' profile.
+      const raw = primary ?? (profileId === 'child' ? localStorage.getItem('xiptvplay_child_favorite_items_v1') : null);
+      const parsed = JSON.parse(raw || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  };
   const activeFamilyProfile = familyConfiguration?.profiles.find(p => p.id === currentProfileId) || null;
   const historyProfileId = currentProfileId || 'parent';
   const [watchHistory, setWatchHistory] = useState<WatchHistoryEntry[]>(() => WatchHistoryService.read('parent'));
@@ -144,7 +151,10 @@ export default function App() {
   useEffect(() => { setWatchHistory(WatchHistoryService.read(historyProfileId)); }, [historyProfileId]);
   const isChildProfile = activeFamilyProfile?.kind === 'child';
   const canAccessMedia = (item: MediaItem): boolean => !isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, item);
-  const activeFavoriteItems = isChildProfile ? childFavoriteItems : favoriteItems;
+  const activeFavoriteItems = historyProfileId === 'parent' ? favoriteItems : profileFavorites;
+  useEffect(() => {
+    setProfileFavorites(historyProfileId === 'parent' ? [] : readProfileFavorites(historyProfileId));
+  }, [historyProfileId]);
   const childVisibleCatalog = useMemo(() => isChildProfile
     ? catalogItems.filter(item => FamilyProfilesService.allows(activeFamilyProfile, item))
     : catalogItems, [catalogItems, currentProfileId, familyConfiguration]);
@@ -230,8 +240,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('xiptvplay_child_favorite_items_v1', JSON.stringify(childFavoriteItems));
-  }, [childFavoriteItems]);
+    if (historyProfileId !== 'parent') {
+      localStorage.setItem('xiptvplay_profile_favorites_v1_' + historyProfileId, JSON.stringify(profileFavorites));
+    }
+  }, [profileFavorites, historyProfileId]);
 
   // Sync playlists to persistent storage whenever modified
   useEffect(() => {
@@ -466,7 +478,7 @@ export default function App() {
   const handleToggleFavorite = (mediaId: string) => {
     const currentItem = catalogItems.find(item => item.id === mediaId);
     if (isChildProfile && (!currentItem || !canAccessMedia(currentItem))) return;
-    const setter = isChildProfile ? setChildFavoriteItems : setFavoriteItems;
+    const setter = historyProfileId === 'parent' ? setFavoriteItems : setProfileFavorites;
     setter((prev) => {
       const exists = prev.find(item => item.id === mediaId);
       const next = exists 
@@ -986,9 +998,9 @@ export default function App() {
   // 1- Rozet Sayısı Hesaplaması: Sadece mevcut katalogda gerçekten eşleşen favorileri say
   const allFavoritesList = useMemo(() => {
     return isChildProfile
-      ? childFavoriteItems.filter(item => FamilyProfilesService.allows(activeFamilyProfile, item))
-      : favoriteItems;
-  }, [isChildProfile, childFavoriteItems, favoriteItems, familyConfiguration]);
+      ? activeFavoriteItems.filter(item => FamilyProfilesService.allows(activeFamilyProfile, item))
+      : activeFavoriteItems;
+  }, [isChildProfile, activeFavoriteItems, familyConfiguration]);
   const activeDownloadsCount = downloads.filter(
     (d) => d.status === 'downloading' || d.status === 'queued'
   ).length;
@@ -1227,7 +1239,7 @@ export default function App() {
         catalog={catalogItems}
         activePlaylistName={activePlaylist?.name}
         onCreate={(config) => { setFamilyConfiguration(config); setCurrentProfileId('parent'); setFamilyDialogMode('manage'); showToast('Çocuk profili hazır. Şimdi erişim kategorilerini seç.'); }}
-        onSave={(config) => { FamilyProfilesService.save(config); setFamilyConfiguration(config); setFamilyDialogMode(null); showToast('Çocuk profilinin izinleri kaydedildi.'); }}
+        onSave={(config) => { FamilyProfilesService.save(config); setFamilyConfiguration(config); setFamilyDialogMode(null); showToast('Profil ayarları kaydedildi.'); }}
         onSelect={selectFamilyProfile}
         onClose={() => setFamilyDialogMode(null)}
       />}
@@ -1376,7 +1388,7 @@ export default function App() {
             <div className="flex flex-col gap-2 w-full pt-1">
               <button onClick={startFamilySetup}
                 className="w-full py-3 rounded-xl bg-[#00f0ff] text-[#00363a] text-sm font-bold">
-                {familyConfiguration ? 'Çocuk Profilini Yönet' : 'Çocuk Profili ve PIN Oluştur'}
+                {familyConfiguration ? 'Aile Profillerini Yönet' : 'Çocuk Profili ve PIN Oluştur'}
               </button>
               {familyConfiguration && <button onClick={() => { setIsProfileOpen(false); setActivePlayerMedia(null); setCurrentProfileId(null); }}
                 className="w-full py-2.5 rounded-xl bg-[#26262a] text-white text-xs font-semibold border border-white/10">
