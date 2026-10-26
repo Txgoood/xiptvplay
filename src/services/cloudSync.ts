@@ -183,11 +183,43 @@ function applyRemote(entries:Event[]){
   }else{
    // Existing parental configuration stays authoritative for current members;
    // new adult/child profiles from other devices are safely added.
-   const known=new Set(localFamily.profiles.map(p=>p.id));
-   const additions=remoteProfiles.filter(p=>!known.has(p.id));
-   if(additions.length){
-    FamilyProfilesService.save({...localFamily,profiles:[...localFamily.profiles,...additions]});
-    changed=true;
+   const sameAdminPin=localFamily.pinHash===seed.pinHash && localFamily.pinSalt===seed.pinSalt;
+   if(sameAdminPin){
+    const ownProfileChanges=new Map(events().filter(e=>e.kind==='profile').map(e=>[e.mediaId,e]));
+    const existingProfiles=new Map(localFamily.profiles.map(p=>[p.id,p]));
+    let familyChanged=false;
+    for(const [id,event] of recentProfile){
+     const profile=event.familyProfile;
+     if(!profile || id!=='shared\u0000'+profile.id)continue;
+     const old=existingProfiles.get(profile.id);
+     if(!old){
+      // An entirely new adult/child profile can be imported automatically.
+      if(profile.id!=='parent' || profile.kind==='adult'){
+       existingProfiles.set(profile.id,profile);familyChanged=true;
+      }
+     }else if(event.device!==deviceId() && old.id!=='parent'){
+      const localEvents=events().filter(e=>e.kind==='profile'&&e.mediaId===old.id);
+      const lastLocal=localEvents.length?localEvents[localEvents.length-1]:undefined;
+      if(lastLocal && compare(event,lastLocal)<=0)continue;
+      // A remote child edit may rename the profile or make rules stricter,
+      // but must not silently increase its age rating / allowed items.
+      if(old.kind==='child'){
+       const oldAllowed=new Set(old.allowedCategories);
+       const oldItems=new Set(old.allowedItemIds);
+       const widened=(profile.ageLimit||7)>(old.ageLimit||7) ||
+        profile.allowedCategories.some(cat=>!oldAllowed.has(cat)) ||
+        profile.allowedItemIds.some(item=>!oldItems.has(item));
+       if(widened)continue;
+      }
+      if(JSON.stringify(old)!==JSON.stringify(profile)){
+       existingProfiles.set(old.id,profile);familyChanged=true;
+      }
+     }
+    }
+    if(familyChanged){
+     FamilyProfilesService.save({...localFamily,profiles:[...existingProfiles.values()]});
+     changed=true;
+    }
    }
   }
  }
