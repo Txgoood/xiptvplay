@@ -60,6 +60,13 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
   const isAnyDownloading = downloads.some((d) => d.status === 'downloading');
   const liveSpeed = downloads.filter(d => d.status === 'downloading').reduce((sum, d) => sum + (d.speedMbps || 0), 0).toFixed(1);
   const [shareSuccess, setShareSuccess] = useState<string | null>(null);
+  const [sourceHelp, setSourceHelp] = useState<'scheduled' | 'manual' | null>(null);
+  const [showAllScheduled, setShowAllScheduled] = useState(false);
+  const pendingScheduled = scheduledDownloads.filter(j => j.status !== 'completed' && j.status !== 'cancelled');
+  const sortedScheduled = [...pendingScheduled].sort((a, b) =>
+    (a.status === 'downloading' ? -1 : a.status === 'error' ? 0 : 1)
+    - (b.status === 'downloading' ? -1 : b.status === 'error' ? 0 : 1)
+  );
 
 
 
@@ -154,7 +161,13 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                           <CheckCircle2 className="w-3 h-3 text-[#4edea3]" />
                           Tamamlandı ({formatFileSize(item.totalSizeGb)})
                         </span>
-                        <span className="text-[11px] text-[#b9cacb] truncate">Çevrimdışı Hazır</span>
+                        <button
+                          type="button"
+                          onClick={() => setSourceHelp(item.source === 'scheduled' || item.id.startsWith('sched-') ? 'scheduled' : 'manual')}
+                          title={item.source === 'scheduled' || item.id.startsWith('sched-') ? 'Zamanlanmış indirme: bilgi için dokun' : 'Manuel indirme: bilgi için dokun'}
+                          aria-label="İndirme türünü açıkla"
+                          className="shrink-0 rounded-full border border-[#00f0ff]/20 bg-[#00f0ff]/10 text-[#b9faff] px-1.5 py-0.5 text-[10px] font-bold"
+                        >{item.source === 'scheduled' || item.id.startsWith('sched-') ? '🌙' : '⬇️'}</button>
                       </div>
                       <h4 className="font-headline text-[14px] font-bold text-[#e5e1e4] mt-1 truncate select-text active:whitespace-normal active:overflow-visible active:text-clip" title={item.title}>
                         {item.title}
@@ -517,13 +530,13 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
       <section className="bg-[#1d2329] rounded-2xl border border-[#00f0ff]/20 p-3 space-y-3">
         <div className="flex justify-between items-center gap-2">
           <div><h3 className="text-sm font-bold flex items-center gap-2"><Clock className="h-4 w-4 text-[#00f0ff]"/> ⏰ Planlananlar</h3>
-            <p className="text-[11px] text-[#b9cacb]">{scheduledDownloads.length} gece/saatli görev · Android arka plan kuyruğu</p>
+            <p className="text-[11px] text-[#b9cacb]">{pendingScheduled.length} aktif/bekleyen görev · Tamamlananlar aşağıdaki indirilenlere taşınır</p>
           </div>
           <button onClick={onRefreshScheduled} className="rounded-xl px-3 py-2 bg-[#303136] text-xs font-semibold">Yenile</button>
         </div>
-        {scheduledDownloads.length===0?<p className="text-xs text-[#b9cacb]">Planlanmış indirme yok. Film kartındaki saat simgesinden veya dizi ekranındaki Sezonu Zamanla düğmesinden ekleyebilirsin.</p>:
+        {pendingScheduled.length===0?<p className="text-xs text-[#b9cacb]">Bekleyen indirme yok. Tamamlanan zamanlı indirmeler aşağıdaki film ve dizi listesine taşınır.</p>:
           <div className="max-h-72 overflow-y-auto space-y-2">
-            {scheduledDownloads.map(job=><div key={job.id} className="flex gap-3 rounded-xl bg-[#282b31] p-2.5 items-center">
+            {(showAllScheduled ? sortedScheduled : sortedScheduled.slice(0, 3)).map(job=><div key={job.id} className="flex gap-3 rounded-xl bg-[#282b31] p-2.5 items-center">
               {job.poster&&<img src={job.poster} alt="" className="rounded-lg w-12 h-14 object-cover shrink-0"/>}
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold line-clamp-2">{job.title}</p>
@@ -537,7 +550,31 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
               {job.status!=='completed'&&<button aria-label="Planı iptal et" title="Planı iptal et" onClick={()=>onCancelScheduled(job.id)} className="p-2 rounded-lg bg-[#423035] text-[#ffb4ab]"><X className="w-4 h-4"/></button>}
             </div>)}
           </div>}
+        {pendingScheduled.length > 3 && <button type="button" onClick={() => setShowAllScheduled(v => !v)}
+          className="w-full rounded-lg border border-white/10 bg-[#282b31] p-2 text-xs font-semibold text-[#b9faff]">
+          {showAllScheduled ? 'Daha Az Göster' : `Diğer ${pendingScheduled.length - 3} Görevi Göster`}
+        </button>}
       </section>
+
+      <div className="flex items-center justify-end">
+        <button type="button" onClick={() => setSourceHelp('scheduled')}
+          className="rounded-full px-3 py-1.5 text-[11px] font-semibold bg-[#23272c] border border-white/10 text-[#cceef1]">
+          ⓘ İndirme simgeleri
+        </button>
+      </div>
+
+      {sourceHelp && <div className="fixed inset-0 z-[180] bg-black/75 flex items-center justify-center p-5"
+          onClick={() => setSourceHelp(null)}>
+          <section role="dialog" aria-modal="true" aria-label="İndirme simgeleri" onClick={e => e.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl bg-[#24262b] border border-[#00f0ff]/20 p-5 space-y-4 shadow-xl">
+            <div className="flex justify-between items-center"><h3 className="text-base font-bold text-white">İndirme Türleri</h3>
+              <button aria-label="Kapat" onClick={() => setSourceHelp(null)} className="p-1.5 bg-white/10 rounded-full text-white"><X size={18}/></button></div>
+            <p className="text-sm text-[#e5e1e4]">🌙 <strong>Zamanlı indirme:</strong> Belirlediğin saat veya gece kuyruğuyla indirildi.</p>
+            <p className="text-sm text-[#e5e1e4]">⬇️ <strong>Manuel indirme:</strong> Şimdi İndir düğmesiyle başlatıldı.</p>
+            <p className="text-[11px] text-[#aebfc0]">Bu simgeler sadece indirme yöntemini belirtir. Oynatma ve dosya özellikleri aynıdır.</p>
+            <button onClick={() => setSourceHelp(null)} className="rounded-xl bg-[#00f0ff] text-[#00363a] w-full py-2.5 font-bold">Anladım</button>
+          </section>
+        </div>}
 
       {/* Queue Header */}
       <div className="flex items-center justify-between px-1">
