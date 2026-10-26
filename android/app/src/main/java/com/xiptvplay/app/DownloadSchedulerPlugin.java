@@ -33,13 +33,11 @@ public class DownloadSchedulerPlugin extends Plugin {
     }
     @PluginMethod public void cancel(PluginCall call){
         String id=call.getString("id","");
+        // Mark removed first so the worker cannot reinsert it, then interrupt
+        // the transfer and close its socket before cleaning up partial files.
         ScheduledDownloadStore.remove(getContext(),id);
-        String safe=id.replaceAll("[^a-zA-Z0-9_-]","_");
-        java.io.File directory=new java.io.File(getContext().getFilesDir(),"downloads");
-        for(String ext:new String[]{"mp4","mkv","ts"}){
-            java.io.File partial=new java.io.File(directory,"scheduled_"+safe+"."+ext);
-            if(partial.exists())partial.delete();
-        }
+        ScheduledDownloadService.cancelActive(id);
+        ScheduledDownloadService.deletePartial(getContext(),id);
         call.resolve();
     }
     @PluginMethod public void checkNow(PluginCall call){
