@@ -107,7 +107,6 @@ public class ScheduledDownloadService extends Service {
     private void download(JSONObject job)throws Exception{
         String id=job.getString("id"),title=job.optString("title","İçerik");
         if(cancelled(id))return;
-        activeThreads.put(id,Thread.currentThread());
         String url=job.getString("url");
         if(!url.startsWith("http://")&&!url.startsWith("https://"))throw new IOException("Yalnızca HTTP/HTTPS adresleri desteklenir.");
         File base=new File(getFilesDir(),"downloads");if(!base.exists()&&!base.mkdirs())throw new IOException("İndirme klasörü oluşturulamadı");
@@ -120,6 +119,8 @@ public class ScheduledDownloadService extends Service {
         long saved=target.isFile()?target.length():0;
         HttpURLConnection connection=null;
         try{
+            activeThreads.put(id,Thread.currentThread());
+            if(cancelled(id))return;
             connection=(HttpURLConnection)new URL(url).openConnection();
             activeConnections.put(id,connection);
             if(cancelled(id))return;
