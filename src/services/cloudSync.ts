@@ -1,12 +1,14 @@
-import { CloudDriveService, type GoogleDriveSession } from './cloudDrive';
+import type { GoogleDriveSession } from './cloudDrive';
 import { StorageService } from './storage';
-import { FamilyProfilesService } from './familyProfiles';
+import { FamilyProfilesService, type FamilyConfiguration, type FamilyProfile } from './familyProfiles';
+import type { Playlist } from '../types';
 import type { MediaItem } from '../types';
 import type { WatchHistoryEntry } from './watchHistory';
 
 // One encrypted, append-only journal per device. Different devices never overwrite
 // each other's files, so simultaneous offline changes cannot cause lost updates.
-type Event = { id:string; device:string; seq:number; ts:number; kind:'favorite'|'history'; profile:string; mediaId:string; enabled?:boolean; media?:MediaItem; history?:WatchHistoryEntry };
+type Event = { id:string; device:string; seq:number; ts:number; kind:'favorite'|'history'|'playlist'|'family'|'profile'; profile:string; mediaId:string; enabled?:boolean; media?:MediaItem; history?:WatchHistoryEntry; playlist?:Playlist; family?:Pick<FamilyConfiguration,'version'|'pinSalt'|'pinHash'>; familyProfile?:FamilyProfile };
+type Snapshot = {fav:Record<string,MediaItem[]>;hist:Record<string,WatchHistoryEntry[]>;playlists:Playlist[];family:FamilyConfiguration|null};
 type Journal = { version:1; device:string; events:Event[] };
 type Envelope = {schema:1;salt:string;nonce:string;payload:string};
 const DRIVE='https://www.googleapis.com/drive/v3', UPLOAD='https://www.googleapis.com/upload/drive/v3';
@@ -22,17 +24,17 @@ function profileIds(){return [...new Set(['parent',...(FamilyProfilesService.get
 const favKey=(p:string)=>p==='parent'?'xiptvplay_favorite_items_v1':'xiptvplay_profile_favorites_v1_'+p;
 const histKey=(p:string)=>'xiptvplay_watch_history_v1_'+p;
 function readItems<T>(key:string):T[]{try{const d=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(d)?d:[];}catch{return [];}}
-function snapshots(){
+function snapshots(): Snapshot {
  const fav:Record<string,MediaItem[]>={},hist:Record<string,WatchHistoryEntry[]>={};
  for(const p of profileIds()){
   fav[p]=p==='parent'?StorageService.getFavoriteItems():readItems<MediaItem>(favKey(p));
   hist[p]=readItems<WatchHistoryEntry>(histKey(p));
  }
- return {fav,hist};
+ return {fav,hist,playlists:StorageService.getPlaylists(),family:FamilyProfilesService.get()};
 }
 function captureLocalChanges(){
  const now=snapshots(),device=deviceId(),previous=localStorage.getItem(LAST_SEEN_KEY);
- let old:typeof now|undefined;
+ let old:Snapshot|undefined;
  try{if(previous)old=JSON.parse(previous);}catch{}
  const journal=events();let seq=journal.reduce((x,e)=>Math.max(x,e.device===device?e.seq:0),0);
  const add=(event:Omit<Event,'id'|'device'|'seq'|'ts'>,ts=Date.now())=>{
@@ -53,6 +55,28 @@ function captureLocalChanges(){
   // Watch-history deletion does not propagate in v1: it must never erase another
   // device's legitimate playback progress without a confirmation protocol.
  }
+ // First device sends its existing playlist definitions; importing on an empty
+ // device never generates removals or overwrites an existing remote connection.
+ const prevPlaylists = new Map((old?.playlists||[]).map(x=>[x.id,x]));
+ for(const item of now.playlists){
+  const previousItem=prevPlaylists.get(item.id);
+  if(!previousItem || JSON.stringify(previousItem)!==JSON.stringify(item))
+   add({kind:'playlist',profile:'shared',mediaId:item.id,playlist:item});
+ }
+ // An account-wide parental PIN is copied only to devices that do not yet
+ // have a family configuration. Profile permissions are versioned per ID.
+ if(now.family && (!old?.family || old.family.pinSalt!==now.family.pinSalt || old.family.pinHash!==now.family.pinHash))
+  add({kind:'family',profile:'shared',mediaId:'family-security',family:{
+   version:1,pinSalt:now.family.pinSalt,pinHash:now.family.pinHash,
+  }});
+ const oldProfiles=new Map((old?.family?.profiles||[]).map(p=>[p.id,p]));
+ for(const profile of now.family?.profiles||[]){
+  const previousProfile=oldProfiles.get(profile.id);
+  if(!previousProfile || JSON.stringify(previousProfile)!==JSON.stringify(profile))
+   add({kind:'profile',profile:'shared',mediaId:profile.id,familyProfile:profile});
+ }
+ // Playlist/profile removals are deliberately *not* propagated in this
+ // iteration. A fresh device must never erase the existing family's data.
  saveEvents(journal);
  localStorage.setItem(LAST_SEEN_KEY,JSON.stringify(now));
 }
@@ -102,10 +126,19 @@ async function uploadOwn(token:string,own:DriveFile|undefined,body:string){
 }
 function applyRemote(entries:Event[]){
  const recentFav=new Map<string,Event>(),recentHistory=new Map<string,Event>();
+ const recentPlaylist=new Map<string,Event>(),recentProfile=new Map<string,Event>();
+ let familySeed:Event|undefined;
  const compare=(a:Event,b:Event)=>a.ts-b.ts||a.device.localeCompare(b.device)||a.seq-b.seq;
  for(const e of entries){
   if(!e?.profile||!e?.mediaId||!e?.id)continue;
-  const key=e.profile+'\u0000'+e.mediaId,table=e.kind==='favorite'?recentFav:recentHistory;
+  if(e.kind==='family'){
+   if(e.family && (!familySeed || compare(e,familySeed)>0))familySeed=e;
+   continue;
+  }
+  const key=e.profile+'\u0000'+e.mediaId;
+  const table=e.kind==='favorite'?recentFav:e.kind==='history'?recentHistory:
+    e.kind==='playlist'?recentPlaylist:e.kind==='profile'?recentProfile:null;
+  if(!table)continue;
   const old=table.get(key);
   if(!old||compare(e,old)>0)table.set(key,e);
  }
@@ -126,9 +159,43 @@ function applyRemote(entries:Event[]){
   const h=[...history.values()].sort((a,b)=>b.watchedAt-a.watchedAt).slice(0,350);
   if(JSON.stringify(h)!==JSON.stringify(current.hist[p])){localStorage.setItem(histKey(p),JSON.stringify(h));changed=true;}
  }
- if(changed)window.dispatchEvent(new CustomEvent('xiptv-cloud-data-changed'));
- // Do not create false removal events from changes downloaded from Drive.
+ // Use latest edit per playlist ID, retaining unrelated local playlists.
+ // A remote empty list is never treated as a delete request.
+ const playlistMap=new Map(current.playlists.map(p=>[p.id,p]));
+ for(const e of recentPlaylist.values()){
+  if(e.playlist && e.playlist.id===e.mediaId)playlistMap.set(e.mediaId,e.playlist);
+ }
+ const mergedPlaylists=[...playlistMap.values()];
+ if(JSON.stringify(mergedPlaylists)!==JSON.stringify(current.playlists)){
+  if(!StorageService.savePlaylists(mergedPlaylists))throw Error('Playlistler cihazda saklanamadı.');
+  changed=true;
+ }
+ // Parent PIN/settings bootstrap: never change an already-configured device's
+ // parental PIN as a side effect of ordinary background synchronization.
+ const localFamily=current.family;
+ const seed=familySeed?.family;
+ if(seed && typeof seed.pinHash==='string' && typeof seed.pinSalt==='string'){
+  const remoteProfiles=[...recentProfile.values()].map(e=>e.familyProfile).filter((p):p is FamilyProfile=>Boolean(p?.id && p.name));
+  if(!localFamily){
+   const newConfig:FamilyConfiguration={version:1,pinSalt:seed.pinSalt,pinHash:seed.pinHash,
+    profiles:remoteProfiles.length?remoteProfiles:[{id:'parent',name:'Ana Profil',kind:'adult',role:'admin',allowedCategories:[],allowedItemIds:[]}]};
+   FamilyProfilesService.save(newConfig);changed=true;
+  }else{
+   // Existing parental configuration stays authoritative for current members;
+   // new adult/child profiles from other devices are safely added.
+   const known=new Set(localFamily.profiles.map(p=>p.id));
+   const additions=remoteProfiles.filter(p=>!known.has(p.id));
+   if(additions.length){
+    FamilyProfilesService.save({...localFamily,profiles:[...localFamily.profiles,...additions]});
+    changed=true;
+   }
+  }
+ }
+ // Prevent the React UI from writing its old state over imported records.
+ // First record the new snapshot, then notify the UI.
  localStorage.setItem(LAST_SEEN_KEY,JSON.stringify(snapshots()));
+ if(changed)window.dispatchEvent(new CustomEvent('xiptv-cloud-data-changed'));
+ // Imported data is the new baseline; do not echo it as local edits.
  return changed;
 }
 let running=false;
