@@ -5,7 +5,11 @@ export interface FamilyProfile {
   id: string;
   name: string;
   kind: 'adult' | 'child';
+  role?: 'admin' | 'member';
   ageLimit?: ChildAge;
+  icon?: string;
+  pinSalt?: string;
+  pinHash?: string;
   allowedCategories: string[];
   allowedItemIds: string[];
 }
@@ -36,7 +40,7 @@ export const FamilyProfilesService = {
       const value = localStorage.getItem(CONFIG_KEY);
       if (!value) return null;
       const config = JSON.parse(value) as FamilyConfiguration;
-      return config?.version === 1 && Array.isArray(config.profiles) && config.profiles.length >= 2
+      return config?.version === 1 && Array.isArray(config.profiles) && config.profiles.length >= 1
         && typeof config.pinSalt === 'string' && typeof config.pinHash === 'string' ? config : null;
     } catch { return null; }
   },
@@ -48,7 +52,7 @@ export const FamilyProfilesService = {
       pinSalt: salt,
       pinHash: await hashPin(pin, salt),
       profiles: [
-        { id: 'parent', name: 'Ana Profil', kind: 'adult', allowedCategories: [], allowedItemIds: [] },
+        { id: 'parent', name: 'Ana Profil', kind: 'adult', role: 'admin', allowedCategories: [], allowedItemIds: [] },
         { id: 'child', name: childName.trim() || 'Çocuk', kind: 'child', ageLimit, allowedCategories: [], allowedItemIds: [] },
       ],
     };
@@ -57,6 +61,37 @@ export const FamilyProfilesService = {
   },
   save(config: FamilyConfiguration): void {
     localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  },
+  async add(config: FamilyConfiguration, options: { name: string; kind: 'adult' | 'child'; ageLimit?: ChildAge; pin?: string; copyFromId?: string }): Promise<FamilyConfiguration> {
+    const name = options.name.trim().slice(0, 32);
+    if (!name) throw new Error('Profil adı gerekli.');
+    if (config.profiles.length >= 100) throw new Error('Cihaz güvenliği için 100 profil sınırı uygulandı.');
+    if (options.pin && !/^\\d{4,6}$/.test(options.pin)) throw new Error('PIN 4–6 rakam olmalı.');
+    const template = options.copyFromId ? config.profiles.find(p => p.id === options.copyFromId && p.kind === 'child') : null;
+    const profile: FamilyProfile = {
+      id: 'profile-' + crypto.randomUUID(), name, kind: options.kind, role: 'member',
+      ageLimit: options.kind === 'child' ? (options.ageLimit || 7) : undefined,
+      allowedCategories: options.kind === 'child' && template ? [...template.allowedCategories] : [],
+      allowedItemIds: options.kind === 'child' && template ? [...template.allowedItemIds] : [],
+    };
+    if (options.kind === 'adult' && options.pin) {
+      profile.pinSalt = hex(crypto.getRandomValues(new Uint8Array(16)));
+      profile.pinHash = await hashPin(options.pin, profile.pinSalt);
+    }
+    const next = { ...config, profiles: [...config.profiles, profile] };
+    this.save(next);
+    return next;
+  },
+  delete(config: FamilyConfiguration, id: string): FamilyConfiguration {
+    if (id === 'parent') throw new Error('Ana Profil silinemez.');
+    const next = { ...config, profiles: config.profiles.filter(p => p.id !== id) };
+    this.save(next);
+    return next;
+  },
+  async verifyProfilePin(pin: string, profile: FamilyProfile, config: FamilyConfiguration): Promise<boolean> {
+    if (profile.id === 'parent') return this.verifyPin(pin, config);
+    if (!profile.pinHash || !profile.pinSalt) return true;
+    return this.verifyPin(pin, { ...config, pinHash: profile.pinHash, pinSalt: profile.pinSalt });
   },
   async verifyPin(pin: string, config: FamilyConfiguration): Promise<boolean> {
     let guard: { count: number; until: number } = { count: 0, until: 0 };
