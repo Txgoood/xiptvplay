@@ -77,6 +77,7 @@ export interface DownloadItem {
   progressPercent: number;
   status: 'downloading' | 'paused' | 'queued' | 'completed' | 'error';
   statusLabel: string;
+  source?: 'scheduled' | 'manual';
   queueOrder?: number;
   poster: string;
   verifiedMd5?: boolean;
