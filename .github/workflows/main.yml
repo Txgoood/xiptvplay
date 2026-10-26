@@ -72,6 +72,7 @@ jobs:
             exit 1
           }
           echo "Stable XIPTV Play debug signing certificate verified."
+          echo "XIPTV_DEBUG_KEYSTORE_PATH=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
 
       - name: Build Capacitor APK
         run: |
