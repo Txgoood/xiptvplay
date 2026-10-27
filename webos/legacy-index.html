@@ -19,7 +19,20 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 </style><link rel="stylesheet" href="./tv-layout.css" /></head>
 <body><main>
 <h1>XIPTV Play <span id="tv-version-label">TV</span></h1>
-<p>Video oynatma tanılama sürümü <b>v0.8.1</b></p>
+<section id="tv-home">
+<div class="tv-home-eyebrow">XIPTV PLAY · SMART TV</div>
+<h2>Televizyon keyfi, şimdi büyük ekranda.</h2>
+<p>Canlı yayınlar, filmler ve diziler tek bir yerde.</p>
+<div class="tv-home-actions">
+<button id="tv-home-live" type="button">◉ Canlı TV</button>
+<button id="tv-home-films" type="button">▣ Filmler</button>
+<button id="tv-home-series" type="button">▤ Diziler</button>
+</div>
+<div class="tv-home-foot">Kayıtlı hesabın varsa katalog otomatik açılır. Kumandanla bir bölüm seç.</div>
+<button id="tv-show-diagnostics" type="button">Geliştirici araçları</button>
+</section>
+<div id="tv-diagnostics" style="display:none">
+<p>Video oynatma tanılama sürümü <b>v0.9.0</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -33,6 +46,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <button id="w3">W3 MP4</button>
 <button id="aac">AAC Sesli MP4</button>
 <button id="iptv-open" type="button">Canlı TV (Xtream)</button>
+</div>
 <section id="iptv-panel" style="display:none;background:#1c2b38;padding:20px;margin:16px 0;border:2px solid #497082">
 <button id="iptv-hide" type="button">TV Menüsünü Kapat</button>
 <div id="iptv-login">
@@ -144,4 +158,4 @@ video.addEventListener('error',function(){var code=video.error?video.error.code:
 video.addEventListener('ended',function(){message('Video başarıyla sona erdi.');update();},false);
 focus(0);system();update();
 })();
-</script><script src="./tv-features.js"></script><script src="./tv-iptv.js"></script><script src="./tv-profiles.js"></script><script src="./tv-keyboard.js"></script></body></html>
+</script><script src="./tv-home.js"></script><script src="./tv-features.js"></script><script src="./tv-iptv.js"></script><script src="./tv-profiles.js"></script><script src="./tv-keyboard.js"></script></body></html>
