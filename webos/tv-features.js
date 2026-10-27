@@ -13,11 +13,13 @@ function toggleFavorite(mode,item){
  if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();
 }
 function decorateItem(button,mode,item){
- var star=document.createElement('button');star.type='button';star.style.cssText='font-size:16px;padding:6px;float:right;margin:1px';
+ var wrapper=document.createElement('div');wrapper.className='tv-item-wrap';
+ button.parentNode.insertBefore(wrapper,button);wrapper.appendChild(button);
+ var star=document.createElement('button');star.type='button';star.className='tv-card-favorite';star.setAttribute('aria-label','Favorilere ekle veya çıkar');
  star.textContent=isFavorite(mode,item)?'★':'☆';
  star.title='Favori değiştir';
  star.onclick=function(e){if(e&&e.stopPropagation)e.stopPropagation();toggleFavorite(mode,item);};
- button.parentNode.appendChild(star);
+ wrapper.appendChild(star);
 }
 function updateHeart(){
  if(!playingItem){favButton.style.display='none';return;}
