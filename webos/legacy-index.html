@@ -14,23 +14,26 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 </style></head>
 <body><main>
 <h1>XIPTV Play — LG webOS 2</h1>
-<p>Video oynatma tanılama sürümü <b>v0.2.7</b></p>
+<p>Video oynatma tanılama sürümü <b>v0.2.8</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
 <button id="network">Bağlantı Testi</button>
 <button id="stop">Durdur</button>
 <button id="proxy">Proxy MP4</button>
-<button id="hls">HLS Testi</button>
+<button id="hls">HLS Source</button>
+<button id="mp4src">MP4 Source</button>
+<button id="blob">Blob MP4</button>
 <div id="status">Uygulama başlatılıyor...</div>
 <video id="video" controls preload="none"></video>
 <div id="events"></div>
-<p><small>Önce Yerel Video düğmesini dene. Test videosu uygulamanın içinde, internete ihtiyaç duymaz. Ardından İnternet Video, Proxy MP4 ve HLS Testi düğmelerini deneyebilirsin. Bu sürüm henüz playlist/profil içermez.</small></p>
+<p><small>Önce Yerel Video düğmesini dene. Test videosu uygulamanın içinde, internete ihtiyaç duymaz. Ardından HLS Source, MP4 Source ve Blob MP4 seçeneklerini deneyebilirsin. Blob testi yalnızca kısa test videosu içindir. Bu sürüm henüz playlist/profil içermez.</small></p>
 </main><script>
 (function(){
 var video=document.getElementById('video'),status=document.getElementById('status'),events=document.getElementById('events');
-var ids=['system','local','remote','network','stop','proxy','hls'],buttons=[],selected=0,lastKey='yok',actions=0;
+var ids=['system','local','remote','network','stop','proxy','hls','mp4src','blob'],buttons=[],selected=0,lastKey='yok',actions=0;
 var remoteUrl='https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4';
+var lastSource='',activeBlob=null;
 var proxyUrl='https://xiptvplay.onrender.com/api/iptv/proxy?url='+encodeURIComponent(remoteUrl);
 var hlsUrl='https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
 for(var i=0;i<ids.length;i++){buttons[i]=document.getElementById(ids[i]);}
@@ -38,16 +41,59 @@ function message(text){status.innerHTML=text;}
 function update(){events.innerHTML='Tuş: '+lastKey+' | İşlem sayısı: '+actions+' | video.readyState='+video.readyState+' | networkState='+video.networkState;}
 function focus(n){selected=(n+buttons.length)%buttons.length;for(var i=0;i<buttons.length;i++)buttons[i].className=i===selected?'active':'';try{if(document.activeElement!==buttons[selected])buttons[selected].focus();}catch(e){}}
 function system(){var mime='video/mp4; codecs="avc1.42E01E, mp4a.40.2"';message('Sistem çalışıyor | XMLHttpRequest: '+(window.XMLHttpRequest?'EVET':'HAYIR')+' | H.264/AAC: '+(video.canPlayType(mime)||'belirsiz'));}
-function play(src,label){message(label+' yükleniyor...');try{video.pause();video.removeAttribute('src');video.load();video.src=src;video.load();var p=video.play();if(p&&p.catch)p.catch(function(e){message(label+' play() hatası: '+e.message);});}catch(e){message(label+' başlatma hatası: '+e.message);}update();}
+function clearVideo(){
+  try{video.pause();video.removeAttribute('src');while(video.firstChild)video.removeChild(video.firstChild);video.load();}catch(ex){}
+  if(activeBlob){try{window.URL.revokeObjectURL(activeBlob);}catch(e){}activeBlob=null;}
+}
+function play(src,label,mime){
+  clearVideo();lastSource=src;
+  message(label+' yükleniyor...');
+  try{
+    if(mime){
+      var item=document.createElement('source');
+      item.setAttribute('src',src);
+      item.setAttribute('type',mime);
+      video.appendChild(item);
+    }else{video.src=src;}
+    video.load();
+    var promise=video.play();
+    if(promise&&promise.catch)promise.catch(function(e){message(label+' play() hatası: '+e.message);});
+  }catch(e){message(label+' başlatma hatası: '+e.message);}
+  update();
+}
+function blobVideo(){
+  var xhr=new XMLHttpRequest();
+  message('1 MB test videosu belleğe alınıyor (yalnızca tanılama)...');
+  try{
+    xhr.open('GET',remoteUrl,true);xhr.responseType='blob';xhr.timeout=18000;
+    xhr.onload=function(){
+      if(xhr.status<200||xhr.status>299){message('Blob GET HTTP '+xhr.status);return;}
+      var b=xhr.response;
+      if(!b||!b.size){message('Blob yanıtı boş');return;}
+      if(!window.URL||!window.URL.createObjectURL){message('Blob video bu TV sürümünde desteklenmiyor');return;}
+      var url=window.URL.createObjectURL(b);
+      play(url,'Bellekteki MP4 ('+b.size+' bayt)');
+      activeBlob=url;
+    };
+    xhr.onerror=function(){message('Blob ağ isteği başarısız');};
+    xhr.ontimeout=function(){message('Blob bağlantı zaman aşımı');};
+    xhr.send(null);
+  }catch(e){message('Blob başlatma hatası: '+e.message);}
+}
 function network(){var x=new XMLHttpRequest();var started=new Date().getTime();message('İnternet video kaynağı test ediliyor...');try{x.open('GET',remoteUrl,true);x.timeout=12000;x.setRequestHeader('Range','bytes=0-1023');x.onreadystatechange=function(){if(x.readyState===4){message('İnternet GET: HTTP '+x.status+' | '+(x.getResponseHeader('Content-Type')||'tür bilinmiyor')+' | '+(new Date().getTime()-started)+'ms');}};x.onerror=function(){message('İnternet bağlantısı başarısız (XHR)');};x.ontimeout=function(){message('İnternet bağlantısı zaman aşımı');};x.send(null);}catch(e){message('İnternet bağlantı hatası: '+e.message);}}
-function execute(n){actions++;focus(n);if(n===0)system();if(n===1)play('./sample.mp4','Yerel MP4 (H.264 Baseline + AAC-LC)');if(n===2)play(remoteUrl,'İnternet MP4');if(n===3)network();if(n===4){video.pause();video.removeAttribute('src');video.load();message('Durduruldu');}if(n===5)play(proxyUrl,'Render proxy üzerinden MP4');if(n===6)play(hlsUrl,'Doğrudan HLS canlı akış testi');update();}
+function execute(n){actions++;focus(n);if(n===0)system();if(n===1)play('./sample.mp4','Yerel MP4 (H.264 Baseline + AAC-LC)');if(n===2)play(remoteUrl,'İnternet MP4');if(n===3)network();if(n===4){clearVideo();message('Durduruldu');}
+if(n===5)play(proxyUrl,'Render proxy üzerinden MP4');
+if(n===6)play(hlsUrl,'HLS dosyası, açık MIME','application/x-mpegurl');
+if(n===7)play(remoteUrl,'MP4 source öğesi','video/mp4');
+if(n===8)blobVideo();
+update();}
 for(var j=0;j<buttons.length;j++){(function(n){buttons[n].onclick=function(){execute(n);};buttons[n].onfocus=function(){selected=n;for(var k=0;k<buttons.length;k++)buttons[k].className=k===n?'active':'';};})(j);}
 document.addEventListener('keydown',function(e){var k=e.keyCode||e.which;lastKey=String(k);if(k===37||k===38||k===39||k===40){focus(selected+((k===37||k===38)?-1:1));if(e.preventDefault)e.preventDefault();}else if(k===13||k===16777220){execute(selected);if(e.preventDefault)e.preventDefault();}else if(k===461||k===27){video.pause();message('Geri tuşu: Video duraklatıldı');}update();},false);
-video.onloadedmetadata=function(){message('Medya yüklendi: '+video.videoWidth+'x'+video.videoHeight+' | '+Math.round(video.duration)+' saniye');update();};
-video.oncanplay=function(){message('Medya oynatmaya hazır');update();};
-video.onplaying=function(){message('Video OYNUYOR! Görüntü ve sesi kontrol et.');update();};
-video.onerror=function(){var code=video.error?video.error.code:'?';message('VIDEO HATASI '+code+' | networkState='+video.networkState+' | readyState='+video.readyState+' | Kaynak: '+video.currentSrc);update();};
-video.onended=function(){message('Video başarıyla sona erdi.');update();};
+video.addEventListener('loadedmetadata',function(){message('Medya yüklendi: '+video.videoWidth+'x'+video.videoHeight+' | '+Math.round(video.duration)+' saniye');update();},false);
+video.addEventListener('canplay',function(){message('Medya oynatmaya hazır');update();},false);
+video.addEventListener('playing',function(){message('Video OYNUYOR! Görüntü ve sesi kontrol et.');update();},false);
+video.addEventListener('error',function(){var code=video.error?video.error.code:'?';message('VIDEO HATASI '+code+' | networkState='+video.networkState+' | readyState='+video.readyState+' | Kaynak: '+(video.currentSrc||lastSource));update();},false);
+video.addEventListener('ended',function(){message('Video başarıyla sona erdi.');update();},false);
 focus(0);system();update();
 })();
 </script></body></html>
