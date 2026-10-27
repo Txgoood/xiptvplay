@@ -33,7 +33,7 @@ function paint(keep){
  for(var n=0;n<extra.length;n++)append(extra[n],extra[n]);
  focusAt(keep?selection:0);title();
 }
-function notify(){try{var e=document.createEvent('Event');e.initEvent('input',true,true);target.dispatchEvent(e);}catch(x){if(target.onkeyup)target.onkeyup();}}
+function notify(){try{var e=document.createEvent('Event');e.initEvent('input',true,true);target.dispatchEvent(e);if(target.onkeyup)target.onkeyup();}catch(x){if(target.onkeyup)target.onkeyup();}}
 function write(v){target.value+=v;notify();title();}
 function press(v){
  if(!target)return;
