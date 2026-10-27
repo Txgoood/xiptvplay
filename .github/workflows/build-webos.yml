@@ -74,7 +74,7 @@ jobs:
             echo "Unsupported modern JavaScript module found in webOS 2 package"
             exit 1
           fi
-          node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv'||f.version!=='0.6.0'||f.trustLevel!=='netcast'||f.vendorExtension?.allowCrossDomain!==true) process.exit(1)"
+          node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv'||f.version!=='0.6.1'||f.trustLevel!=='netcast'||f.vendorExtension?.allowCrossDomain!==true) process.exit(1)"
 
       - name: Run remote-control and playback UI smoke tests
         run: node webos/legacy-smoke-test.mjs
