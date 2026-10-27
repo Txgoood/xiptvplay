@@ -11,10 +11,15 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 #status{background:#233142;padding:13px;white-space:pre-wrap;line-height:1.5;min-height:70px;font-size:21px}
 #video{display:block;width:75%;height:44vh;background:#000;margin:15px 0}
 #events{font-size:18px;color:#b7e7f1;white-space:pre-wrap}
+#iptv-keyboard{position:fixed;z-index:99999;top:7%;left:5%;width:90%;height:82%;box-sizing:border-box;background:#172737;border:3px solid #3bdcfa;padding:16px;overflow:hidden;box-shadow:0 0 0 500px rgba(0,0,0,.72)}
+#iptv-keyboard-title{font-size:23px;margin:0 0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#iptv-keys{height:85%;overflow-y:auto;overflow-x:hidden;text-align:left}
+#iptv-keys button{min-width:64px;margin:3px;padding:10px;font-size:19px}
+#iptv-keys button:focus{background:#159bc0;outline:3px solid #fff}
 </style></head>
 <body><main>
 <h1>XIPTV Play — LG webOS 2</h1>
-<p>Video oynatma tanılama sürümü <b>v0.4.3</b></p>
+<p>Video oynatma tanılama sürümü <b>v0.4.4</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -36,7 +41,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <p><label>Kullanıcı adı <input id="iptv-user" type="text" autocomplete="off" style="font-size:22px;padding:10px" /> <button id="iptv-user-keyboard" type="button">Klavye Aç</button></label></p>
 <p><label>Şifre <input id="iptv-pass" type="password" autocomplete="off" style="font-size:22px;padding:10px" /> <button id="iptv-pass-keyboard" type="button">Klavye Aç</button></label></p>
 <p><label><input type="checkbox" id="iptv-remember" /> Bu TV'de giriş bilgilerimi hatırla (şifre cihazda saklanır)</label></p>
-<div id="iptv-keyboard" style="display:none;border:2px solid #0df;padding:12px;max-height:300px;overflow:auto"><p id="iptv-keyboard-title">Klavye</p><div id="iptv-keys"></div></div>
+<div id="iptv-keyboard" style="display:none"><p id="iptv-keyboard-title">Klavye</p><div id="iptv-keys"></div></div>
 <button id="iptv-connect" type="button">Doğrula ve Kanalları Getir</button>
 <button id="iptv-forget" type="button">Kayıtlı Girişi Sil</button>
 </div>
