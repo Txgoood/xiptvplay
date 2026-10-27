@@ -20,19 +20,37 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <body><main>
 <h1>XIPTV Play <span id="tv-version-label">TV</span></h1>
 <section id="tv-home">
-<div class="tv-home-eyebrow">XIPTV PLAY · SMART TV</div>
-<h2>Televizyon keyfi, şimdi büyük ekranda.</h2>
-<p>Canlı yayınlar, filmler ve diziler tek bir yerde.</p>
-<div class="tv-home-actions">
-<button id="tv-home-live" type="button">◉ Canlı TV</button>
-<button id="tv-home-films" type="button">▣ Filmler</button>
-<button id="tv-home-series" type="button">▤ Diziler</button>
+<div id="stitch-side">
+  <div class="stitch-logo">X</div>
+  <button id="tv-nav-home" class="selected" type="button">⌂</button>
+  <button id="tv-home-live" type="button">▣</button>
+  <button id="tv-home-films" type="button">▤</button>
+  <button id="tv-home-series" type="button">▥</button>
+  <button id="tv-nav-fav" type="button">♡</button>
+  <button id="tv-nav-search" type="button">⌕</button>
+  <button id="tv-nav-profile" type="button">⚙</button>
 </div>
-<div class="tv-home-foot">Kayıtlı hesabın varsa katalog otomatik açılır. Kumandanla bir bölüm seç.</div>
-<button id="tv-show-diagnostics" type="button">Geliştirici araçları</button>
+<div class="stitch-main">
+<header class="stitch-top"><strong>XIPTV Play</strong><span class="stitch-top-meta">● Bağlı &nbsp;&nbsp; LG webOS TV</span><span class="stitch-avatar">TV</span></header>
+<div class="stitch-scroll">
+<div class="stitch-hero">
+ <div class="stitch-kicker">XIPTV PLAY · SMART TV</div>
+ <h2>Sinema keyfi, evinde.</h2>
+ <p>Canlı TV, filmler ve diziler — tek bir uygulamada.</p>
+ <div class="stitch-hero-buttons"><button id="tv-feature-play" type="button">▶ İzlemeye Başla</button><button id="tv-feature-detail" type="button">Kataloğu Keşfet</button></div>
+</div>
+<div class="stitch-heading"><strong>İzlemeye Devam Et</strong><span>Profiline özel içerikler</span></div>
+<div id="stitch-continue" class="stitch-tiles"><div class="stitch-empty">Filmler ve diziler oynatıldıkça burada görünecek.</div></div>
+<div class="stitch-heading"><strong>Favori Kanallar</strong><span>Canlı yayınlara hızlı erişim</span></div>
+<div id="stitch-favorites" class="stitch-tiles"><div class="stitch-empty">Favori kanallarını burada bulacaksın.</div></div>
+<div class="stitch-heading"><strong>Filmler ve Diziler</strong><span>Xtream kataloğun</span></div>
+<div id="stitch-recent" class="stitch-tiles"><div class="stitch-empty">Kataloğu açarak içerikleri görüntüleyebilirsin.</div></div>
+<div class="stitch-footer">XIPTV Play · LG webOS 2 uyumlu sürüm</div>
+</div></div>
+<button id="tv-show-diagnostics" type="button">Tanılama</button>
 </section>
 <div id="tv-diagnostics" style="display:none">
-<p>Video oynatma tanılama sürümü <b>v0.9.0</b></p>
+<p>Video oynatma tanılama sürümü <b>v1.0.0</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
