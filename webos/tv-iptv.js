@@ -77,6 +77,7 @@
     renderChannels();
   }
   function playChannel(item){
+    document.getElementById('tv-now-playing').textContent=String(item.name||'Canlı TV');
     var id=item.stream_id;
     if(id===null||typeof id==='undefined'){say('Bu kanalın stream ID bilgisi eksik');return;}
     var raw=server.replace(/\/$/,'')+'/live/'+encodeURIComponent(username)+'/'+encodeURIComponent(password)+'/'+encodeURIComponent(id)+'.m3u8';
@@ -106,7 +107,7 @@
     }
     var active=document.activeElement,idx=-1;
     for(i=0;i<list.length;i++)if(list[i]===active){idx=i;break;}
-    if(key===461 && panel.style.display!=='none'){hide(panel);launcher.focus();e.preventDefault();e.stopImmediatePropagation();return;}
+    if(key===461 && panel.style.display!=='none'){hide(panel);document.body.className='';launcher.focus();e.preventDefault();e.stopImmediatePropagation();return;}
     if(key===13 && active && active.tagName==='BUTTON'){
       active.click();e.preventDefault();e.stopImmediatePropagation();return;
     }
@@ -118,6 +119,7 @@
     }
   },true);
   launcher.onclick=function(){
+    document.body.className='tv-mode';
     show(panel);show(login);hide(browser);
     if(hydrate()){say('Kayıtlı Xtream bağlantısı bulundu. Otomatik bağlanılıyor...');document.getElementById('iptv-connect').click();}
     else{document.getElementById('iptv-server').focus();}
@@ -131,7 +133,7 @@
     server='';username='';password='';categoryList=[];channelList=[];
     hide(browser);show(login);say('Bu TV’deki kayıtlı giriş bilgileri temizlendi.');
   };
-  document.getElementById('iptv-hide').onclick=function(){hide(panel);launcher.focus();};
+  document.getElementById('iptv-hide').onclick=function(){hide(panel);document.body.className='';launcher.focus();};
   document.getElementById('iptv-connect').onclick=function(){
     server=document.getElementById('iptv-server').value.trim().replace(/\/+$/,'');
     username=document.getElementById('iptv-user').value.trim();
