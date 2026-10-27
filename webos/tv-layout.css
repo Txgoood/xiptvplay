@@ -144,3 +144,16 @@ body.tv-mode #tv-profile-panel label{font-size:20px}
  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:28px!important}
 #iptv-keys{height:calc(100% - 48px)!important;overflow-y:auto!important;overflow-x:hidden!important}
 #iptv-keys button{font-size:18px!important;min-width:59px!important;margin:3px!important;padding:7px 9px!important}
+
+/* XIPTV TV consumer home, compatible with WebKit 538. */
+#tv-home{position:fixed;left:0;right:0;top:0;bottom:0;overflow:hidden;z-index:30;
+background:radial-gradient(ellipse at 76% 27%,#164451 0%,#121d29 42%,#0a0c12 82%);padding:10vh 7vw;box-sizing:border-box;color:#f7f9fb}
+#tv-home .tv-home-eyebrow{font-size:18px;color:#00f0ff;font-weight:bold;letter-spacing:4px}
+#tv-home h2{max-width:70%;font-size:52px;line-height:1.12;margin:38px 0 15px;color:#fff}
+#tv-home p{font-size:25px;color:#c0cbd0;margin:0 0 46px}
+#tv-home .tv-home-actions button{display:inline-block;min-width:210px;height:145px;
+ margin:0 18px 15px 0;padding:15px;text-align:center;background:#1c3039;
+border:2px solid #47717e;border-radius:16px;font-size:25px;font-weight:bold;color:#fff}
+#tv-home .tv-home-actions button:focus{outline:4px solid #00f0ff;background:#17677b;box-shadow:0 0 30px rgba(0,240,255,.23)}
+#tv-home .tv-home-foot{position:absolute;bottom:8vh;color:#9ab1bd;font-size:18px}
+#tv-show-diagnostics{position:absolute;right:5vw;bottom:6vh;font-size:15px;padding:9px;background:#1b232c;border:1px solid #44525b;border-radius:7px;color:#a8b4bb}
