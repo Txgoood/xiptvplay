@@ -258,6 +258,7 @@
       request('/api/iptv/xtream/catalog',{serverUrl:server,username:username,password:password},function(error,catalog){
         if(error){say('Katalog hatası: '+error.message);return;}
         catalogData=catalog;
+        if(window.XIPTVTVHome&&window.XIPTVTVHome.render)window.XIPTVTVHome.render(catalog);
         window.XIPTVTV.catalogReady();
         hide(login);show(browser);
         chooseMode(window.XIPTVTV.startMode||'live');
