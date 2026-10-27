@@ -414,19 +414,20 @@ export default function App() {
     const isSelected=()=>activePlaylistRef.current?.id===id;
     // Every catalog rebuild must end in success or a visible error. Network
     // stalls and a frozen WebView bridge must not leave "downloading" forever.
+    let catalogStage = 'IPTV bağlantı kontrolü';
     const withDeadline = async <T,>(work:Promise<T>, timeoutMs:number):Promise<T> => {
       let deadline:ReturnType<typeof setTimeout>|undefined;
       try {
         return await Promise.race([
           work,
           new Promise<T>((_,reject)=>{
-            deadline=setTimeout(()=>reject(new Error('IPTV sunucusu zamanında yanıt vermedi. Ağ bağlantısını kontrol edip tekrar deneyin.')),timeoutMs);
+            deadline=setTimeout(()=>reject(new Error(catalogStage + ': süre sınırı aşıldı. Tekrar deneyin.')),timeoutMs);
           })
         ]);
       }finally{if(deadline)clearTimeout(deadline);}
     };
     if(isSelected())setIsCatalogLoading(true);
-    setPlaylists(prev=>prev.map(p=>p.id===id?{...p,lastSync:'Yenileniyor',statusLabel:'Katalog indiriliyor...'}:p));
+    setPlaylists(prev=>prev.map(p=>p.id===id?{...p,lastSync:'Yenileniyor',statusLabel:'Bağlantı kontrol ediliyor...',errorMessage:undefined}:p));
     try {
       let items:MediaItem[]=[];
       let counts:{live:number;movie:number;series:number};
@@ -441,13 +442,18 @@ export default function App() {
         if(!verify.success)
           throw Error('IPTV bağlantısı doğrulanamadı: '+(verify.error || 'Sunucu yanıt vermedi.'));
         const result=await withDeadline(XtreamClientService.fetchCatalog(
-          verify.effectiveServerUrl||target.serverUrl,target.username,target.password,target.id),180000);
+          verify.effectiveServerUrl||target.serverUrl,target.username,target.password,target.id,
+          stage => {
+            catalogStage = stage;
+            setPlaylists(prev=>prev.map(p=>p.id===id?{...p,statusLabel:stage+' indiriliyor...'}:p));
+          }),420000);
         items=result.items;counts=result.counts;
         workingServer=result.workingServer || verify.effectiveServerUrl || target.serverUrl;
         expiryDays=verify.expiryDays??expiryDays;
         expiryDateStr=verify.expiryDateStr??expiryDateStr;
         pingMs=verify.pingMs??pingMs;
       }else if(target.type==='m3u'){
+        catalogStage = 'M3U listesi';
         let content=target.m3uContent;
         if(target.m3uUrl){
           const fetched=await withDeadline(M3UParserService.fetchM3U(target.m3uUrl),90000);

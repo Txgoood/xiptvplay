@@ -1,5 +1,5 @@
 import { MediaItem, XtreamUserInfo, XtreamServerInfo, SeriesDetail, SeriesEpisode, SeriesSeason } from '../types';
-import { isNative, httpGetJson } from './net';
+import { isNative, httpGetJson, httpGetCatalogJson } from './net';
 
 export interface XtreamVerificationResult {
   success: boolean;
@@ -154,7 +154,8 @@ export class XtreamClientService {
     serverUrl: string,
     username: string,
     password: string,
-    playlistId: string
+    playlistId: string,
+    onProgress?: (stage: string) => void
   ): Promise<XtreamCatalogResult> {
     const cleanUrl = this.normalizeServerUrl(serverUrl);
 
@@ -162,7 +163,22 @@ export class XtreamClientService {
       try {
         const fetchNativeAction = async (action: string): Promise<any[]> => {
           const url = `${cleanUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=${action}`;
-          const result = await httpGetJson(url);
+          const labels: Record<string, string> = {
+            get_live_categories: 'Canlı TV kategorileri',
+            get_live_streams: 'Canlı TV listesi',
+            get_vod_categories: 'Film kategorileri',
+            get_vod_streams: 'Film listesi',
+            get_series_categories: 'Dizi kategorileri',
+            get_series: 'Dizi listesi',
+          };
+          const stage = labels[action] || 'Katalog';
+          onProgress?.(stage);
+          let result: any;
+          try {
+            result = await httpGetCatalogJson(url);
+          } catch (error: any) {
+            throw new Error(`${stage}: ${error?.message || 'İstek başarısız oldu.'}`);
+          }
           if (Array.isArray(result)) return result;
           if (result === null || result === undefined || (typeof result === 'object' && result?.error)) {
             throw new Error(`IPTV sunucusu ${action} isteğine geçerli yanıt vermedi.`);

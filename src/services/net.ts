@@ -20,6 +20,8 @@ export async function httpGetText(
       const response = await CapacitorHttp.get({
         url,
         headers: { 'User-Agent': IPTV_UA, Accept: '*/*' },
+        // Keep large catalogs as text across the native bridge; parse once in JS.
+        responseType: 'text',
         readTimeout: timeoutMs,
         connectTimeout: timeoutMs,
       });
@@ -60,4 +62,30 @@ export async function fetchWithProtocolFallback(url: string) {
     : url.replace('https://', 'http://');
 
   return await httpGetText(fallbackUrl);
+}
+
+/** Strict catalog requests report safe errors without exposing URLs or credentials. */
+export async function httpGetCatalogJson(url: string, timeoutMs = 60000): Promise<any> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      httpGetText(url, timeoutMs),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('İstek zaman aşımına uğradı.')), timeoutMs);
+      }),
+    ]);
+    if (result.status < 200 || result.status >= 300) {
+      if (result.status === 500 && /timeout|timed out/i.test(result.text)) {
+        throw new Error('İstek zaman aşımına uğradı.');
+      }
+      throw new Error(`Sunucuya erişilemedi (HTTP ${result.status}).`);
+    }
+    try {
+      return JSON.parse(result.text);
+    } catch {
+      throw new Error('Sunucu geçerli JSON yerine boş veya farklı biçimde yanıt verdi.');
+    }
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
