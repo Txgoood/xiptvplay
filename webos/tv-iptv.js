@@ -72,6 +72,7 @@
   function showSeries(item){
     var id=item.series_id;
     if(!id){say('Dizi bilgisi eksik');return;}
+    window.XIPTVTV.setPlayingItem('series',item);
     say('Dizi bölümleri yükleniyor...');
     request('/api/iptv/xtream/series_info',{serverUrl:server,username:username,password:password,seriesId:id},function(err,data){
       if(err){say('Bölümler alınamadı: '+err.message);return;}
@@ -127,7 +128,7 @@
       (function(item){
         var line=action(channels,(count+1)+'. '+String(item.name||item.title||'İsimsiz'),function(){
           if(mode==='live')playChannel(item);
-          else if(mode==='movie')playStream('movie',item.stream_id,String(item.container_extension||'mp4').replace(/[^a-zA-Z0-9]/g,''),item.name);
+          else if(mode==='movie'){window.XIPTVTV.setPlayingItem('movie',item);playStream('movie',item.stream_id,String(item.container_extension||'mp4').replace(/[^a-zA-Z0-9]/g,''),item.name);}
           else showSeries(item);
         });
         if(mode!=='live'){
@@ -165,6 +166,7 @@
   }
   function playChannel(item){
     lastLive=item;
+    window.XIPTVTV.setPlayingItem('live',item);
     playStream('live',item.stream_id,'m3u8',item.name);
   }
   document.getElementById('tv-try-ts').onclick=function(){
