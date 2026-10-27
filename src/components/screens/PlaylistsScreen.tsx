@@ -411,6 +411,12 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
                     </span>
                   </div>
 
+                  {playlist.status === 'error' && playlist.errorMessage && (
+                    <p role="alert" className="text-xs text-[#ffb4ab] p-3 rounded-xl bg-[#401f24] break-words">
+                      Katalog hatası: {playlist.errorMessage}
+                    </p>
+                  )}
+
                   {/* Real Counts Stream Bar */}
                   <div className="p-2.5 rounded-xl bg-[#0e0e10]/80 border border-white/5 flex items-center justify-between text-[#b9cacb]">
                     <div className="flex items-center gap-1.5">
