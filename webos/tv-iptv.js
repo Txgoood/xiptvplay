@@ -58,6 +58,7 @@
   }
   function chooseMode(next){
     mode=next;selectedCategory='all';
+    channels.className=mode==='live'?'tv-live-list':'tv-poster-list';
     var tabNames=['live','movie','series'];
     for(var t=0;t<tabNames.length;t++){
       document.getElementById('tv-tab-'+tabNames[t]).className=mode===tabNames[t]?'active':'';
@@ -129,6 +130,25 @@
           else if(mode==='movie')playStream('movie',item.stream_id,String(item.container_extension||'mp4').replace(/[^a-zA-Z0-9]/g,''),item.name);
           else showSeries(item);
         });
+        if(mode!=='live'){
+          var title=String(item.name||item.title||'İsimsiz');
+          var picture=String(item.stream_icon||item.cover||item.cover_big||'');
+          line.textContent='';
+          if(/^https?:\/\//i.test(picture)){
+            var img=document.createElement('img');img.src=picture;
+            img.alt='';img.loading='lazy';
+            img.onerror=function(){this.style.display='none';};
+            line.appendChild(img);
+          }else{
+            var placeholder=document.createElement('span');
+            placeholder.className='tv-poster-placeholder';
+            placeholder.textContent=mode==='movie'?'FİLM':'DİZİ';
+            line.appendChild(placeholder);
+          }
+          var caption=document.createElement('span');caption.className='tv-card-title';
+          caption.textContent=title;line.appendChild(caption);
+          line.title=title;
+        }
         window.XIPTVTV.decorateItem(line,mode,item);
       })(ch);count++;
       if(count>=350)break;
