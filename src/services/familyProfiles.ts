@@ -65,7 +65,7 @@ export const FamilyProfilesService = {
   async add(config: FamilyConfiguration, options: { name: string; kind: 'adult' | 'child'; ageLimit?: ChildAge; pin?: string; copyFromId?: string }): Promise<FamilyConfiguration> {
     const name = options.name.trim().slice(0, 32);
     if (!name) throw new Error('Profil adı gerekli.');
-    if (options.pin && !/^\\d{4,6}$/.test(options.pin)) throw new Error('PIN 4–6 rakam olmalı.');
+    if (options.pin && !/^\d{4,6}$/.test(options.pin)) throw new Error('PIN 4–6 rakam olmalı.');
     const template = options.copyFromId ? config.profiles.find(p => p.id === options.copyFromId && p.kind === 'child') : null;
     const profile: FamilyProfile = {
       id: 'profile-' + crypto.randomUUID(), name, kind: options.kind, role: 'member',
@@ -80,6 +80,13 @@ export const FamilyProfilesService = {
     const next = { ...config, profiles: [...config.profiles, profile] };
     this.save(next);
     return next;
+  },
+  async setProfilePin(config: FamilyConfiguration, id: string, pin: string): Promise<FamilyConfiguration> {
+    if(id==='parent')throw new Error('Yönetici PIN’i çocuk koruması için korunur.');
+    if(pin&&!/^\d{4,6}$/.test(pin))throw new Error('PIN 4–6 rakam olmalı.');
+    const salt=pin?hex(crypto.getRandomValues(new Uint8Array(16))):undefined;
+    const hash=salt?await hashPin(pin,salt):undefined;
+    return {...config,profiles:config.profiles.map(p=>p.id===id&&p.kind==='adult'?{...p,pinSalt:salt,pinHash:hash}:p)};
   },
   delete(config: FamilyConfiguration, id: string): FamilyConfiguration {
     if (id === 'parent') throw new Error('Ana Profil silinemez.');

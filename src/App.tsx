@@ -1,3 +1,4 @@
+import { DeviceProfileAccess } from './services/deviceProfileAccess';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { ScreenType, AppMode, Playlist, DownloadItem, MediaItem, SeriesEpisode } from './types';
 import { INITIAL_STATS } from './data/mockData';
@@ -32,7 +33,11 @@ import { DownloadNotifications } from './services/downloadNotifications';
 
 export default function App() {
   const [appMode, setAppMode] = useState<AppMode>('app');
-  const [currentScreen, setCurrentScreen] = useState<ScreenType>('playlists');
+  const [currentScreen, setCurrentScreen] = useState<ScreenType>(() => {
+    const config=FamilyProfilesService.get();
+    const id=DeviceProfileAccess.startup(config);
+    return config?.profiles.find(p=>p.id===id)?.kind==='child'?'catalog':'playlists';
+  });
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Persistent Application Data States (Clean Empty Initial States)
@@ -139,8 +144,8 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCloudBackupOpen, setIsCloudBackupOpen] = useState(false);
   const [familyConfiguration, setFamilyConfiguration] = useState<FamilyConfiguration | null>(() => FamilyProfilesService.get());
-  // Every app restart requires profile selection after family protection has been configured.
-  const [currentProfileId, setCurrentProfileId] = useState<string | null>(() => FamilyProfilesService.get() ? null : 'parent');
+  // Device-local opt-in may resume the last authenticated adult; child sessions stay restricted.
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(() => DeviceProfileAccess.startup(FamilyProfilesService.get()));
   const [familyDialogMode, setFamilyDialogMode] = useState<'setup' | 'manage' | null>(null);
   const [profileFavorites, setProfileFavorites] = useState<MediaItem[]>([]);
   const readProfileFavorites = (profileId: string): MediaItem[] => {
@@ -208,6 +213,7 @@ export default function App() {
     setIsProfileOpen(false);
     setAppMode('app');
     setCurrentScreen(profile.kind === 'child' ? 'catalog' : 'playlists');
+    if(familyConfiguration)DeviceProfileAccess.remember(profile,familyConfiguration);
     setCurrentProfileId(profile.id);
     setFamilyDialogMode(null);
   };

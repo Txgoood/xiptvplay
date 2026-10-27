@@ -1,3 +1,4 @@
+import { ProfileAppearanceSettings, ProfileAvatar } from './ProfileAppearanceSettings';
 import React, { useMemo, useState } from 'react';
 import { LockKeyhole, ShieldCheck, UserRound, Baby, X, Settings2 } from 'lucide-react';
 import type { MediaItem } from '../../types';
@@ -23,6 +24,7 @@ const isTurkishCategory = (category: string): boolean => /^TR(?:$|[^A-Za-z0-9])/
 export const FamilyProfilesModal: React.FC<Props> = ({
   mode, configuration, catalog, activePlaylistName, onCreate, onSave, onSelect, onClose,
 }) => {
+  const [managementUnlocked,setManagementUnlocked]=useState(false);
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [childName, setChildName] = useState(configuration?.profiles.find(p => p.kind === 'child')?.name || 'Çocuk');
@@ -170,6 +172,17 @@ export const FamilyProfilesModal: React.FC<Props> = ({
     onSave(next);
   };
 
+  if(mode==='manage' && configuration && !managementUnlocked)return (
+    <div className="fixed inset-0 z-[300] bg-[#0b0c10] text-white flex items-center justify-center p-4">
+      <section className="w-full max-w-sm space-y-4 rounded-2xl bg-[#25252a] p-5" role="dialog" aria-label="Aile ayarlarını aç">
+        <h2>Aile ayarları · Yönetici PIN’i</h2>
+        <input aria-label="Yönetici PIN’i" type="password" inputMode="numeric" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,'').slice(0,6))} className="w-full bg-[#34363b] p-3 rounded-xl"/>
+        {error&&<p role="alert">{error}</p>}
+        <button disabled={busy} onClick={async()=>{setBusy(true);setError('');try{if(await FamilyProfilesService.verifyPin(pin,configuration)){setManagementUnlocked(true);setPin('');}else setError('PIN yanlış.');}catch(e:any){setError(e.message);}finally{setBusy(false);}}} className="w-full p-3 bg-cyan-400 text-black rounded-xl">Ayarları Aç</button>
+        <button onClick={onClose} className="w-full p-3">Vazgeç</button>
+      </section>
+    </div>
+  );
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-[#0b0c10] p-4 text-white overflow-y-auto">
       <section role="dialog" aria-modal="true" aria-label="Aile profilleri" className="w-full max-w-lg max-h-[94dvh] overflow-y-auto rounded-3xl bg-[#1d1d20] border border-white/10 shadow-2xl p-5 space-y-4">
@@ -194,7 +207,7 @@ export const FamilyProfilesModal: React.FC<Props> = ({
           <div className="grid grid-cols-2 gap-3">
             {(configuration?.profiles || []).map(p => <button key={p.id} onClick={() => {setError(''); setPin(''); setSelected(p); if (p.kind === 'child') onSelect(p);}}
               className={'rounded-2xl border p-5 flex flex-col items-center gap-2 min-h-36 ' + (selected?.id === p.id ? 'border-[#00f0ff] bg-[#00f0ff]/10' : 'border-white/10 bg-[#2a2a30]')}>
-              {p.kind === 'child' ? <Baby className="h-9 w-9 text-[#00f0ff]" /> : <UserRound className="h-9 w-9 text-[#00f0ff]" />}
+              <ProfileAvatar icon={p.icon}/>
               <strong className="text-sm break-all">{p.name}</strong>
               <span className="text-[11px] text-[#aebfc0]">{p.kind === 'child' ? `${p.ageLimit}+ yaş` : 'PIN korumalı'}</span>
             </button>)}
@@ -205,6 +218,7 @@ export const FamilyProfilesModal: React.FC<Props> = ({
           </div>}
         </>}
         {mode === 'manage' && <>
+          {configuration && <ProfileAppearanceSettings configuration={configuration} onSave={onSave}/>}
           <div className="space-y-3 p-3 rounded-xl bg-[#262a30] border border-white/10">
             <h3 className="text-sm font-bold">Aile Profilleri ({configuration?.profiles.length || 0})</h3>
             <div className="flex flex-wrap gap-2">
