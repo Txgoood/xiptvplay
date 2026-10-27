@@ -1,0 +1,37 @@
+name: Build LG webOS IPK
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/lg-webos-tv]
+    paths:
+      - 'webos/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/build-webos.yml'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build TV web assets
+        run: VITE_WEBOS_TV=true VITE_API_BASE_URL=https://xiptvplay.onrender.com npm run build
+      - name: Prepare webOS application
+        run: node webos/build.mjs
+      - name: Install official webOS CLI
+        run: npm install -g @webos-tools/cli
+      - name: Package IPK
+        run: |
+          mkdir -p webos-artifacts
+          ares-package --no-minify ./webos-package -o ./webos-artifacts
+          test -n "$(find webos-artifacts -name '*.ipk' -type f -size +0c -print -quit)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xiptvplay-lg-webos-ipk
+          path: webos-artifacts/*.ipk
+          if-no-files-found: error
