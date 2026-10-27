@@ -184,3 +184,8 @@ border:2px solid #47717e;border-radius:16px;font-size:25px;font-weight:bold;colo
 .stitch-empty{display:inline-block;min-width:280px;max-width:92%;background:#1c2028;border:1px solid #303c45;border-radius:10px;padding:28px 22px;color:#b4c9d1;font-size:18px;white-space:normal}
 .stitch-footer{font-size:14px;color:#8ea9b1;background:#181c24;border-radius:10px;padding:15px 20px;margin-top:24px}
 #tv-home #tv-show-diagnostics{position:fixed;top:auto;bottom:8px;right:12px;z-index:6;opacity:.45;font-size:12px;padding:5px}
+
+#tv-home .stitch-movie-tile{display:inline-block;vertical-align:top;width:112px;height:120px;margin:0 14px 0 0;padding:0;background:#262b35;border:1px solid #3b494c;border-radius:8px;color:#e1e7ec;overflow:hidden}
+#tv-home .stitch-movie-tile img{display:block;height:90px;width:100%;object-fit:cover}
+#tv-home .stitch-movie-tile span{display:block;font-size:12px;padding:5px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tv-home .stitch-movie-tile:focus{outline:3px solid #00daf3}
