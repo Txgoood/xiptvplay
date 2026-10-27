@@ -22,7 +22,21 @@ document.getElementById('tv-nav-fav').onclick=function(){open('live');document.g
 document.getElementById('tv-nav-search').onclick=function(){open('films');document.getElementById('tv-search').click();};
 document.getElementById('tv-nav-profile').onclick=function(){open('live');document.getElementById('tv-profile-switch').click();};
 document.getElementById('tv-show-diagnostics').onclick=function(){diag.style.display='block';home.style.display='none';document.getElementById('system').focus();};
-document.getElementById('iptv-hide').addEventListener('click',function(){home.style.display='block';document.getElementById('tv-nav-home').focus();},false);
+document.getElementById('iptv-hide').addEventListener('click',function(){home.style.display='block';window.XIPTVTVHome={
+ render:function(catalog){
+  var wrap=document.getElementById('stitch-recent'),items=(catalog.vodStreams||[]).slice(0,8);
+  while(wrap.firstChild)wrap.removeChild(wrap.firstChild);
+  if(!items.length){wrap.textContent='Film içeriği bulunamadı.';return;}
+  for(var i=0;i<items.length;i++){(function(item){
+   var b=document.createElement('button');b.type='button';b.className='stitch-movie-tile';
+   var cover=String(item.stream_icon||item.cover||'');
+   if(/^https?:\/\//.test(cover)){var img=document.createElement('img');img.src=cover;img.alt='';img.onerror=function(){this.style.display='none';};b.appendChild(img);}
+   var t=document.createElement('span');t.textContent=String(item.name||'Film');b.appendChild(t);
+   b.onclick=function(){open('films');};wrap.appendChild(b);
+  })(items[i]);}
+ }
+};
+document.getElementById('tv-nav-home').focus();},false);
 document.addEventListener('keydown',function(e){
  if(home.style.display==='none')return;
  var k=e.keyCode||e.which;
