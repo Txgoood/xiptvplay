@@ -14,7 +14,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 </style></head>
 <body><main>
 <h1>XIPTV Play — LG webOS 2</h1>
-<p>Video oynatma tanılama sürümü <b>v0.4.1</b></p>
+<p>Video oynatma tanılama sürümü <b>v0.4.2</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -32,10 +32,11 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <button id="iptv-hide" type="button">TV Menüsünü Kapat</button>
 <div id="iptv-login">
 <p>Xtream Codes bağlantısı — bilgiler yalnızca bu oturumda tutulur.</p>
-<p><label>Sunucu adresi <input id="iptv-server" type="text" placeholder="http://sunucu:port" autocomplete="off" style="font-size:22px;padding:10px;width:55%" /></label></p>
-<p><label>Kullanıcı adı <input id="iptv-user" type="text" autocomplete="off" style="font-size:22px;padding:10px" /></label></p>
-<p><label>Şifre <input id="iptv-pass" type="password" autocomplete="off" style="font-size:22px;padding:10px" /></label></p>
+<p><label>Sunucu adresi <input id="iptv-server" type="url" placeholder="http://sunucu:port" autocomplete="off" style="font-size:22px;padding:10px;width:55%" /> <button id="iptv-server-keyboard" type="button">Klavye Aç</button></label></p>
+<p><label>Kullanıcı adı <input id="iptv-user" type="text" autocomplete="off" style="font-size:22px;padding:10px" /> <button id="iptv-user-keyboard" type="button">Klavye Aç</button></label></p>
+<p><label>Şifre <input id="iptv-pass" type="password" autocomplete="off" style="font-size:22px;padding:10px" /> <button id="iptv-pass-keyboard" type="button">Klavye Aç</button></label></p>
 <p><label><input type="checkbox" id="iptv-remember" /> Bu TV'de giriş bilgilerimi hatırla (şifre cihazda saklanır)</label></p>
+<div id="iptv-keyboard" style="display:none;border:2px solid #0df;padding:12px;max-height:300px;overflow:auto"><p id="iptv-keyboard-title">Klavye</p><div id="iptv-keys"></div></div>
 <button id="iptv-connect" type="button">Doğrula ve Kanalları Getir</button>
 <button id="iptv-forget" type="button">Kayıtlı Girişi Sil</button>
 </div>
@@ -120,4 +121,4 @@ video.addEventListener('error',function(){var code=video.error?video.error.code:
 video.addEventListener('ended',function(){message('Video başarıyla sona erdi.');update();},false);
 focus(0);system();update();
 })();
-</script><script src="./tv-iptv.js"></script></body></html>
+</script><script src="./tv-iptv.js"></script><script src="./tv-keyboard.js"></script></body></html>
