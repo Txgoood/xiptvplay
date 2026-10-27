@@ -130,3 +130,17 @@ body.tv-mode #tv-profile-items button{display:inline-block;margin:8px;padding:16
 body.tv-mode #tv-profile-close{float:right}
 body.tv-mode #tv-profile-panel input{padding:10px;margin:7px;font-size:19px;max-width:30%}
 body.tv-mode #tv-profile-panel label{font-size:20px}
+
+/* Compact non-obscuring text entry: input preview remains visible above keys. */
+#iptv-keyboard,body.tv-mode #iptv-keyboard{
+ position:fixed!important;left:4%!important;right:4%!important;top:auto!important;
+ bottom:2%!important;width:92%!important;height:43%!important;max-height:43%!important;
+ z-index:99999!important;border:2px solid #00f0ff!important;border-radius:12px;
+ box-sizing:border-box;background:#111b24!important;padding:9px 14px!important;
+ overflow:hidden!important;box-shadow:0 -3px 14px rgba(0,0,0,.6)!important
+}
+#iptv-keyboard-title{font-size:20px!important;line-height:26px;margin:0 0 6px!important;
+ background:#25353c;border-radius:6px;padding:5px 10px!important;color:#f3fbfc;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:28px!important}
+#iptv-keys{height:calc(100% - 48px)!important;overflow-y:auto!important;overflow-x:hidden!important}
+#iptv-keys button{font-size:18px!important;min-width:59px!important;margin:3px!important;padding:7px 9px!important}
