@@ -230,8 +230,19 @@
     }
   },true);
   launcher.onclick=function(){
-    document.body.className='tv-mode';
-    show(panel);show(login);hide(browser);
+    // Reuse the active catalogue when changing sections from Stitch navigation.
+    // Do not reset to the login/transition screen for every menu selection.
+    if((' '+document.body.className+' ').indexOf(' tv-catalog ')<0){
+      document.body.className='tv-mode';
+    }
+    show(panel);
+    if(catalogData){
+      hide(login);
+      show(browser);
+      chooseMode(window.XIPTVTV.startMode||mode||'live');
+      return;
+    }
+    show(login);hide(browser);
     if(hydrate()){say('Kayıtlı Xtream bağlantısı bulundu. Otomatik bağlanılıyor...');document.getElementById('iptv-connect').click();}
     else{document.getElementById('iptv-server').focus();}
   };
