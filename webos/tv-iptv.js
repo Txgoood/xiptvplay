@@ -12,6 +12,7 @@
   var channels=document.getElementById('iptv-channels');
   var categoryList=[], channelList=[], selectedCategory='all', mode='live';
   var catalogData=null, lastLive=null;
+  var PAGE_SIZE=60, currentPage=0, searchTimer=null, sortedCache={};
   var server='',username='',password='';
   var SAVE_KEY='xiptv_webos2_xtream_local_v1';
   function savedCredentials(){try{return JSON.parse(localStorage.getItem(SAVE_KEY)||'null');}catch(e){return null;}}
@@ -57,7 +58,7 @@
     }catch(e){callback(e);}
   }
   function chooseMode(next){
-    mode=next;selectedCategory='all';
+    mode=next;selectedCategory='all';currentPage=0;
     channels.className=mode==='live'?'tv-live-list':'tv-poster-list';
     var tabNames=['live','movie','series'];
     for(var t=0;t<tabNames.length;t++){
@@ -113,11 +114,12 @@
     var count=0;
     var query=(document.getElementById('tv-search').value||'').toLowerCase();
     var sorting=document.getElementById('tv-sort').value;
-    var list=channelList.slice(0);
+    var cacheKey=mode+'|'+sorting;
+    var list=sortedCache[cacheKey];
+    if(!list){list=channelList.slice(0);if(sorting==='az')list.sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});if(sorting==='za')list.sort(function(a,b){return String(b.name||'').localeCompare(String(a.name||''));});sortedCache[cacheKey]=list;}
+    var matches=[];
     var categoryNames={};for(var ca=0;ca<categoryList.length;ca++)categoryNames[String(categoryList[ca].category_id)]=String(categoryList[ca].category_name||'');
     var batch=document.createDocumentFragment();
-    if(sorting==='az')list.sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});
-    if(sorting==='za')list.sort(function(a,b){return String(b.name||'').localeCompare(String(a.name||''));});
     for(var i=0;i<list.length;i++){
       var ch=list[i];
       if(selectedCategory!=='all' && String(ch.category_id)!==selectedCategory)continue;
@@ -126,6 +128,14 @@
       var catLabel=categoryNames[String(ch.category_id)]||'';
       if(document.getElementById('tv-tr-only').checked && catLabel.toUpperCase().indexOf('TR')!==0)continue;
       if(document.getElementById('tv-hide-adult').checked && /^(XXX|18\+|ADULT|🔞|❤)/i.test(catLabel))continue;
+      matches.push(ch);
+    }
+    var totalPages=Math.max(1,Math.ceil(matches.length/PAGE_SIZE));
+    if(currentPage>=totalPages)currentPage=totalPages-1;
+    if(currentPage>0)action(channels,'◀ Önceki sayfa',function(){currentPage--;renderChannels();channels.scrollTop=0;});
+    var first=currentPage*PAGE_SIZE,last=Math.min(first+PAGE_SIZE,matches.length);
+    for(var j=first;j<last;j++){
+      var ch=matches[j];
       (function(item){
         var line=action(channels,(count+1)+'. '+String(item.name||item.title||'İsimsiz'),function(){
           if(mode==='live')playChannel(item);
@@ -154,16 +164,16 @@
         window.XIPTVTV.decorateItem(line,mode,item);
       })(ch);count++;
       if(channels.lastChild)batch.appendChild(channels.lastChild);
-      if(count>=350)break;
     }
     channels.appendChild(batch);
-    say(count+' kanal listelendi'+(count===350?' (ilk 350)':'')+'. Kumandayla veya işaretçiyle seçim yap.');
+    if(currentPage+1<totalPages)action(channels,'Sonraki sayfa ▶ ('+(currentPage+2)+'/'+totalPages+')',function(){currentPage++;renderChannels();channels.scrollTop=0;});
+    say(matches.length+' içerik bulundu. Sayfa '+(currentPage+1)+'/'+totalPages+'.');
   }
   function renderCategories(){
     clear(categories);
-    action(categories,'Tümü',function(){selectedCategory='all';renderChannels();});
+    action(categories,'Tümü',function(){selectedCategory='all';currentPage=0;renderChannels();});
     for(var i=0;i<categoryList.length;i++){
-      (function(c){action(categories,String(c.category_name||'Kategori'),function(){selectedCategory=String(c.category_id);renderChannels();});})(categoryList[i]);
+      (function(c){action(categories,String(c.category_name||'Kategori'),function(){selectedCategory=String(c.category_id);currentPage=0;renderChannels();});})(categoryList[i]);
     }
     renderChannels();
   }
@@ -181,10 +191,10 @@
     if(!lastLive){say('Önce bir canlı kanal seç.');return;}
     playStream('live',lastLive.stream_id,'m3u8',lastLive.name);
   };
-  document.getElementById('tv-search').onkeyup=renderChannels;
-  document.getElementById('tv-sort').onchange=renderChannels;
-  document.getElementById('tv-tr-only').onchange=renderChannels;
-  document.getElementById('tv-hide-adult').onchange=renderChannels;
+  document.getElementById('tv-search').onkeyup=function(){clearTimeout(searchTimer);searchTimer=setTimeout(function(){currentPage=0;renderChannels();},250);};
+  document.getElementById('tv-sort').onchange=function(){currentPage=0;renderChannels();};
+  document.getElementById('tv-tr-only').onchange=function(){currentPage=0;renderChannels();};
+  document.getElementById('tv-hide-adult').onchange=function(){currentPage=0;renderChannels();};
   window.XIPTVTV.refresh=renderChannels;
   document.getElementById('tv-tab-live').onclick=function(){chooseMode('live');};
   document.getElementById('tv-tab-movie').onclick=function(){chooseMode('movie');};
@@ -273,7 +283,7 @@
       say('Bağlantı başarılı, canlı TV kataloğu alınıyor...');
       request('/api/iptv/xtream/catalog',{serverUrl:server,username:username,password:password},function(error,catalog){
         if(error){say('Katalog hatası: '+error.message);return;}
-        catalogData=catalog;
+        catalogData=catalog;sortedCache={};currentPage=0;
         if(window.XIPTVTVHome&&window.XIPTVTVHome.render)window.XIPTVTVHome.render(catalog);
         window.XIPTVTV.catalogReady();
         hide(login);show(browser);
