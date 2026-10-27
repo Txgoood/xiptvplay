@@ -6,7 +6,7 @@ const html=fs.readFileSync('webos-package/index.html','utf8');
 const match=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(match,'inline legacy script is missing');
 assert(!html.includes('type="module"'),'webOS 2 must not use JS modules');
-assert(html.includes('v0.4.3'),'wrong TV build version');
+assert(html.includes('v0.4.4'),'wrong TV build version');
 const metadata=JSON.parse(fs.readFileSync('webos-package/appinfo.json','utf8'));
 assert.equal(metadata.trustLevel,'netcast');
 assert.equal(metadata.vendorExtension?.allowCrossDomain,true);
@@ -30,6 +30,9 @@ assert(html.includes('id="iptv-server-keyboard"'));
 assert(html.includes('id="iptv-user-keyboard"'));
 assert(html.includes('id="iptv-pass-keyboard"'));
 assert(html.includes('src="./tv-keyboard.js"'));
+assert(html.includes('#iptv-keyboard{position:fixed'));
+assert(html.includes('height:82%'));
+assert(html.includes('overflow-y:auto'));
 const elements={},handlers={};
 const ids=['system','local','remote','network','stop','proxy','hls','mp4src','blob','mdn','w3','aac','video','status','events'];
 const document={
