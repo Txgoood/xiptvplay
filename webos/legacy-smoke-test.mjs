@@ -6,10 +6,16 @@ const html=fs.readFileSync('webos-package/index.html','utf8');
 const match=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(match,'inline legacy script is missing');
 assert(!html.includes('type="module"'),'webOS 2 must not use JS modules');
-assert(html.includes('v0.3.1'),'wrong TV build version');
+assert(html.includes('v0.4.0'),'wrong TV build version');
 const metadata=JSON.parse(fs.readFileSync('webos-package/appinfo.json','utf8'));
 assert.equal(metadata.trustLevel,'netcast');
 assert.equal(metadata.vendorExtension?.allowCrossDomain,true);
+const iptvScript=fs.readFileSync('webos-package/tv-iptv.js','utf8');
+new vm.Script(iptvScript,{filename:'webos-tv-iptv.js'});
+assert(html.includes('id="iptv-open"'));
+assert(html.includes('src="./tv-iptv.js"'));
+assert(iptvScript.includes('/api/iptv/xtream/verify'));
+assert(iptvScript.includes('/api/iptv/xtream/catalog'));
 const elements={},handlers={};
 const ids=['system','local','remote','network','stop','proxy','hls','mp4src','blob','mdn','w3','aac','video','status','events'];
 const document={
