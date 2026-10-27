@@ -11,7 +11,7 @@
   var categories=document.getElementById('iptv-categories');
   var channels=document.getElementById('iptv-channels');
   var categoryList=[], channelList=[], selectedCategory='all', mode='live';
-  var catalogData=null;
+  var catalogData=null, lastLive=null;
   var server='',username='',password='';
   var SAVE_KEY='xiptv_webos2_xtream_local_v1';
   function savedCredentials(){try{return JSON.parse(localStorage.getItem(SAVE_KEY)||'null');}catch(e){return null;}}
@@ -95,7 +95,7 @@
   }
   function playStream(kind,id,ext,name){
     if(id===null||typeof id==='undefined'){say('Yayın kimliği eksik');return;}
-    var suffix=kind==='live'?'m3u8':(ext||'mp4');
+    var suffix=ext|| (kind==='live'?'m3u8':'mp4');
     var url=server.replace(/\/$/,'')+'/'+kind+'/'+encodeURIComponent(username)+'/'+encodeURIComponent(password)+'/'+encodeURIComponent(id)+'.'+suffix;
     document.getElementById('tv-now-playing').textContent=String(name||'Video');
     try{
@@ -131,9 +131,18 @@
     renderChannels();
   }
   function playChannel(item){
-    var id=item.stream_id;
-    playStream('live',id,'m3u8',item.name);
+    lastLive=item;
+    playStream('live',item.stream_id,'m3u8',item.name);
   }
+  document.getElementById('tv-try-ts').onclick=function(){
+    if(!lastLive){say('Önce bir canlı kanal seç.');return;}
+    playStream('live',lastLive.stream_id,'ts',lastLive.name);
+    say('Alternatif MPEG-TS akışı deneniyor. Bu biçim de desteklenmeyebilir.');
+  };
+  document.getElementById('tv-try-hls').onclick=function(){
+    if(!lastLive){say('Önce bir canlı kanal seç.');return;}
+    playStream('live',lastLive.stream_id,'m3u8',lastLive.name);
+  };
   document.getElementById('tv-tab-live').onclick=function(){chooseMode('live');};
   document.getElementById('tv-tab-movie').onclick=function(){chooseMode('movie');};
   document.getElementById('tv-tab-series').onclick=function(){chooseMode('series');};
