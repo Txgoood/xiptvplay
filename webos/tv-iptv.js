@@ -118,6 +118,7 @@
       var ch=list[i];
       if(selectedCategory!=='all' && String(ch.category_id)!==selectedCategory)continue;
       if(query&&String(ch.name||ch.title||'').toLowerCase().indexOf(query)<0)continue;
+      if(!window.XIPTVTV.filterFavorite(mode,ch))continue;
       (function(item){
         var line=action(channels,(count+1)+'. '+String(item.name||item.title||'İsimsiz'),function(){
           if(mode==='live')playChannel(item);
