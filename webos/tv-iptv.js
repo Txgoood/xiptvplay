@@ -147,11 +147,25 @@
   document.getElementById('tv-tab-movie').onclick=function(){chooseMode('movie');};
   document.getElementById('tv-tab-series').onclick=function(){chooseMode('series');};
   document.getElementById('tv-episodes-close').onclick=function(){document.getElementById('tv-episodes').style.display='none';};
+  var fullBtn=document.getElementById('tv-fullscreen');
+  var aspectBtn=document.getElementById('tv-aspect');
+  function hasClass(name){return (' '+document.body.className+' ').indexOf(' '+name+' ')>=0;}
+  function setClass(name,enabled){
+    var classes=(' '+document.body.className+' ').replace(' '+name+' ',' ');
+    document.body.className=classes.replace(/^\s+|\s+$/g,'')+(enabled?' '+name:'');
+  }
+  function updatePlayerButtons(){
+    fullBtn.textContent=hasClass('tv-fullscreen')?'Tam Ekrandan Çık':'Tam Ekran';
+    aspectBtn.textContent=hasClass('tv-fill')?'Orijinal Oran':'Ekrana Doldur';
+  }
+  fullBtn.onclick=function(){setClass('tv-fullscreen',!hasClass('tv-fullscreen'));updatePlayerButtons();};
+  aspectBtn.onclick=function(){setClass('tv-fill',!hasClass('tv-fill'));updatePlayerButtons();};
   // Catch D-pad before the legacy diagnostic menu handler; traverse visible controls.
   document.addEventListener('keydown',function(e){
     if(document.getElementById('iptv-keyboard').style.display!=='none')return;
     var key=e.keyCode||e.which;
-    if(key!==37&&key!==38&&key!==39&&key!==40&&key!==13&&key!==461)return;
+    if(key!==37&&key!==38&&key!==39&&key!==40&&key!==13&&key!==461&&key!==27)return;
+    if((key===461||key===27)&&hasClass('tv-fullscreen')){setClass('tv-fullscreen',false);updatePlayerButtons();fullBtn.focus();e.preventDefault();e.stopImmediatePropagation();return;}
     var list=[],nodes=document.getElementsByTagName('button'),i,el;
     for(i=0;i<nodes.length;i++){
       el=nodes[i];
@@ -164,7 +178,7 @@
     }
     var active=document.activeElement,idx=-1;
     for(i=0;i<list.length;i++)if(list[i]===active){idx=i;break;}
-    if(key===461 && panel.style.display!=='none'){hide(panel);document.body.className='';launcher.focus();e.preventDefault();e.stopImmediatePropagation();return;}
+    if(key===461 && panel.style.display!=='none'){hide(panel);document.body.className='';updatePlayerButtons();launcher.focus();e.preventDefault();e.stopImmediatePropagation();return;}
     if(key===13 && active && active.tagName==='BUTTON'){
       active.click();e.preventDefault();e.stopImmediatePropagation();return;
     }
@@ -190,7 +204,7 @@
     server='';username='';password='';categoryList=[];channelList=[];
     hide(browser);show(login);say('Bu TV’deki kayıtlı giriş bilgileri temizlendi.');
   };
-  document.getElementById('iptv-hide').onclick=function(){hide(panel);document.body.className='';launcher.focus();};
+  document.getElementById('iptv-hide').onclick=function(){hide(panel);document.body.className='';updatePlayerButtons();launcher.focus();};
   document.getElementById('iptv-connect').onclick=function(){
     server=document.getElementById('iptv-server').value.trim().replace(/\/+$/,'');
     username=document.getElementById('iptv-user').value.trim();
