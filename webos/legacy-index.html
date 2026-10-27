@@ -16,10 +16,10 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 #iptv-keys{height:85%;overflow-y:auto;overflow-x:hidden;text-align:left}
 #iptv-keys button{min-width:64px;margin:3px;padding:10px;font-size:19px}
 #iptv-keys button:focus{background:#159bc0;outline:3px solid #fff}
-</style></head>
+</style><link rel="stylesheet" href="./tv-layout.css" /></head>
 <body><main>
-<h1>XIPTV Play — LG webOS 2</h1>
-<p>Video oynatma tanılama sürümü <b>v0.4.4</b></p>
+<h1>XIPTV Play <span id="tv-version-label">TV</span></h1>
+<p>Video oynatma tanılama sürümü <b>v0.5.0</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -45,7 +45,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <button id="iptv-connect" type="button">Doğrula ve Kanalları Getir</button>
 <button id="iptv-forget" type="button">Kayıtlı Girişi Sil</button>
 </div>
-<div id="iptv-browser" style="display:none">
+<div id="iptv-browser" style="display:none"><div id="tv-now-playing">Kanal seçilmedi</div>
 <p>Canlı TV Kategorileri</p><div id="iptv-categories" style="max-height:160px;overflow:auto"></div>
 <p>Kanallar</p><div id="iptv-channels" style="max-height:230px;overflow:auto"></div>
 </div>
