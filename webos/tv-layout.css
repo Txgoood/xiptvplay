@@ -205,3 +205,8 @@ border:2px solid #47717e;border-radius:16px;font-size:25px;font-weight:bold;colo
 #tv-home .stitch-top{box-sizing:border-box}
 #tv-home .stitch-avatar{float:none;display:inline-block;margin:0 0 0 15px;padding:4px 13px;vertical-align:middle;height:29px;line-height:29px}
 #tv-home .stitch-top-meta{float:right;margin-right:8px}
+
+/* Embedded icon shapes do not depend on Material Symbols or emoji fonts. */
+#stitch-side button svg{display:block;margin:auto;width:27px;height:27px;stroke:currentColor;fill:none}
+#stitch-side button:focus svg,#stitch-side button.selected svg{stroke:#00363d}
+#stitch-side .stitch-playmark{font-family:Arial,sans-serif;font-size:23px;line-height:46px;display:block;color:#00363d}
