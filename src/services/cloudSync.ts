@@ -1,4 +1,4 @@
-import type { GoogleDriveSession } from './cloudDrive';
+import { CloudDriveService, type GoogleDriveSession } from './cloudDrive';
 import { StorageService } from './storage';
 import { FamilyProfilesService, type FamilyConfiguration, type FamilyProfile } from './familyProfiles';
 import type { Playlist } from '../types';
@@ -235,6 +235,7 @@ function applyRemote(entries:Event[]){
       // A remote child edit may rename the profile or make rules stricter,
       // but must not silently increase its age rating / allowed items.
       if(old.kind==='child'){
+       if(profile.kind!=='child')continue;
        const oldAllowed=new Set(old.allowedCategories);
        const oldItems=new Set(old.allowedItemIds);
        const widened=(profile.ageLimit||7)>(old.ageLimit||7) ||
@@ -276,7 +277,7 @@ export const CloudSyncService={
    const journal:Journal={version:1,device:deviceId(),events:events()};
    const payload=JSON.stringify(await seal(journal,password));
    const all=new Map<string,Event>();
-   for(const file of files.filter(f=>f.name!==ownName)){
+   for(const file of files){
     let data:Envelope;
     try{data=await (await request(DRIVE+'/files/'+encodeURIComponent(file.id)+'?alt=media',session.accessToken)).json();}
     catch(e){throw Error('Diğer cihazın senkronizasyon dosyası okunamadı: '+file.name);}
@@ -295,39 +296,74 @@ export const CloudSyncService={
  }
 };
 
-// Credentials and the encryption passphrase stay in memory, never localStorage.
-// Automatic sync pauses after an app restart until the user unlocks it again.
-let timer:number|null=null;
-let current:{session:GoogleDriveSession;password:string}|null=null;
-let lastError:string|null=null;
-let latest:string|null=null;
-async function tick(){
- if(!current || document.visibilityState!=='visible' || !navigator.onLine)return;
- try{
-  await CloudSyncService.sync(current.session,current.password);
-  latest=new Date().toISOString();lastError=null;
-  window.dispatchEvent(new Event('xiptv-cloud-sync-status'));
- }catch(e){
-  lastError=e instanceof Error?e.message:String(e);
-  if(/HTTP 401|HTTP 403|parolası farklı|Başka Google hesabına/.test(lastError))CloudSyncController.stop();
-  window.dispatchEvent(new Event('xiptv-cloud-sync-status'));
- }
-}
+// Persistent passphrase is encrypted by Android Keystore, never localStorage.
+let timer:number|null=null,current:{session:GoogleDriveSession;password:string}|null=null;
+let lastError:string|null=null,latest:string|null=localStorage.getItem('xiptvplay_auto_sync_latest_v1');
+let busy=false,restoring=false,generation=0;
+const emit=()=>window.dispatchEvent(new Event('xiptv-cloud-sync-status'));
 const onForeground=()=>{if(document.visibilityState==='visible')void tick();};
+function pause(){
+ generation++;current=null;
+ if(timer!==null){window.clearInterval(timer);timer=null;}
+ document.removeEventListener('visibilitychange',onForeground);
+ window.removeEventListener('online',onForeground);
+ emit();
+}
+async function tick():Promise<boolean>{
+ if(!current||busy||document.visibilityState!=='visible'||!navigator.onLine){emit();return false;}
+ const credentials=current,epoch=generation;busy=true;emit();
+ try{
+  try{await CloudSyncService.sync(credentials.session,credentials.password);}
+  catch(e){
+   if(!/HTTP 401/.test(String(e)))throw e;
+   const refreshed=await CloudDriveService.signIn(credentials.session.email);
+   if(refreshed.accountId!==credentials.session.accountId)throw Error('Google hesabı değişti. Yeniden bağlan.');
+   if(epoch!==generation)return false;
+   credentials.session=refreshed;
+   await CloudSyncService.sync(refreshed,credentials.password);
+  }
+  if(epoch!==generation)return false;
+  latest=new Date().toISOString();localStorage.setItem('xiptvplay_auto_sync_latest_v1',latest);lastError=null;
+  return true;
+ }catch(e){if(epoch===generation)lastError=e instanceof Error?e.message:'Eşitleme başarısız.';return false;}
+ finally{busy=false;emit();}
+}
+function activate(session:GoogleDriveSession,password:string){
+ pause();current={session,password};lastError=null;
+ timer=window.setInterval(()=>void tick(),90000);
+ document.addEventListener('visibilitychange',onForeground);
+ window.addEventListener('online',onForeground);
+ emit();
+}
 export const CloudSyncController={
- start(session:GoogleDriveSession,password:string){
+ async start(session:GoogleDriveSession,password:string){
   if(password.length<10)throw Error('Senkronizasyon parolası en az 10 karakter olmalı.');
-  this.stop();current={session,password};lastError=null;
-  timer=window.setInterval(()=>void tick(),90000);
-  document.addEventListener('visibilitychange',onForeground);
-  void tick();
+  if(busy||restoring)throw Error('Devam eden eşitlemeyi bekle.');
+  activate(session,password);
+  if(!await tick())throw Error(lastError||'İnternet bağlantısını kontrol edip yeniden dene.');
+  try{await CloudDriveService.rememberSync(session,password);}catch(e){lastError='Bu oturumda eşitleme açık, ancak güvenli kayıt yapılamadı. Yeniden etkinleştir.';emit();throw e;}
+  emit();
  },
- stop(){
-  current=null;
-  if(timer!==null){window.clearInterval(timer);timer=null;}
-  document.removeEventListener('visibilitychange',onForeground);
+ async restore(){
+  if(restoring||current||!navigator.onLine)return;
+  restoring=true;const epoch=generation;emit();
+  try{
+   const saved=await CloudDriveService.savedSync();if(!saved)return;
+   const owner=CloudDriveService.linkedOwner();
+   if(owner&&owner!==saved.accountId)throw Error('Kayıtlı Google hesabı cihazla eşleşmiyor.');
+   const session=await CloudDriveService.signIn(saved.email);
+   if(epoch!==generation)return;
+   if(session.accountId!==saved.accountId)throw Error('Google hesabı değişti. Yeniden bağlan.');
+   activate(session,saved.password);await tick();
+  }catch(e){lastError=e instanceof Error?e.message:'Otomatik eşitleme başlatılamadı.';}
+  finally{restoring=false;emit();}
  },
- status(){return {active:current!==null,lastError,lastSync:latest};},
- async now(){if(!current)throw Error('Önce otomatik senkronizasyonu aç.');await tick();}
+ async stop(){pause();await CloudDriveService.forgetSync();emit();},
+ session(){return current?.session||null;},
+ status(){
+  let pending=false;
+  try{pending=localStorage.getItem(LAST_SEEN_KEY)!==JSON.stringify(snapshots());}catch{}
+  return {active:current!==null,busy,restoring,offline:!navigator.onLine,pending,lastError,lastSync:latest};
+ },
+ async now(){if(!current){await this.restore();return;}await tick();}
 };
-

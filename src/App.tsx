@@ -1,3 +1,4 @@
+import { CloudSyncController } from './services/cloudSync';
 import { DeviceProfileAccess } from './services/deviceProfileAccess';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { ScreenType, AppMode, Playlist, DownloadItem, MediaItem, SeriesEpisode } from './types';
@@ -32,6 +33,13 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { DownloadNotifications } from './services/downloadNotifications';
 
 export default function App() {
+  useEffect(()=>{
+    const resume=()=>{if(document.visibilityState==='visible')void CloudSyncController.restore();};
+    void CloudSyncController.restore();
+    window.addEventListener('online',resume);
+    document.addEventListener('visibilitychange',resume);
+    return ()=>{window.removeEventListener('online',resume);document.removeEventListener('visibilitychange',resume);};
+  },[]);
   const [appMode, setAppMode] = useState<AppMode>('app');
   const [currentScreen, setCurrentScreen] = useState<ScreenType>(() => {
     const config=FamilyProfilesService.get();

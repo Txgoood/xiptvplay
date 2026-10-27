@@ -3,7 +3,10 @@ import { FamilyProfilesService } from './familyProfiles';
 import { StorageService } from './storage';
 
 type GoogleDriveNative = {
-  authorize(): Promise<{ accessToken: string; grantedScopes: string[] }>;
+  authorize(options?: {silent:boolean;email?:string}): Promise<{ accessToken: string; grantedScopes: string[] }>;
+  saveSyncSecret(options:{value:string}):Promise<void>;
+  loadSyncSecret():Promise<{value?:string}>;
+  clearSyncSecret():Promise<void>;
   disconnect(): Promise<void>;
 };
 const Native = registerPlugin<GoogleDriveNative>('XiptvGoogleDrive');
@@ -104,11 +107,23 @@ const collect = ():CloudSnapshot => {
     playlists:StorageService.getPlaylists(),favorites,history,settings:StorageService.getSettings()};
 };
 export const CloudDriveService={
+  async rememberSync(session:GoogleDriveSession,password:string){
+    await Native.saveSyncSecret({value:JSON.stringify({accountId:session.accountId,email:session.email,password})});
+  },
+  async savedSync():Promise<{accountId:string;email:string;password:string}|null>{
+    if(!Capacitor.isNativePlatform())return null;
+    const result=await Native.loadSyncSecret();
+    if(!result.value)return null;
+    const v=JSON.parse(result.value);
+    if(typeof v.accountId!=='string'||typeof v.email!=='string'||typeof v.password!=='string'||v.password.length<10)throw Error('Güvenli eşitleme kaydı geçersiz.');
+    return v;
+  },
+  async forgetSync(){if(Capacitor.isNativePlatform())await Native.clearSyncSecret();},
   linkedOwner():string|null { return localStorage.getItem(OWNER_KEY); },
   lastBackup():string|null { return localStorage.getItem(LAST_SYNC_KEY); },
-  async signIn():Promise<GoogleDriveSession>{
+  async signIn(email?:string):Promise<GoogleDriveSession>{
     if(!Capacitor.isNativePlatform())throw Error('Google bağlantısı şimdilik Android APK için destekleniyor.');
-    const result=await Native.authorize();
+    const result=await Native.authorize(email?{silent:true,email}:undefined);
     const identity=await (await call('https://openidconnect.googleapis.com/v1/userinfo',result.accessToken)).json();
     if(!identity.sub || !identity.email)throw Error('Google hesap bilgisi doğrulanamadı.');
     return { accountId:identity.sub,email:identity.email,accessToken:result.accessToken };

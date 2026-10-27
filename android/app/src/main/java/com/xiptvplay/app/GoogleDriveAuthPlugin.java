@@ -1,6 +1,20 @@
 package com.xiptvplay.app;
 
 import android.app.Activity;
+import android.accounts.Account;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
+import java.security.KeyStore;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import java.nio.charset.StandardCharsets;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileInputStream;
+import java.io.ByteArrayOutputStream;
 import android.app.PendingIntent;
 import android.content.Intent;
 import androidx.activity.result.ActivityResult;
@@ -46,11 +60,18 @@ public class GoogleDriveAuthPlugin extends Plugin {
     @PluginMethod public void authorize(PluginCall call) {
         if(pending!=null){call.reject("Google bağlantısı zaten açılıyor.");return;}
         List<Scope> scopes=Arrays.asList(new Scope(APPDATA),new Scope("openid"),new Scope("email"));
-        AuthorizationRequest request=AuthorizationRequest.builder().setRequestedScopes(scopes)
-            .setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT).build();
+        boolean silent=Boolean.TRUE.equals(call.getBoolean("silent",false));
+        AuthorizationRequest.Builder builder=AuthorizationRequest.builder().setRequestedScopes(scopes);
+        String email=call.getString("email");
+        if(silent){
+            if(email==null || email.isEmpty()){call.reject("Google hesabına yeniden bağlan.");return;}
+            builder.setAccount(new Account(email,"com.google"));
+        }else builder.setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT);
+        AuthorizationRequest request=builder.build();
         Identity.getAuthorizationClient(getActivity()).authorize(request)
             .addOnSuccessListener(result -> {
                 if(result.hasResolution()){
+                    if(silent){call.reject("Google izni yenilenmeli. Google ile Bağlan düğmesini kullan.");return;}
                     PendingIntent pendingIntent=result.getPendingIntent();
                     if(pendingIntent==null){call.reject("Google izin ekranı açılamadı.");return;}
                     try {
@@ -69,6 +90,52 @@ public class GoogleDriveAuthPlugin extends Plugin {
         data.put("grantedScopes",result.getGrantedScopes());
         // Google API /userinfo identifies which account owns this token.
         call.resolve(data);
+    }
+    private static final String ALIAS="xiptv_sync_secret_v1";
+    private File secretFile(){return new File(getContext().getNoBackupFilesDir(),"drive-sync-secret");}
+    private SecretKey secretKey() throws Exception {
+        KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);
+        if(!store.containsAlias(ALIAS)){
+            KeyGenerator generator=KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,"AndroidKeyStore");
+            generator.init(new KeyGenParameterSpec.Builder(ALIAS,KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());
+            generator.generateKey();
+        }
+        return (SecretKey)store.getKey(ALIAS,null);
+    }
+    @PluginMethod public void saveSyncSecret(PluginCall call){
+        try{
+            String value=call.getString("value");
+            if(value==null || value.length()>8192)throw new Exception();
+            Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,secretKey());
+            String data=Base64.encodeToString(cipher.getIV(),Base64.NO_WRAP)+":"+Base64.encodeToString(cipher.doFinal(value.getBytes(StandardCharsets.UTF_8)),Base64.NO_WRAP);
+            android.util.AtomicFile file=new android.util.AtomicFile(secretFile());
+            FileOutputStream out=null;
+            try{out=file.startWrite();out.write(data.getBytes(StandardCharsets.UTF_8));file.finishWrite(out);}
+            catch(Exception e){if(out!=null)file.failWrite(out);throw e;}
+            call.resolve();
+        }catch(Exception e){call.reject("Güvenli eşitleme anahtarı kaydedilemedi.");}
+    }
+    @PluginMethod public void loadSyncSecret(PluginCall call){
+        try{
+            JSObject result=new JSObject();
+            android.util.AtomicFile file=new android.util.AtomicFile(secretFile());
+            if(!file.getBaseFile().exists()){call.resolve(result);return;}
+            String data=new String(file.readFully(),StandardCharsets.UTF_8);
+            String[] parts=data.split(":",2);
+            Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE,secretKey(),new GCMParameterSpec(128,Base64.decode(parts[0],Base64.NO_WRAP)));
+            result.put("value",new String(cipher.doFinal(Base64.decode(parts[1],Base64.NO_WRAP)),StandardCharsets.UTF_8));
+            call.resolve(result);
+        }catch(Exception e){call.reject("Güvenli kayıt açılamadı. Eşitlemeyi parolanla yeniden etkinleştir.");}
+    }
+    @PluginMethod public void clearSyncSecret(PluginCall call){
+        try{
+            new android.util.AtomicFile(secretFile()).delete();
+            KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);
+            if(store.containsAlias(ALIAS))store.deleteEntry(ALIAS);
+            call.resolve();
+        }catch(Exception e){call.reject("Güvenli kayıt kaldırılamadı.");}
     }
     @PluginMethod public void disconnect(PluginCall call) {
         // Disconnect only removes the in-memory session on the JS side.
