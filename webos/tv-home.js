@@ -4,6 +4,7 @@ var home=document.getElementById('tv-home'),diag=document.getElementById('tv-dia
 var live=document.getElementById('tv-home-live'),films=document.getElementById('tv-home-films'),series=document.getElementById('tv-home-series');
 function open(section){
  home.style.display='none';
+ window.XIPTVTV.startMode=section==='films'?'movie':section==='series'?'series':'live';
  document.getElementById('iptv-open').click();
  if(section!=='live'){
    var tab=document.getElementById('tv-tab-'+(section==='films'?'movie':'series'));
