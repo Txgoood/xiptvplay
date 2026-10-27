@@ -19,7 +19,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 </style><link rel="stylesheet" href="./tv-layout.css" /></head>
 <body><main>
 <h1>XIPTV Play <span id="tv-version-label">TV</span></h1>
-<p>Video oynatma tanılama sürümü <b>v0.8.0</b></p>
+<p>Video oynatma tanılama sürümü <b>v0.8.1</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -41,7 +41,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <p><label>Kullanıcı adı <input id="iptv-user" type="text" autocomplete="off" style="font-size:22px;padding:10px" /> <button id="iptv-user-keyboard" type="button">Klavye Aç</button></label></p>
 <p><label>Şifre <input id="iptv-pass" type="password" autocomplete="off" style="font-size:22px;padding:10px" /> <button id="iptv-pass-keyboard" type="button">Klavye Aç</button></label></p>
 <p><label><input type="checkbox" id="iptv-remember" /> Bu TV'de giriş bilgilerimi hatırla (şifre cihazda saklanır)</label></p>
-<div id="iptv-keyboard" style="display:none"><p id="iptv-keyboard-title">Klavye</p><div id="iptv-keys"></div></div>
+
 <button id="iptv-connect" type="button">Doğrula ve Kanalları Getir</button>
 <button id="iptv-forget" type="button">Kayıtlı Girişi Sil</button>
 </div>
@@ -66,6 +66,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <p>Canlı TV Kategorileri</p><div id="iptv-categories" style="max-height:160px;overflow:auto"></div>
 <p>Kanallar</p><div id="iptv-channels" style="max-height:230px;overflow:auto"></div>
 </div>
+<div id="iptv-keyboard" style="display:none"><p id="iptv-keyboard-title">Klavye</p><div id="iptv-keys"></div></div>
 <p id="iptv-message" style="color:#89eaf9"></p>
 </section>
 <div id="status">Uygulama başlatılıyor...</div>
