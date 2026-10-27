@@ -110,6 +110,7 @@ export default function App() {
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const autoRefreshAttemptedRef = useRef<Set<string>>(new Set());
   const refreshingPlaylistIdsRef = useRef<Set<string>>(new Set());
+  const catalogQueueRef = useRef<Promise<void>>(Promise.resolve());
   // The Drive merge can import a playlist between React renders. Always
   // resolve refresh actions from the latest local source of truth.
   const playlistsRef = useRef(playlists);
@@ -404,6 +405,12 @@ export default function App() {
     const target = playlistsRef.current.find(p=>p.id===id) || StorageService.getPlaylists().find(p=>p.id===id);
     if(!target)return;
     refreshingPlaylistIdsRef.current.add(id);
+    // Only one bulk catalog fetch at a time, across all playlists/profiles.
+    // Concurrent large Xtream requests can overwhelm IPTV servers or Android.
+    const previousJob=catalogQueueRef.current;
+    let releaseQueue:()=>void=()=>{};
+    catalogQueueRef.current=new Promise<void>(resolve=>{releaseQueue=resolve;});
+    await previousJob.catch(()=>{});
     const isSelected=()=>activePlaylistRef.current?.id===id;
     // Every catalog rebuild must end in success or a visible error. Network
     // stalls and a frozen WebView bridge must not leave "downloading" forever.
@@ -490,6 +497,7 @@ export default function App() {
       showToast(`"${target.name}" katalog hatası: ${message}`);
     }finally{
       refreshingPlaylistIdsRef.current.delete(id);
+      releaseQueue();
     }
   };
 
@@ -1128,6 +1136,7 @@ export default function App() {
                 continueWatching={watchHistory.filter(e => e.media.type !== 'live' && e.durationSeconds > 0 && e.positionSeconds > 0 && !e.completed && (!isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, e.media as MediaItem)))}
                 activePlaylist={activePlaylist}
                 onBackToPlaylists={() => { if (!isChildProfile) setCurrentScreen('playlists'); }}
+                onRetryCatalog={() => { if(activePlaylist)void handleRefreshPlaylist(activePlaylist.id); }}
                 onPlayMedia={safePlay}
                 onDownloadMedia={handleDownloadMedia}
                 onScheduleMedia={(item) => { if (!isChildProfile) setScheduleSelection([item]); }}
