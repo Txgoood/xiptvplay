@@ -119,6 +119,10 @@
       if(selectedCategory!=='all' && String(ch.category_id)!==selectedCategory)continue;
       if(query&&String(ch.name||ch.title||'').toLowerCase().indexOf(query)<0)continue;
       if(!window.XIPTVTV.filterFavorite(mode,ch))continue;
+      var catLabel='';
+      for(var ci=0;ci<categoryList.length;ci++)if(String(categoryList[ci].category_id)===String(ch.category_id)){catLabel=String(categoryList[ci].category_name||'');break;}
+      if(document.getElementById('tv-tr-only').checked && catLabel.toUpperCase().indexOf('TR')!==0)continue;
+      if(document.getElementById('tv-hide-adult').checked && /^(XXX|18\+|ADULT|🔞|❤)/i.test(catLabel))continue;
       (function(item){
         var line=action(channels,(count+1)+'. '+String(item.name||item.title||'İsimsiz'),function(){
           if(mode==='live')playChannel(item);
@@ -154,6 +158,8 @@
   };
   document.getElementById('tv-search').onkeyup=renderChannels;
   document.getElementById('tv-sort').onchange=renderChannels;
+  document.getElementById('tv-tr-only').onchange=renderChannels;
+  document.getElementById('tv-hide-adult').onchange=renderChannels;
   window.XIPTVTV.refresh=renderChannels;
   document.getElementById('tv-tab-live').onclick=function(){chooseMode('live');};
   document.getElementById('tv-tab-movie').onclick=function(){chooseMode('movie');};
