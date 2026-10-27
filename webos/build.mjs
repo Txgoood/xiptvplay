@@ -4,10 +4,11 @@ import zlib from 'node:zlib';
 const root=process.cwd(), out=path.join(root,'webos-package');
 fs.rmSync(out,{recursive:true,force:true});
 fs.cpSync(path.join(root,'dist'),out,{recursive:true});
-const info={id:'com.xiptvplay.tv',version:'0.4.1',trustLevel:'netcast',vendorExtension:{allowCrossDomain:true},vendor:'XIPTV Play',type:'web',main:'index.html',title:'XIPTV Play',icon:'icon.png',resolution:'1920x1080'};
+const info={id:'com.xiptvplay.tv',version:'0.4.2',trustLevel:'netcast',vendorExtension:{allowCrossDomain:true},vendor:'XIPTV Play',type:'web',main:'index.html',title:'XIPTV Play',icon:'icon.png',resolution:'1920x1080'};
 fs.writeFileSync(path.join(out,'appinfo.json'),JSON.stringify(info,null,2));
 fs.copyFileSync(path.join(root,'webos/tv-remote.js'),path.join(out,'tv-remote.js'));
 fs.copyFileSync(path.join(root,'webos/tv-iptv.js'),path.join(out,'tv-iptv.js'));
+fs.copyFileSync(path.join(root,'webos/tv-keyboard.js'),path.join(out,'tv-keyboard.js'));
 fs.copyFileSync(path.join(root,'webos/tv.css'),path.join(out,'tv.css'));
 const file=path.join(out,'index.html');let html=fs.readFileSync(file,'utf8');html=html.replace('</head>','<link rel="stylesheet" href="./tv.css" /></head>').replace('</body>','<script src="./tv-remote.js"></script></body>');// React başlamazsa siyah ekran yerine görülebilir hata kodu göster.
 const diagnostic = `<script>(function(){var status='Başlatılıyor';function show(msg){var el=document.getElementById('webos-startup-error');if(!el){el=document.createElement('div');el.id='webos-startup-error';el.style.cssText='position:fixed;z-index:2147483647;inset:0;background:#12171f;color:white;padding:8vw;font:24px sans-serif;overflow:auto';document.body.appendChild(el);}el.textContent='XIPTV Play TV v0.1.1 — Açılış hatası: '+msg;}window.addEventListener('error',function(e){status=(e.message||'Kaynak yükleme hatası')+' '+(e.filename||'');show(status);});window.addEventListener('unhandledrejection',function(e){status=String(e.reason||'Bilinmeyen hata');show(status);});setTimeout(function(){var root=document.getElementById('root');if(!root||!root.children.length)show(status==='Başlatılıyor'?'Uygulama ekranı oluşmadı; TV tarayıcı uyumluluğu veya JS yükleme hatası':status);},9000);})();</script>`;
