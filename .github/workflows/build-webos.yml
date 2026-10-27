@@ -51,6 +51,8 @@ jobs:
           grep -q "sample.mp4" webos-package/index.html
           if grep -q 'type="module"' webos-package/index.html; then echo "Legacy entry must not have ES modules"; exit 1; fi
           node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv'||f.version!=='0.2.6') process.exit(1)"
+      - name: Smoke test remote buttons and offline video source
+        run: node webos/legacy-smoke-test.mjs
       - name: Install official webOS CLI
         run: npm install -g @webos-tools/cli
       - name: Package IPK
