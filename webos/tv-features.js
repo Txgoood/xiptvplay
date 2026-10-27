@@ -58,7 +58,8 @@ document.getElementById('tv-seek-forward').onclick=function(){try{video.currentT
 document.getElementById('tv-favorite-only').onchange=function(){if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();};
 window.XIPTVTV={
  refresh:null,
- catalogReady:function(){scope='default';},
+ catalogReady:function(){if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();},
+ setProfile:function(id,child){scope=id||'default';document.getElementById('tv-hide-adult').checked=!!child;if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();},
  isFavorite:isFavorite,
  decorateItem:decorateItem,
  beforePlay:function(kind,id,url,name){
