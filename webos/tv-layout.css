@@ -28,3 +28,6 @@ body.tv-mode #tv-episodes-title{display:block;font-size:23px;max-width:75%;overf
 body.tv-mode #tv-episodes-close{float:right;font-size:16px}
 body.tv-mode #tv-episodes-list{clear:both;overflow-y:auto;height:85%;padding:8px}
 body.tv-mode #tv-episodes-list button{display:block;width:94%;text-align:left;padding:12px;font-size:19px}
+
+body.tv-mode #tv-4k-options{position:absolute;right:1%;top:105px;width:43%;height:48px;z-index:4;white-space:nowrap}
+body.tv-mode #tv-4k-options button{font-size:16px;padding:7px 12px;margin:0 10px 0 0}
