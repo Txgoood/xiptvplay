@@ -14,7 +14,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 </style></head>
 <body><main>
 <h1>XIPTV Play — LG webOS 2</h1>
-<p>Video oynatma tanılama sürümü <b>v0.3.1</b></p>
+<p>Video oynatma tanılama sürümü <b>v0.4.0</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -27,6 +27,22 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <button id="mdn">MDN MP4</button>
 <button id="w3">W3 MP4</button>
 <button id="aac">AAC Sesli MP4</button>
+<button id="iptv-open" type="button">Canlı TV (Xtream)</button>
+<section id="iptv-panel" style="display:none;background:#1c2b38;padding:20px;margin:16px 0;border:2px solid #497082">
+<button id="iptv-hide" type="button">TV Menüsünü Kapat</button>
+<div id="iptv-login">
+<p>Xtream Codes bağlantısı — bilgiler yalnızca bu oturumda tutulur.</p>
+<p><label>Sunucu adresi <input id="iptv-server" type="text" placeholder="http://sunucu:port" autocomplete="off" style="font-size:22px;padding:10px;width:55%" /></label></p>
+<p><label>Kullanıcı adı <input id="iptv-user" type="text" autocomplete="off" style="font-size:22px;padding:10px" /></label></p>
+<p><label>Şifre <input id="iptv-pass" type="password" autocomplete="off" style="font-size:22px;padding:10px" /></label></p>
+<button id="iptv-connect" type="button">Doğrula ve Kanalları Getir</button>
+</div>
+<div id="iptv-browser" style="display:none">
+<p>Canlı TV Kategorileri</p><div id="iptv-categories" style="max-height:160px;overflow:auto"></div>
+<p>Kanallar</p><div id="iptv-channels" style="max-height:230px;overflow:auto"></div>
+</div>
+<p id="iptv-message" style="color:#89eaf9"></p>
+</section>
 <div id="status">Uygulama başlatılıyor...</div>
 <video id="video" controls preload="none"></video>
 <div id="events"></div>
@@ -102,4 +118,4 @@ video.addEventListener('error',function(){var code=video.error?video.error.code:
 video.addEventListener('ended',function(){message('Video başarıyla sona erdi.');update();},false);
 focus(0);system();update();
 })();
-</script></body></html>
+</script><script src="./tv-iptv.js"></script></body></html>
