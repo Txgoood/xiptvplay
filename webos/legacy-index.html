@@ -50,7 +50,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <button id="tv-show-diagnostics" type="button">Tanılama</button>
 </section>
 <div id="tv-diagnostics" style="display:none">
-<p>Video oynatma tanılama sürümü <b>v1.0.2</b></p>
+<p>Video oynatma tanılama sürümü <b>v1.0.3</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -103,6 +103,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 </section>
 <div id="status">Uygulama başlatılıyor...</div>
 <video id="video" controls preload="none"></video>
+<button id="tv-video-favorite" type="button" title="Favorilere ekle/kaldır" style="display:none">♡</button>
 <div id="events"></div>
 <p><small>Önce Yerel Video düğmesini dene. Test videosu uygulamanın içinde, internete ihtiyaç duymaz. Ardından HLS Source, MP4 Source ve Blob MP4 seçeneklerini deneyebilirsin. Blob testi yalnızca kısa test videosu içindir. MDN çiçek videosu sessiz olabilir; ses doğrulaması için AAC Sesli MP4 düğmesini dene. Bu sürüm henüz playlist/profil içermez.</small></p>
 </main><script>
