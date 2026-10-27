@@ -122,3 +122,11 @@ body.tv-mode #iptv-channels.tv-poster-list .tv-poster-placeholder{
 body.tv-mode #iptv-channels.tv-poster-list>button:focus{
  border-color:#00f0ff!important;outline:2px solid #00f0ff!important
 }
+
+body.tv-mode #tv-profile-panel{position:absolute;top:4%;left:8%;right:8%;bottom:4%;z-index:70;background:#171a21;border:2px solid #00f0ff;border-radius:12px;padding:20px;overflow-y:auto;box-sizing:border-box;box-shadow:0 0 0 400px rgba(0,0,0,.75)}
+body.tv-mode #tv-profile-panel h2{color:#00f0ff;font-size:29px;margin:4px}
+body.tv-mode #tv-profile-items{max-height:35%;overflow:auto}
+body.tv-mode #tv-profile-items button{display:inline-block;margin:8px;padding:16px;background:#25303b;color:#fff;border-radius:10px}
+body.tv-mode #tv-profile-close{float:right}
+body.tv-mode #tv-profile-panel input{padding:10px;margin:7px;font-size:19px;max-width:30%}
+body.tv-mode #tv-profile-panel label{font-size:20px}
