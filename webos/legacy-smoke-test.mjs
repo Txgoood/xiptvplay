@@ -7,7 +7,7 @@ const html=fs.readFileSync('webos-package/index.html','utf8');
 const match=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(match,'inline ES5 app script missing');
 assert(!html.includes('type="module"'),'webOS 2 entry point must not use JavaScript modules');
-const elements={},handlers={},ids=['system','local','remote','network','stop','video','status','events'];
+const elements={},handlers={},ids=['system','local','remote','network','stop','proxy','hls','video','status','events'];
 const document={
   activeElement:null,
   getElementById(id){return elements[id];},
@@ -34,4 +34,10 @@ handlers.keydown({keyCode:39,preventDefault(){}});
 handlers.keydown({keyCode:13,preventDefault(){}});
 assert.match(elements.video.src,/^https:\/\//);
 assert.equal(playCount,2);
-console.log('PASS: legacy script syntax, startup, local selection, remote selection, keydown OK');
+elements.proxy.onclick();
+assert.match(elements.video.src,/^https:\/\/xiptvplay\.onrender\.com\/api\/iptv\/proxy\?url=/);
+assert.equal(playCount,3);
+elements.hls.onclick();
+assert.match(elements.video.src,/\.m3u8$/);
+assert.equal(playCount,4);
+console.log('PASS: legacy script syntax, startup, local selection, remote selection, keydown OK, proxy and HLS selection');
