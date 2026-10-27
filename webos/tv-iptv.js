@@ -63,7 +63,7 @@
   function playChannel(item){
     var id=item.stream_id;
     if(id===null||typeof id==='undefined'){say('Bu kanalın stream ID bilgisi eksik');return;}
-    var raw=server.replace(/\\/$/,'')+'/live/'+encodeURIComponent(username)+'/'+encodeURIComponent(password)+'/'+encodeURIComponent(id)+'.m3u8';
+    var raw=server.replace(/\/$/,'')+'/live/'+encodeURIComponent(username)+'/'+encodeURIComponent(password)+'/'+encodeURIComponent(id)+'.m3u8';
     // Native first for webOS 2. Do not proxy HLS manifest without rewriting segment URLs.
     var source=raw;
     try{
@@ -76,11 +76,11 @@
   launcher.onclick=function(){show(panel);show(login);hide(browser);document.getElementById('iptv-server').focus();};
   document.getElementById('iptv-hide').onclick=function(){hide(panel);launcher.focus();};
   document.getElementById('iptv-connect').onclick=function(){
-    server=document.getElementById('iptv-server').value.replace(/^\\s+|\\s+$/g,'').replace(/\\/+$/,'');
+    server=document.getElementById('iptv-server').value.trim().replace(/\/+$/,'');
     username=document.getElementById('iptv-user').value.replace(/^\\s+|\\s+$/g,'');
     password=document.getElementById('iptv-pass').value;
     if(!server||!username||!password){say('Sunucu, kullanıcı ve şifre zorunludur');return;}
-    if(!/^https?:\\/\\//i.test(server))server='http://'+server;
+    if(server.indexOf('http://')!==0 && server.indexOf('https://')!==0)server='http://'+server;
     say('Xtream bağlantısı doğrulanıyor...');
     request('/api/iptv/xtream/verify',{serverUrl:server,username:username,password:password},function(err,data){
       if(err||!data.success){say('Doğrulama başarısız: '+(err?err.message:data.error||'Hesap reddedildi'));return;}
