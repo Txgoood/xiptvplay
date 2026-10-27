@@ -3,7 +3,7 @@
 var home=document.getElementById('tv-home'),diag=document.getElementById('tv-diagnostics');
 /* Keep Stitch navigation visible in every catalog view, not just launcher. */
 var side=document.getElementById('stitch-side');home.parentNode.insertBefore(side,home);
-var ids=['tv-nav-home','tv-home-live','tv-home-films','tv-home-series','tv-nav-fav','tv-nav-search','tv-nav-profile','tv-feature-play','tv-feature-detail','tv-show-diagnostics'];
+var ids=['tv-nav-home','tv-home-live','tv-home-films','tv-home-series','tv-nav-fav','tv-nav-search','tv-nav-profile','tv-nav-settings','tv-feature-play','tv-feature-detail','tv-show-diagnostics'];
 var nodes=[],i;for(i=0;i<ids.length;i++)nodes.push(document.getElementById(ids[i]));
 function open(section){
  home.style.display='none';
@@ -48,9 +48,17 @@ document.getElementById('tv-feature-detail').onclick=function(){open('films');};
 document.getElementById('tv-nav-fav').onclick=function(){open('live');document.getElementById('tv-favorite-only').checked=true;if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();};
 document.getElementById('tv-nav-search').onclick=function(){open('films');document.getElementById('tv-search').click();};
 document.getElementById('tv-nav-profile').onclick=function(){open('live');document.getElementById('tv-profile-switch').click();};
+function settings(show){document.getElementById('tv-settings-panel').style.display=show?'block':'none';if(show)document.getElementById('tv-settings-close').focus();}
+document.getElementById('tv-nav-settings').onclick=function(){settings(true);};
+document.getElementById('tv-settings-close').onclick=function(){settings(false);document.getElementById('tv-nav-settings').focus();};
+document.getElementById('tv-settings-player').onclick=function(){settings(false);open('live');document.getElementById('tv-controls-toggle').click();};
+document.getElementById('tv-settings-profiles').onclick=function(){settings(false);open('live');document.getElementById('tv-profile-switch').click();};
+document.getElementById('tv-settings-connection').onclick=function(){settings(false);open('live');document.getElementById('iptv-login').style.display='block';document.getElementById('iptv-browser').style.display='none';};
+document.getElementById('tv-settings-diagnostics').onclick=function(){settings(false);document.getElementById('tv-show-diagnostics').click();};
 document.getElementById('tv-show-diagnostics').onclick=function(){diag.style.display='block';home.style.display='none';document.getElementById('system').focus();};
 document.getElementById('iptv-hide').addEventListener('click',function(){home.style.display='block';document.body.className='';document.getElementById('tv-nav-home').focus();},false);
 document.addEventListener('keydown',function(e){
+ if(document.getElementById('tv-settings-panel').style.display!=='none')return;
  if(home.style.display==='none')return;
  var k=e.keyCode||e.which;if(k!==37&&k!==38&&k!==39&&k!==40&&k!==13)return;
  var current=0;for(var p=0;p<nodes.length;p++)if(nodes[p]===document.activeElement)current=p;
