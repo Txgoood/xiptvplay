@@ -10,7 +10,8 @@
   var msg=document.getElementById('iptv-message');
   var categories=document.getElementById('iptv-categories');
   var channels=document.getElementById('iptv-channels');
-  var categoryList=[], channelList=[], selectedCategory='all';
+  var categoryList=[], channelList=[], selectedCategory='all', mode='live';
+  var catalogData=null;
   var server='',username='',password='';
   var SAVE_KEY='xiptv_webos2_xtream_local_v1';
   function savedCredentials(){try{return JSON.parse(localStorage.getItem(SAVE_KEY)||'null');}catch(e){return null;}}
@@ -55,6 +56,55 @@
       xhr.send(JSON.stringify(data));
     }catch(e){callback(e);}
   }
+  function chooseMode(next){
+    mode=next;selectedCategory='all';
+    var tabNames=['live','movie','series'];
+    for(var t=0;t<tabNames.length;t++){
+      document.getElementById('tv-tab-'+tabNames[t]).className=mode===tabNames[t]?'active':'';
+    }
+    if(!catalogData)return;
+    categoryList=catalogData[mode==='live'?'liveCategories':mode==='movie'?'vodCategories':'seriesCategories']||[];
+    channelList=catalogData[mode==='live'?'liveStreams':mode==='movie'?'vodStreams':'seriesList']||[];
+    document.getElementById('tv-now-playing').textContent=mode==='live'?'Canlı TV':mode==='movie'?'Filmler':'Diziler';
+    renderCategories();
+  }
+  function showSeries(item){
+    var id=item.series_id;
+    if(!id){say('Dizi bilgisi eksik');return;}
+    say('Dizi bölümleri yükleniyor...');
+    request('/api/iptv/xtream/series_info',{serverUrl:server,username:username,password:password,seriesId:id},function(err,data){
+      if(err){say('Bölümler alınamadı: '+err.message);return;}
+      var seasons=data.episodes||{}, episodes=[];
+      for(var season in seasons){if(Object.prototype.hasOwnProperty.call(seasons,season)){
+        var group=seasons[season];
+        if(group&&group.length)for(var i=0;i<group.length;i++)episodes.push({season:season,item:group[i]});
+      }}
+      if(!episodes.length){say('Bu dizi için bölüm bulunamadı');return;}
+      var popup=document.getElementById('tv-episodes'),list=document.getElementById('tv-episodes-list');
+      clear(list);popup.style.display='block';
+      document.getElementById('tv-episodes-title').textContent=item.name||'Dizi Bölümleri';
+      for(var x=0;x<episodes.length&&x<250;x++){(function(ep){
+        action(list,'Sezon '+ep.season+' • '+String(ep.item.title||ep.item.episode_num||'Bölüm'),function(){
+          popup.style.display='none';
+          var ext=String(ep.item.container_extension||'mp4').replace(/[^a-zA-Z0-9]/g,'');
+          playStream('series',ep.item.id,ext,ep.item.title||'Dizi Bölümü');
+        });
+      })(episodes[x]);}
+      say(episodes.length+' bölüm bulundu. Bölüm seç.');
+    });
+  }
+  function playStream(kind,id,ext,name){
+    if(id===null||typeof id==='undefined'){say('Yayın kimliği eksik');return;}
+    var suffix=kind==='live'?'m3u8':(ext||'mp4');
+    var url=server.replace(/\/$/,'')+'/'+kind+'/'+encodeURIComponent(username)+'/'+encodeURIComponent(password)+'/'+encodeURIComponent(id)+'.'+suffix;
+    document.getElementById('tv-now-playing').textContent=String(name||'Video');
+    try{
+      video.pause();video.removeAttribute('src');
+      while(video.firstChild)video.removeChild(video.firstChild);
+      video.load();video.src=url;video.load();video.play();
+      say('Oynatılıyor: '+String(name||'Video')+' | '+suffix.toUpperCase()+' • Görüntü/ses desteği yayına bağlıdır.');
+    }catch(e){say('Oynatma hatası: '+e.message);}
+  }
   function renderChannels(){
     clear(channels);
     var count=0;
@@ -62,7 +112,11 @@
       var ch=channelList[i];
       if(selectedCategory!=='all' && String(ch.category_id)!==selectedCategory)continue;
       (function(item){
-        action(channels,(count+1)+'. '+String(item.name||'İsimsiz Kanal'),function(){playChannel(item);});
+        action(channels,(count+1)+'. '+String(item.name||item.title||'İsimsiz'),function(){
+          if(mode==='live')playChannel(item);
+          else if(mode==='movie')playStream('movie',item.stream_id,String(item.container_extension||'mp4').replace(/[^a-zA-Z0-9]/g,''),item.name);
+          else showSeries(item);
+        });
       })(ch);count++;
       if(count>=350)break;
     }
@@ -77,19 +131,13 @@
     renderChannels();
   }
   function playChannel(item){
-    document.getElementById('tv-now-playing').textContent=String(item.name||'Canlı TV');
     var id=item.stream_id;
-    if(id===null||typeof id==='undefined'){say('Bu kanalın stream ID bilgisi eksik');return;}
-    var raw=server.replace(/\/$/,'')+'/live/'+encodeURIComponent(username)+'/'+encodeURIComponent(password)+'/'+encodeURIComponent(id)+'.m3u8';
-    // Native first for webOS 2. Do not proxy HLS manifest without rewriting segment URLs.
-    var source=raw;
-    try{
-      video.pause();video.removeAttribute('src');
-      while(video.firstChild)video.removeChild(video.firstChild);
-      video.load();video.src=source;video.load();video.play();
-      say('Kanal oynatılıyor: '+(item.name||id)+' | Akış: HLS (uyumsuz yayınlarda oynatıcı hata gösterebilir)');
-    }catch(e){say('Oynatma başlatılamadı: '+e.message);}
+    playStream('live',id,'m3u8',item.name);
   }
+  document.getElementById('tv-tab-live').onclick=function(){chooseMode('live');};
+  document.getElementById('tv-tab-movie').onclick=function(){chooseMode('movie');};
+  document.getElementById('tv-tab-series').onclick=function(){chooseMode('series');};
+  document.getElementById('tv-episodes-close').onclick=function(){document.getElementById('tv-episodes').style.display='none';};
   // Catch D-pad before the legacy diagnostic menu handler; traverse visible controls.
   document.addEventListener('keydown',function(e){
     if(document.getElementById('iptv-keyboard').style.display!=='none')return;
@@ -148,10 +196,9 @@
       say('Bağlantı başarılı, canlı TV kataloğu alınıyor...');
       request('/api/iptv/xtream/catalog',{serverUrl:server,username:username,password:password},function(error,catalog){
         if(error){say('Katalog hatası: '+error.message);return;}
-        categoryList=catalog.liveCategories||[];
-        channelList=catalog.liveStreams||[];
+        catalogData=catalog;
         hide(login);show(browser);
-        renderCategories();
+        chooseMode('live');
       });
     });
   };
