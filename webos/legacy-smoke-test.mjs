@@ -6,7 +6,10 @@ const html=fs.readFileSync('webos-package/index.html','utf8');
 const match=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(match,'inline legacy script is missing');
 assert(!html.includes('type="module"'),'webOS 2 must not use JS modules');
-assert(html.includes('v0.2.8'),'wrong TV build version');
+assert(html.includes('v0.2.9'),'wrong TV build version');
+const metadata=JSON.parse(fs.readFileSync('webos-package/appinfo.json','utf8'));
+assert.equal(metadata.trustLevel,'netcast');
+assert.equal(metadata.vendorExtension?.allowCrossDomain,true);
 const elements={},handlers={};
 const ids=['system','local','remote','network','stop','proxy','hls','mp4src','blob','video','status','events'];
 const document={
