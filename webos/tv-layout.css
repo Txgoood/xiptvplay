@@ -18,3 +18,13 @@ body.tv-mode #iptv-login{position:absolute;left:4%;top:5%;right:4%;bottom:40px;o
 body.tv-mode #iptv-login p{font-size:18px;margin:10px 0}
 body.tv-mode #iptv-login input{max-width:45%;font-size:20px!important}
 body.tv-mode #iptv-keyboard{top:5%;height:88%;left:5%;width:90%}
+
+body.tv-mode #tv-mode-tabs{position:absolute;top:0;left:0;right:0;height:53px;z-index:3;white-space:nowrap;overflow:hidden}
+body.tv-mode #tv-mode-tabs button{font-size:19px;margin:2px 10px 5px 0;padding:9px 24px}
+body.tv-mode #iptv-categories,body.tv-mode #iptv-channels{top:58px}
+body.tv-mode #tv-now-playing{top:67px;z-index:3}
+body.tv-mode #tv-episodes{position:absolute;top:58px;bottom:0;left:22%;right:0;z-index:8;background:#152535;border:2px solid #3dcadd;padding:12px;box-sizing:border-box;overflow:hidden}
+body.tv-mode #tv-episodes-title{display:block;font-size:23px;max-width:75%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:8px}
+body.tv-mode #tv-episodes-close{float:right;font-size:16px}
+body.tv-mode #tv-episodes-list{clear:both;overflow-y:auto;height:85%;padding:8px}
+body.tv-mode #tv-episodes-list button{display:block;width:94%;text-align:left;padding:12px;font-size:19px}
