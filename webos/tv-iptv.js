@@ -91,6 +91,7 @@
   }
   // Catch D-pad before the legacy diagnostic menu handler; traverse visible controls.
   document.addEventListener('keydown',function(e){
+    if(document.getElementById('iptv-keyboard').style.display!=='none')return;
     var key=e.keyCode||e.which;
     if(key!==37&&key!==38&&key!==39&&key!==40&&key!==13&&key!==461)return;
     var list=[],nodes=document.getElementsByTagName('button'),i,el;
