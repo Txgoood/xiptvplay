@@ -4,13 +4,14 @@ import zlib from 'node:zlib';
 const root=process.cwd(), out=path.join(root,'webos-package');
 fs.rmSync(out,{recursive:true,force:true});
 fs.cpSync(path.join(root,'dist'),out,{recursive:true});
-const info={id:'com.xiptvplay.tv',version:'0.1.1',vendor:'XIPTV Play',type:'web',main:'index.html',title:'XIPTV Play',icon:'icon.png',resolution:'1920x1080'};
+const info={id:'com.xiptvplay.tv',version:'0.2.0',vendor:'XIPTV Play',type:'web',main:'index.html',title:'XIPTV Play',icon:'icon.png',resolution:'1920x1080'};
 fs.writeFileSync(path.join(out,'appinfo.json'),JSON.stringify(info,null,2));
 fs.copyFileSync(path.join(root,'webos/tv-remote.js'),path.join(out,'tv-remote.js'));
 fs.copyFileSync(path.join(root,'webos/tv.css'),path.join(out,'tv.css'));
 const file=path.join(out,'index.html');let html=fs.readFileSync(file,'utf8');html=html.replace('</head>','<link rel="stylesheet" href="./tv.css" /></head>').replace('</body>','<script src="./tv-remote.js"></script></body>');// React başlamazsa siyah ekran yerine görülebilir hata kodu göster.
 const diagnostic = `<script>(function(){var status='Başlatılıyor';function show(msg){var el=document.getElementById('webos-startup-error');if(!el){el=document.createElement('div');el.id='webos-startup-error';el.style.cssText='position:fixed;z-index:2147483647;inset:0;background:#12171f;color:white;padding:8vw;font:24px sans-serif;overflow:auto';document.body.appendChild(el);}el.textContent='XIPTV Play TV v0.1.1 — Açılış hatası: '+msg;}window.addEventListener('error',function(e){status=(e.message||'Kaynak yükleme hatası')+' '+(e.filename||'');show(status);});window.addEventListener('unhandledrejection',function(e){status=String(e.reason||'Bilinmeyen hata');show(status);});setTimeout(function(){var root=document.getElementById('root');if(!root||!root.children.length)show(status==='Başlatılıyor'?'Uygulama ekranı oluşmadı; TV tarayıcı uyumluluğu veya JS yükleme hatası':status);},9000);})();</script>`;
 html=html.replace('<script type="module"', diagnostic+'<script type="module"');
+if(process.env.WEBOS_LEGACY === 'true') html=fs.readFileSync(path.join(root,'webos/legacy-index.html'),'utf8');
 fs.writeFileSync(file,html);
 // Harici görsel araçlara gerek olmadan 80x80 RGB PNG simgesi.
 const w=80,h=80,raw=Buffer.alloc(h*(1+w*3));for(let y=0;y<h;y++)for(let x=0;x<w;x++){let i=y*(1+w*3)+1+x*3;let on=x>24&&x<61&&Math.abs(y-40)<(x-24)*0.64;raw[i]=on?0:14;raw[i+1]=on?240:28;raw[i+2]=on?255:38;}
