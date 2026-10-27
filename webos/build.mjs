@@ -4,7 +4,7 @@ import zlib from 'node:zlib';
 const root=process.cwd(), out=path.join(root,'webos-package');
 fs.rmSync(out,{recursive:true,force:true});
 fs.cpSync(path.join(root,'dist'),out,{recursive:true});
-const info={id:'com.xiptvplay.tv',version:'0.2.2',vendor:'XIPTV Play',type:'web',main:'index.html',title:'XIPTV Play',icon:'icon.png',resolution:'1920x1080'};
+const info={id:'com.xiptvplay.tv',version:'0.2.3',vendor:'XIPTV Play',type:'web',main:'index.html',title:'XIPTV Play',icon:'icon.png',resolution:'1920x1080'};
 fs.writeFileSync(path.join(out,'appinfo.json'),JSON.stringify(info,null,2));
 fs.copyFileSync(path.join(root,'webos/tv-remote.js'),path.join(out,'tv-remote.js'));
 fs.copyFileSync(path.join(root,'webos/tv.css'),path.join(out,'tv.css'));
