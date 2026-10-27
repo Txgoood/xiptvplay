@@ -14,7 +14,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 </style></head>
 <body><main>
 <h1>XIPTV Play — LG webOS 2</h1>
-<p>Video oynatma tanılama sürümü <b>v0.3.0</b></p>
+<p>Video oynatma tanılama sürümü <b>v0.3.1</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -26,14 +26,15 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <button id="blob">Blob MP4</button>
 <button id="mdn">MDN MP4</button>
 <button id="w3">W3 MP4</button>
+<button id="aac">AAC Sesli MP4</button>
 <div id="status">Uygulama başlatılıyor...</div>
 <video id="video" controls preload="none"></video>
 <div id="events"></div>
-<p><small>Önce Yerel Video düğmesini dene. Test videosu uygulamanın içinde, internete ihtiyaç duymaz. Ardından HLS Source, MP4 Source ve Blob MP4 seçeneklerini deneyebilirsin. Blob testi yalnızca kısa test videosu içindir. Farklı sunuculardan internet MP4 kaynağı karşılaştırması. Bu sürüm henüz playlist/profil içermez.</small></p>
+<p><small>Önce Yerel Video düğmesini dene. Test videosu uygulamanın içinde, internete ihtiyaç duymaz. Ardından HLS Source, MP4 Source ve Blob MP4 seçeneklerini deneyebilirsin. Blob testi yalnızca kısa test videosu içindir. MDN çiçek videosu sessiz olabilir; ses doğrulaması için AAC Sesli MP4 düğmesini dene. Bu sürüm henüz playlist/profil içermez.</small></p>
 </main><script>
 (function(){
 var video=document.getElementById('video'),status=document.getElementById('status'),events=document.getElementById('events');
-var ids=['system','local','remote','network','stop','proxy','hls','mp4src','blob','mdn','w3'],buttons=[],selected=0,lastKey='yok',actions=0;
+var ids=['system','local','remote','network','stop','proxy','hls','mp4src','blob','mdn','w3','aac'],buttons=[],selected=0,lastKey='yok',actions=0;
 var remoteUrl='https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4';
 var lastSource='',activeBlob=null;
 var proxyUrl='https://xiptvplay.onrender.com/api/iptv/proxy?url='+encodeURIComponent(remoteUrl);
@@ -90,6 +91,7 @@ if(n===7)play(remoteUrl,'MP4 source öğesi','video/mp4');
 if(n===8)blobVideo();
 if(n===9)play('https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4','MDN kısa MP4 kaynak');
 if(n===10)play('https://www.w3schools.com/html/mov_bbb.mp4','W3Schools MP4 kaynak');
+if(n===11)play('https://assets.testfiles.dev/video/sample-3s.mp4','H.264 ve AAC sesli MP4');
 update();}
 for(var j=0;j<buttons.length;j++){(function(n){buttons[n].onclick=function(){execute(n);};buttons[n].onfocus=function(){selected=n;for(var k=0;k<buttons.length;k++)buttons[k].className=k===n?'active':'';};})(j);}
 document.addEventListener('keydown',function(e){var k=e.keyCode||e.which;lastKey=String(k);if(k===37||k===38||k===39||k===40){focus(selected+((k===37||k===38)?-1:1));if(e.preventDefault)e.preventDefault();}else if(k===13||k===16777220){execute(selected);if(e.preventDefault)e.preventDefault();}else if(k===461||k===27){video.pause();message('Geri tuşu: Video duraklatıldı');}update();},false);
