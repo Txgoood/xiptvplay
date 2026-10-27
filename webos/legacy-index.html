@@ -19,7 +19,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 </style><link rel="stylesheet" href="./tv-layout.css" /></head>
 <body><main>
 <h1>XIPTV Play <span id="tv-version-label">TV</span></h1>
-<p>Video oynatma tanılama sürümü <b>v0.7.1</b></p>
+<p>Video oynatma tanılama sürümü <b>v0.8.0</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -46,7 +46,14 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <button id="iptv-forget" type="button">Kayıtlı Girişi Sil</button>
 </div>
 <div id="iptv-browser" style="display:none">
-<div id="tv-filter-panel"><input id="tv-search" type="text" placeholder="Katalogda ara" /><select id="tv-sort"><option value="normal">Orijinal sıralama</option><option value="az">A-Z</option><option value="za">Z-A</option></select><label><input id="tv-favorite-only" type="checkbox" /> ★ Favoriler</label><label><input id="tv-tr-only" type="checkbox" /> TR</label><label><input id="tv-hide-adult" type="checkbox" /> Yetişkin kategorileri gizle</label><button id="tv-controls-toggle" type="button">Oynatıcı Ayarları</button></div>
+<div id="tv-profile-panel" style="display:none">
+<button id="tv-profile-close" type="button">Kapat</button><h2>Profiller</h2><div id="tv-profile-items"></div>
+<p>Yeni profil</p><input id="tv-profile-name" type="text" placeholder="Profil adı">
+<input id="tv-profile-pin" type="password" placeholder="4 haneli PIN (isteğe bağlı)">
+<label><input id="tv-profile-child" type="checkbox">Çocuk profili</label>
+<button id="tv-profile-add" type="button">Profil Ekle</button><p id="tv-profile-message"></p>
+</div>
+<div id="tv-filter-panel"><button id="tv-profile-switch" type="button">Profil: Ana Profil</button><input id="tv-search" type="text" placeholder="Katalogda ara" /><select id="tv-sort"><option value="normal">Orijinal sıralama</option><option value="az">A-Z</option><option value="za">Z-A</option></select><label><input id="tv-favorite-only" type="checkbox" /> ★ Favoriler</label><label><input id="tv-tr-only" type="checkbox" /> TR</label><label><input id="tv-hide-adult" type="checkbox" /> Yetişkin kategorileri gizle</label><button id="tv-controls-toggle" type="button">Oynatıcı Ayarları</button></div>
 <div id="tv-controls" style="display:none"><span id="tv-current-media"></span>
 <label>Altyazı <select id="tv-subtitles"><option value="off">Kapalı</option></select></label>
 <label>Ses <select id="tv-audio"><option value="auto">Otomatik / Türkçe öncelikli</option></select></label>
@@ -136,4 +143,4 @@ video.addEventListener('error',function(){var code=video.error?video.error.code:
 video.addEventListener('ended',function(){message('Video başarıyla sona erdi.');update();},false);
 focus(0);system();update();
 })();
-</script><script src="./tv-features.js"></script><script src="./tv-iptv.js"></script><script src="./tv-keyboard.js"></script></body></html>
+</script><script src="./tv-features.js"></script><script src="./tv-iptv.js"></script><script src="./tv-profiles.js"></script><script src="./tv-keyboard.js"></script></body></html>
