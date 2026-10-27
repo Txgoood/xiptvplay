@@ -25,13 +25,13 @@ let playCount=0;
 const sources=[],videoEvents={};
 Object.assign(elements.video,{
   readyState:0,networkState:0,canPlayType:()=> 'maybe',
-  get firstChild(){return sources[0]||null;},
   appendChild(node){sources.push(node);},
   removeChild(node){assert.equal(sources.shift(),node);},
   addEventListener(name,fn){videoEvents[name]=fn;},
   pause(){},load(){},play(){playCount++;return {catch(){}};},
   removeAttribute(key){if(key==='src')this.src='';}
 });
+Object.defineProperty(elements.video,'firstChild',{get(){return sources[0]||null;}});
 let xhrCount=0,blobRequest=null;
 function FakeXHR(){xhrCount++;blobRequest=this;this.status=206;}
 FakeXHR.prototype.open=function(method,url){this.requestURL=url;};
