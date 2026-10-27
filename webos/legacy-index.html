@@ -14,7 +14,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 </style></head>
 <body><main>
 <h1>XIPTV Play — LG webOS 2</h1>
-<p>Video oynatma tanılama sürümü <b>v0.4.0</b></p>
+<p>Video oynatma tanılama sürümü <b>v0.4.1</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -35,7 +35,9 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <p><label>Sunucu adresi <input id="iptv-server" type="text" placeholder="http://sunucu:port" autocomplete="off" style="font-size:22px;padding:10px;width:55%" /></label></p>
 <p><label>Kullanıcı adı <input id="iptv-user" type="text" autocomplete="off" style="font-size:22px;padding:10px" /></label></p>
 <p><label>Şifre <input id="iptv-pass" type="password" autocomplete="off" style="font-size:22px;padding:10px" /></label></p>
+<p><label><input type="checkbox" id="iptv-remember" /> Bu TV'de giriş bilgilerimi hatırla (şifre cihazda saklanır)</label></p>
 <button id="iptv-connect" type="button">Doğrula ve Kanalları Getir</button>
+<button id="iptv-forget" type="button">Kayıtlı Girişi Sil</button>
 </div>
 <div id="iptv-browser" style="display:none">
 <p>Canlı TV Kategorileri</p><div id="iptv-categories" style="max-height:160px;overflow:auto"></div>
