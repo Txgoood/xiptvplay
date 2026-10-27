@@ -1,6 +1,7 @@
 /* XIPTV TV companion controls, ES5-safe. User data stays on this television. */
 (function(){
-var video=document.getElementById('video'),currentKey='',scope='default';
+var video=document.getElementById('video'),currentKey='',scope='default',playingItem=null,playingMode='live';
+var favButton=document.getElementById('tv-video-favorite');
 var prefix='xiptv_webos2_media_v1_';
 function read(k,fallback){try{return JSON.parse(localStorage.getItem(prefix+scope+'_'+k))||fallback;}catch(e){return fallback;}}
 function save(k,value){try{localStorage.setItem(prefix+scope+'_'+k,JSON.stringify(value));}catch(e){}}
@@ -18,6 +19,12 @@ function decorateItem(button,mode,item){
  star.onclick=function(e){if(e&&e.stopPropagation)e.stopPropagation();toggleFavorite(mode,item);};
  button.parentNode.appendChild(star);
 }
+function updateHeart(){
+ if(!playingItem){favButton.style.display='none';return;}
+ favButton.style.display='block';favButton.textContent=isFavorite(playingMode,playingItem)?'♥':'♡';
+ favButton.title=isFavorite(playingMode,playingItem)?'Favorilerden çıkar':'Favorilere ekle';
+}
+favButton.onclick=function(){if(!playingItem)return;toggleFavorite(playingMode,playingItem);updateHeart();};
 function applyTracks(){
  var tracks=video.textTracks||[];
  for(var i=0;i<tracks.length;i++)try{tracks[i].mode='disabled';}catch(e){}
@@ -59,7 +66,8 @@ document.getElementById('tv-favorite-only').onchange=function(){if(window.XIPTVT
 window.XIPTVTV={
  refresh:null,
  catalogReady:function(){if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();},
- setProfile:function(id,child){scope=id||'default';document.getElementById('tv-hide-adult').checked=!!child;if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();},
+ setPlayingItem:function(mode,item){playingMode=mode;playingItem=item;updateHeart();},
+ setProfile:function(id,child){scope=id||'default';document.getElementById('tv-hide-adult').checked=!!child;updateHeart();if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();},
  isFavorite:isFavorite,
  decorateItem:decorateItem,
  beforePlay:function(kind,id,url,name){
