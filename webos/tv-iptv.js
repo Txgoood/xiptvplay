@@ -73,11 +73,38 @@
       say('Kanal oynatılıyor: '+(item.name||id)+' | Akış: HLS (uyumsuz yayınlarda oynatıcı hata gösterebilir)');
     }catch(e){say('Oynatma başlatılamadı: '+e.message);}
   }
+  // Catch D-pad before the legacy diagnostic menu handler; traverse visible controls.
+  document.addEventListener('keydown',function(e){
+    var key=e.keyCode||e.which;
+    if(key!==37&&key!==38&&key!==39&&key!==40&&key!==13&&key!==461)return;
+    var list=[],nodes=document.getElementsByTagName('button'),i,el;
+    for(i=0;i<nodes.length;i++){
+      el=nodes[i];
+      if(el.offsetWidth>0&&el.offsetHeight>0)list.push(el);
+    }
+    var inputs=document.getElementsByTagName('input');
+    for(i=0;i<inputs.length;i++){
+      el=inputs[i];
+      if(el.offsetWidth>0&&el.offsetHeight>0)list.push(el);
+    }
+    var active=document.activeElement,idx=-1;
+    for(i=0;i<list.length;i++)if(list[i]===active){idx=i;break;}
+    if(key===461 && panel.style.display!=='none'){hide(panel);launcher.focus();e.preventDefault();e.stopImmediatePropagation();return;}
+    if(key===13 && active && active.tagName==='BUTTON'){
+      active.click();e.preventDefault();e.stopImmediatePropagation();return;
+    }
+    if(key===37||key===38||key===39||key===40){
+      // Keep text-field arrow navigation native while typing.
+      if(active && active.tagName==='INPUT')return;
+      if(list.length){list[(idx+(key===37||key===38?-1:1)+list.length)%list.length].focus();}
+      e.preventDefault();e.stopImmediatePropagation();
+    }
+  },true);
   launcher.onclick=function(){show(panel);show(login);hide(browser);document.getElementById('iptv-server').focus();};
   document.getElementById('iptv-hide').onclick=function(){hide(panel);launcher.focus();};
   document.getElementById('iptv-connect').onclick=function(){
     server=document.getElementById('iptv-server').value.trim().replace(/\/+$/,'');
-    username=document.getElementById('iptv-user').value.replace(/^\\s+|\\s+$/g,'');
+    username=document.getElementById('iptv-user').value.trim();
     password=document.getElementById('iptv-pass').value;
     if(!server||!username||!password){say('Sunucu, kullanıcı ve şifre zorunludur');return;}
     if(server.indexOf('http://')!==0 && server.indexOf('https://')!==0)server='http://'+server;
