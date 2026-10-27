@@ -19,7 +19,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 </style><link rel="stylesheet" href="./tv-layout.css" /></head>
 <body><main>
 <h1>XIPTV Play <span id="tv-version-label">TV</span></h1>
-<p>Video oynatma tanılama sürümü <b>v0.5.3</b></p>
+<p>Video oynatma tanılama sürümü <b>v0.6.0</b></p>
 <button id="system">Sistem Kontrolü</button>
 <button id="local">Yerel Video</button>
 <button id="remote">İnternet Video</button>
@@ -46,6 +46,13 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <button id="iptv-forget" type="button">Kayıtlı Girişi Sil</button>
 </div>
 <div id="iptv-browser" style="display:none">
+<div id="tv-filter-panel"><input id="tv-search" type="text" placeholder="Katalogda ara" /><select id="tv-sort"><option value="normal">Orijinal sıralama</option><option value="az">A-Z</option><option value="za">Z-A</option></select><label><input id="tv-favorite-only" type="checkbox" /> ★ Favoriler</label><button id="tv-controls-toggle" type="button">Oynatıcı Ayarları</button></div>
+<div id="tv-controls" style="display:none"><span id="tv-current-media"></span>
+<label>Altyazı <select id="tv-subtitles"><option value="off">Kapalı</option></select></label>
+<label>Ses <select id="tv-audio"><option value="auto">Otomatik / Türkçe öncelikli</option></select></label>
+<label>Hız <select id="tv-speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="1.5">1.5x</option><option value="2">2x</option><option value="4">4x</option><option value="8">8x</option><option value="16">16x</option></select></label>
+<button id="tv-seek-back" type="button">-10 sn</button><button id="tv-seek-forward" type="button">+10 sn</button>
+</div>
 <div id="tv-mode-tabs"><button id="tv-tab-live" type="button">Canlı TV</button><button id="tv-tab-movie" type="button">Filmler</button><button id="tv-tab-series" type="button">Diziler</button></div>
 <div id="tv-episodes" style="display:none"><button id="tv-episodes-close" type="button">Bölümleri Kapat</button><strong id="tv-episodes-title">Dizi Bölümleri</strong><div id="tv-episodes-list"></div></div>
 <div id="tv-player-controls"><button id="tv-fullscreen" type="button">Tam Ekran</button><button id="tv-aspect" type="button">Ekrana Doldur</button></div><div id="tv-4k-options"><button id="tv-try-ts" type="button">4K: TS dene</button><button id="tv-try-hls" type="button">HLS dene</button></div><div id="tv-now-playing">Kanal seçilmedi</div>
@@ -129,4 +136,4 @@ video.addEventListener('error',function(){var code=video.error?video.error.code:
 video.addEventListener('ended',function(){message('Video başarıyla sona erdi.');update();},false);
 focus(0);system();update();
 })();
-</script><script src="./tv-iptv.js"></script><script src="./tv-keyboard.js"></script></body></html>
+</script><script src="./tv-features.js"></script><script src="./tv-iptv.js"></script><script src="./tv-keyboard.js"></script></body></html>
