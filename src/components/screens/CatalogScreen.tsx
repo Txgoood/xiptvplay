@@ -23,6 +23,7 @@ interface CatalogScreenProps {
   catalog: MediaItem[];
   activePlaylist: Playlist | null;
   onBackToPlaylists: () => void;
+  onRetryCatalog?: () => void;
   onPlayMedia: (item: MediaItem) => void;
   onDownloadMedia: (item: MediaItem) => void;
   onScheduleMedia: (item: MediaItem) => void;
@@ -41,6 +42,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   catalog,
   activePlaylist,
   onBackToPlaylists,
+  onRetryCatalog,
   onPlayMedia,
   onDownloadMedia,
   onScheduleMedia,
@@ -373,8 +375,15 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
             Kanal Listesi Bulunamadı
           </h3>
           <p className="text-xs text-[#b9cacb] max-w-xs leading-relaxed">
-            Seçili playlist için sunucudan henüz kanal çekilmemiş veya bağlantı kurulamamış olabilir.
+            Seçili playlist için IPTV kataloğu bu cihazda henüz oluşturulamadı.
           </p>
+          {activePlaylist?.errorMessage && <p role="alert" className="text-xs text-[#ffb4ab] p-3 max-w-sm bg-[#401f24] rounded-xl break-words">
+            Hata: {activePlaylist.errorMessage}
+          </p>}
+          {onRetryCatalog && activePlaylist && <button onClick={onRetryCatalog}
+            className="px-4 py-2 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold">
+            Kataloğu Tekrar İndir
+          </button>}
           <button
             onClick={onBackToPlaylists}
             className="px-4 py-2 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold shadow-[0_0_10px_rgba(0,240,255,0.4)] cursor-pointer active:scale-95"
