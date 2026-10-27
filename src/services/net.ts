@@ -12,7 +12,7 @@ export const isNative = (): boolean => {
 export const IPTV_UA = 'IPTVSmartersPro';
 // TV paketinde /api adresleri file:// kökenine değil Render backend'ine gitmeli.
 export const tvApiBase = import.meta.env.VITE_WEBOS_TV === 'true'
-  ? (import.meta.env.VITE_API_BASE_URL || 'https://xiptvplay.onrender.com').replace(/\\/$/, '')
+  ? (import.meta.env.VITE_API_BASE_URL || 'https://xiptvplay.onrender.com').replace(/[/]$/, '')
   : '';
 export const apiUrl = (path: string) => path.startsWith('/api/') ? tvApiBase + path : path;
 
