@@ -33,7 +33,7 @@ export function ProfileAppearanceSettings({configuration,onSave}:{configuration:
  const save=async()=>{
   setBusy(true);setError('');
   try{
-   let next={...configuration,profiles:configuration.profiles.map(q=>q.id===id?{...q,name:name.trim()||q.name,icon}:q)};
+   let next:FamilyConfiguration={...configuration,profiles:configuration.profiles.map(q=>q.id===id?{...q,name:name.trim()||q.name,icon}:q)};
    if(p.id!=='parent'&&p.kind==='adult'&&(removePin||pin))next=await FamilyProfilesService.setProfilePin(next,id,removePin?'':pin);
    DeviceProfileAccess.write(prefs);
    // Preferences belong only to this phone; they are not part of Drive snapshots.
