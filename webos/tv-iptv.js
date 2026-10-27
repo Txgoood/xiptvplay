@@ -260,7 +260,7 @@
         catalogData=catalog;
         window.XIPTVTV.catalogReady();
         hide(login);show(browser);
-        chooseMode('live');
+        chooseMode(window.XIPTVTV.startMode||'live');
       });
     });
   };
