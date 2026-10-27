@@ -6,12 +6,12 @@ const html=fs.readFileSync('webos-package/index.html','utf8');
 const match=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(match,'inline legacy script is missing');
 assert(!html.includes('type="module"'),'webOS 2 must not use JS modules');
-assert(html.includes('v0.2.9'),'wrong TV build version');
+assert(html.includes('v0.3.0'),'wrong TV build version');
 const metadata=JSON.parse(fs.readFileSync('webos-package/appinfo.json','utf8'));
 assert.equal(metadata.trustLevel,'netcast');
 assert.equal(metadata.vendorExtension?.allowCrossDomain,true);
 const elements={},handlers={};
-const ids=['system','local','remote','network','stop','proxy','hls','mp4src','blob','video','status','events'];
+const ids=['system','local','remote','network','stop','proxy','hls','mp4src','blob','mdn','w3','video','status','events'];
 const document={
   activeElement:null,
   getElementById(id){return elements[id];},
@@ -82,6 +82,8 @@ blobRequest.response={size:123456,type:'video/mp4'};
 blobRequest.onload();
 assert.equal(elements.video.src,'blob:fake-local');
 assert.equal(playCount,6);
+elements.mdn.onclick();assert.match(elements.video.src,/mozilla\\.net\\/media/);assert.equal(playCount,7);
+elements.w3.onclick();assert.match(elements.video.src,/w3schools\\.com\\/html/);assert.equal(playCount,8);
 elements.stop.onclick();
 assert.equal(sources.length,0);
 assert.equal(elements.video.src,'');
