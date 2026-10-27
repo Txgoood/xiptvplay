@@ -100,7 +100,20 @@
       e.preventDefault();e.stopImmediatePropagation();
     }
   },true);
-  launcher.onclick=function(){show(panel);show(login);hide(browser);document.getElementById('iptv-server').focus();};
+  launcher.onclick=function(){
+    show(panel);show(login);hide(browser);
+    if(hydrate()){say('Kayıtlı Xtream bağlantısı bulundu. Otomatik bağlanılıyor...');document.getElementById('iptv-connect').click();}
+    else{document.getElementById('iptv-server').focus();}
+  };
+  document.getElementById('iptv-forget').onclick=function(){
+    try{localStorage.removeItem(SAVE_KEY);}catch(e){}
+    document.getElementById('iptv-server').value='';
+    document.getElementById('iptv-user').value='';
+    document.getElementById('iptv-pass').value='';
+    document.getElementById('iptv-remember').checked=false;
+    server='';username='';password='';categoryList=[];channelList=[];
+    hide(browser);show(login);say('Bu TV’deki kayıtlı giriş bilgileri temizlendi.');
+  };
   document.getElementById('iptv-hide').onclick=function(){hide(panel);launcher.focus();};
   document.getElementById('iptv-connect').onclick=function(){
     server=document.getElementById('iptv-server').value.trim().replace(/\/+$/,'');
@@ -112,6 +125,7 @@
     request('/api/iptv/xtream/verify',{serverUrl:server,username:username,password:password},function(err,data){
       if(err||!data.success){say('Doğrulama başarısız: '+(err?err.message:data.error||'Hesap reddedildi'));return;}
       server=data.effectiveServerUrl||server;
+      persistCredentials();
       say('Bağlantı başarılı, canlı TV kataloğu alınıyor...');
       request('/api/iptv/xtream/catalog',{serverUrl:server,username:username,password:password},function(error,catalog){
         if(error){say('Katalog hatası: '+error.message);return;}
