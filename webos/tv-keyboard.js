@@ -1,50 +1,68 @@
-/* webOS 2 Magic Remote fallback: app-operated keyboard when LG keyboard does not appear. */
+/* webOS 2 / Magic Remote: large ES5 keyboard with shortcuts and case toggle. */
 (function(){
 var box=document.getElementById('iptv-keyboard'),keys=document.getElementById('iptv-keys'),display=document.getElementById('iptv-keyboard-title');
-var target=null,upper=false,selection=0,buttons=[];
-var alphabet='1234567890qwertyuiopasdfghjklzxcvbnm';
-var special=['.',':','/','-','_','@','?','&','=','%','+','!'];
+var target=null,upper=false,selection=0,buttons=[],cols=10;
+var names=['iptv-server','iptv-user','iptv-pass'];
+var lines=['1234567890','qwertyuiop','asdfghjkl','zxcvbnm'];
+var extra=['http://','https://','www.','.com','.net','.xyz',':8080','.',':','/','-','_','@','!','?','&','=','%','+','BOŞLUK','SİL','TÜMÜNÜ SİL','ABC ⇄ abc','SONRAKİ ALAN','TAMAM'];
 function visible(){return box.style.display!=='none';}
-function paint(){
- while(keys.firstChild)keys.removeChild(keys.firstChild);buttons=[];
- var seq=alphabet.split('').concat(special).concat(['BOŞLUK','SİL','TEMİZLE','BÜYÜK/küçük','TAMAM']);
- for(var i=0;i<seq.length;i++){
-  (function(t){var b=document.createElement('button');b.type='button';
-   b.textContent=(upper&&t.length===1?t.toUpperCase():t);
-   b.onclick=function(){press(t);};keys.appendChild(b);buttons.push(b);
-  })(seq[i]);
- }
- selection=0;choose(0);
+function title(){
+ var name=target.id==='iptv-server'?'Sunucu':target.id==='iptv-user'?'Kullanıcı':'Şifre';
+ var value=target.id==='iptv-pass'?new Array(target.value.length+1).join('●'):target.value;
+ display.textContent=name+' | '+(upper?'BÜYÜK HARF':'küçük harf')+' | '+value;
 }
-function choose(i){if(!buttons.length)return;selection=(i+buttons.length)%buttons.length;for(var n=0;n<buttons.length;n++)buttons[n].className=n===selection?'active':'';buttons[selection].focus();}
-function press(c){
+function focusAt(n){
+ if(!buttons.length)return;
+ selection=(n+buttons.length)%buttons.length;
+ for(var i=0;i<buttons.length;i++)buttons[i].className=i===selection?'active':'';
+ buttons[selection].focus();
+ buttons[selection].scrollIntoView(false);
+}
+function append(label,value){
+ var b=document.createElement('button');b.type='button';
+ b.textContent=label;b.style.cssText='min-width:67px;margin:4px;padding:10px;font-size:20px';
+ b.onclick=function(){press(value);};keys.appendChild(b);buttons.push(b);
+}
+function paint(keep){
+ while(keys.firstChild)keys.removeChild(keys.firstChild);
+ buttons=[];
+ for(var i=0;i<lines.length;i++)for(var j=0;j<lines[i].length;j++){
+   var c=lines[i].charAt(j);
+   append(upper?c.toUpperCase():c,c);
+ }
+ for(var n=0;n<extra.length;n++)append(extra[n],extra[n]);
+ focusAt(keep?selection:0);title();
+}
+function write(v){target.value+=v;title();}
+function press(v){
  if(!target)return;
- if(c==='TAMAM'){box.style.display='none';target.focus();return;}
- if(c==='BÜYÜK/küçük'){upper=!upper;paint();return;}
- if(c==='SİL'){target.value=target.value.slice(0,-1);}
- else if(c==='TEMİZLE'){target.value='';}
- else{target.value+=(c==='BOŞLUK'?' ':upper?c.toUpperCase():c);}
- display.textContent='Yazılıyor: '+(target.id==='iptv-pass'?new Array(target.value.length+1).join('*'):target.value);
- choose(selection);
+ if(v==='TAMAM'){box.style.display='none';target.focus();return;}
+ if(v==='ABC ⇄ abc'){upper=!upper;paint(true);return;}
+ if(v==='SONRAKİ ALAN'){
+   var n=names.indexOf(target.id);open(names[(n+1)%names.length]);return;
+ }
+ if(v==='SİL')target.value=target.value.slice(0,-1);
+ else if(v==='TÜMÜNÜ SİL')target.value='';
+ else write(v==='BOŞLUK'?' ':v.length===1&&upper?v.toUpperCase():v);
+ title();
+ focusAt(selection);
 }
 function open(id){
  target=document.getElementById(id);if(!target)return;
- box.style.display='block';upper=false;
- display.textContent='Yazılıyor: '+(id==='iptv-pass'?new Array(target.value.length+1).join('*'):target.value);
- paint();
+ box.style.display='block';selection=0;paint(false);
 }
-var names=['iptv-server','iptv-user','iptv-pass'];
 for(var i=0;i<names.length;i++){
- (function(id){var trigger=document.getElementById(id+'-keyboard');trigger.onclick=function(){open(id);};})(names[i]);
+ (function(id){document.getElementById(id+'-keyboard').onclick=function(){open(id);};})(names[i]);
 }
 document.addEventListener('keydown',function(e){
  if(!visible())return;
  var k=e.keyCode||e.which;
  if(k===37||k===38||k===39||k===40){
-  var step=k===37?-1:k===39?1:k===38?-9:9;choose(selection+step);
+   focusAt(selection+(k===37?-1:k===39?1:k===38?-cols:cols));
  }else if(k===13){buttons[selection].click();}
  else if(k===461||k===27){box.style.display='none';}
  else{return;}
- e.preventDefault();if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+ if(e.preventDefault)e.preventDefault();
+ if(e.stopImmediatePropagation)e.stopImmediatePropagation();
 },true);
 })();
