@@ -29,6 +29,8 @@ jobs:
           test -s webos-package/appinfo.json
           test -s webos-package/icon.png
           test -s webos-package/tv-remote.js
+          grep -q "Eski televizyonlar" webos-package/index.html
+          if grep -q 'type="module"' webos-package/index.html; then echo "Legacy entry must not have ES modules"; exit 1; fi
           node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv') process.exit(1)"
       - name: Install official webOS CLI
         run: npm install -g @webos-tools/cli
