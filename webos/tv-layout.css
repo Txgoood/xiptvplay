@@ -96,3 +96,29 @@ body.tv-mode #tv-filter-panel button{background:#202d33;border:1px solid #40707c
 body.tv-mode #tv-episodes,body.tv-mode #tv-controls,body.tv-mode #iptv-login{background:#191c22;border:1px solid #365d68;border-radius:10px;color:#f0f3f4}
 body.tv-mode #tv-episodes-list button{background:#252a30;border:1px solid #38434c;border-radius:8px;color:white}
 body.tv-mode button:focus,body.tv-mode select:focus,body.tv-mode input:focus{outline:3px solid #00f0ff;outline-offset:1px}
+
+/* Poster tiles: compatible with webOS 2 WebKit and the existing hardware video. */
+body.tv-mode #iptv-channels.tv-poster-list{font-size:0;text-align:left}
+body.tv-mode #iptv-channels.tv-poster-list>button{
+ display:inline-block!important;vertical-align:top;position:relative;
+ width:46%!important;height:210px!important;min-height:210px;
+ margin:1% 2%!important;padding:0!important;white-space:normal!important;
+ overflow:hidden!important;text-align:left;background:#1e242b!important;
+ border:2px solid #36434a!important;border-radius:10px!important;
+}
+body.tv-mode #iptv-channels.tv-poster-list>button img{
+ display:block;width:100%;height:164px;object-fit:cover;
+}
+body.tv-mode #iptv-channels.tv-poster-list>button .tv-card-title{
+ display:block;position:absolute;bottom:0;left:0;right:0;
+ height:42px;padding:5px 7px;box-sizing:border-box;
+ background:#1b2027;color:#f0f5f6;font-size:14px;
+ white-space:normal;overflow:hidden;line-height:17px
+}
+body.tv-mode #iptv-channels.tv-poster-list .tv-poster-placeholder{
+ display:block;height:164px;text-align:center;line-height:164px;
+ background:#24313a;color:#00f0ff;font-size:22px;font-weight:bold
+}
+body.tv-mode #iptv-channels.tv-poster-list>button:focus{
+ border-color:#00f0ff!important;outline:2px solid #00f0ff!important
+}
