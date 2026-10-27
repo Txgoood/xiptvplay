@@ -23,6 +23,13 @@ jobs:
         run: VITE_WEBOS_TV=true VITE_API_BASE_URL=https://xiptvplay.onrender.com npm run build
       - name: Prepare webOS application
         run: node webos/build.mjs
+      - name: Static TV package checks
+        run: |
+          test -s webos-package/index.html
+          test -s webos-package/appinfo.json
+          test -s webos-package/icon.png
+          test -s webos-package/tv-remote.js
+          node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv') process.exit(1)"
       - name: Install official webOS CLI
         run: npm install -g @webos-tools/cli
       - name: Package IPK
