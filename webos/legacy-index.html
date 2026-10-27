@@ -1,21 +1,24 @@
 <!doctype html>
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>XIPTV Play TV</title>
-<style>html,body{margin:0;background:#111820;color:#effaff;font-family:Arial,sans-serif}main{padding:5%;}h1{color:#00dfef;font-size:42px}p{font-size:24px;line-height:1.5}button,input{font-size:25px;padding:16px;margin:12px 8px 12px 0;background:#1b2935;color:white;border:2px solid #4d7485}button:focus,input:focus{outline:5px solid #00f0ff}#video{width:80%;max-height:52vh;background:black}#status{color:#ffe092}small{font-size:18px;color:#bcd}</style></head><body>
-<main><h1>XIPTV Play — LG webOS 2</h1><p>Eski televizyonlar için uyumluluk testi (v0.2.0)</p>
+<style>html,body{margin:0;background:#111820;color:#effaff;font-family:Arial,sans-serif}main{padding:5%;}h1{color:#00dfef;font-size:42px}p{font-size:24px;line-height:1.5}button,input{font-size:25px;padding:16px;margin:12px 8px 12px 0;background:#1b2935;color:white;border:2px solid #4d7485}button:focus,input:focus,.selected{outline:5px solid #00f0ff;background:#285568}#video{width:80%;max-height:52vh;background:black}#status{color:#ffe092}small{font-size:18px;color:#bcd}</style></head><body>
+<main><h1>XIPTV Play — LG webOS 2</h1><p>Eski televizyonlar için uyumluluk testi (v0.2.1)</p>
 <p id="status">Açılış başarılı: JavaScript kontrol ediliyor...</p>
 <button id="check">Sistem Kontrolü</button><button id="play">Video Testi</button><button id="stop">Durdur</button>
 <p><small>Bu tanılama sürümü henüz playlist ve profil içermez. Video Testi halka açık örnek MP4 kullanır. İnternet gereklidir.</small></p>
 <video id="video" controls playsinline></video><p id="detail"></p></main>
 <script>
 (function(){
-var status=document.getElementById('status'),detail=document.getElementById('detail'),video=document.getElementById('video');
+var status=document.getElementById('status'),detail=document.getElementById('detail'),video=document.getElementById('video');var buttons=[document.getElementById('check'),document.getElementById('play'),document.getElementById('stop')],selected=0;function focusButton(n){selected=(n+buttons.length)%buttons.length;for(var i=0;i<buttons.length;i++){buttons[i].className=i===selected?'selected':'';}if(document.activeElement!==buttons[selected])buttons[selected].focus();}
 function show(s){status.innerHTML=s;}
 function check(){var x=window.XMLHttpRequest?'EVET':'HAYIR',m=video.canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');show('Arayüz: OK | XMLHttpRequest: '+x+' | MP4/H.264: '+(m||'belirsiz')+' | Kullanıcı aracı: '+navigator.userAgent);}
 document.getElementById('check').onclick=check;
 document.getElementById('play').onclick=function(){detail.innerHTML='Video testi başlıyor...';video.src='https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';try{video.load();var p=video.play();if(p&&p.catch)p.catch(function(e){detail.innerHTML='Oynatma hatası: '+e.message;});}catch(e){detail.innerHTML='Oynatma hatası: '+e.message;}};
 document.getElementById('stop').onclick=function(){video.pause();video.removeAttribute('src');video.load();detail.innerHTML='Durduruldu';};
 video.onerror=function(){detail.innerHTML='Video hata kodu: '+(video.error?video.error.code:'bilinmiyor');};
-document.addEventListener('keydown',function(e){if(e.keyCode===461||e.keyCode===27){video.pause();}});
+document.addEventListener('keydown',function(e){var k=e.keyCode||e.which;detail.innerHTML='Kumanda tuş kodu: '+k;if(k===37||k===38||k===39||k===40){focusButton(selected+((k===37||k===38)?-1:1));e.preventDefault();}else if(k===13||k===16777220){if(document.activeElement===video)return;buttons[selected].click();e.preventDefault();}else if(k===461||k===27){video.pause();detail.innerHTML='Geri tuşu algılandı';e.preventDefault();}},false);
+for(var i=0;i<buttons.length;i++){(function(n){buttons[n].onclick=(function(original){return function(){focusButton(n);original();};})(buttons[n].onclick);buttons[n].onfocus=function(){focusButton(n);};})(i);}
+document.addEventListener('click',function(e){detail.setAttribute('data-last-pointer','ok');},false);
+focusButton(0);
 check();
 })();
 </script></body></html>
