@@ -12,6 +12,22 @@
   var channels=document.getElementById('iptv-channels');
   var categoryList=[], channelList=[], selectedCategory='all';
   var server='',username='',password='';
+  var SAVE_KEY='xiptv_webos2_xtream_local_v1';
+  function savedCredentials(){try{return JSON.parse(localStorage.getItem(SAVE_KEY)||'null');}catch(e){return null;}}
+  function persistCredentials(){try{
+    if(document.getElementById('iptv-remember').checked){
+      localStorage.setItem(SAVE_KEY,JSON.stringify({server:server,username:username,password:password}));
+    }else{localStorage.removeItem(SAVE_KEY);}
+  }catch(e){say('TV hafızasına kaydedilemedi: '+e.message);}}
+  function hydrate(){
+    var c=savedCredentials();if(!c)return false;
+    document.getElementById('iptv-server').value=c.server||'';
+    document.getElementById('iptv-user').value=c.username||'';
+    document.getElementById('iptv-pass').value=c.password||'';
+    document.getElementById('iptv-remember').checked=true;
+    return !!(c.server&&c.username&&c.password);
+  }
+
   var video=document.getElementById('video');
   function say(t){msg.textContent=t;}
   function show(el){el.style.display='block';}
