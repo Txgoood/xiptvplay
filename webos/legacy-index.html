@@ -29,6 +29,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
   <button id="tv-nav-fav" type="button"><svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M20.8 8.5c0 4.2-8.8 10.5-8.8 10.5S3.2 12.7 3.2 8.5a4.5 4.5 0 0 1 8.8-1.2 4.5 4.5 0 0 1 8.8 1.2z"/></svg></button>
   <button id="tv-nav-search" type="button"><svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button>
   <button id="tv-nav-profile" type="button"><svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-5 16-5 16 0"/></svg></button>
+<button id="tv-nav-settings" type="button" title="Ayarlar" aria-label="Ayarlar"><svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M10 2h4l1 3 3 1 3-1 2 4-2 2v3l2 2-2 4-3-1-3 1-1 3h-4l-1-3-3-1-3 1-2-4 2-2v-3l-2-2 2-4 3 1 3-1z"/></svg></button>
 </div>
 <div class="stitch-main">
 <header class="stitch-top"><strong>XIPTV Play</strong><span class="stitch-top-meta">● Bağlı &nbsp;&nbsp; LG webOS TV</span><span class="stitch-avatar">TV</span></header>
@@ -66,7 +67,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <button id="iptv-open" type="button">Canlı TV (Xtream)</button>
 </div>
 <section id="iptv-panel" style="display:none;background:#1c2b38;padding:20px;margin:16px 0;border:2px solid #497082">
-<button id="iptv-hide" type="button">TV Menüsünü Kapat</button>
+<div id="tv-settings-panel" style="display:none"><h2>Ayarlar</h2><button id="tv-settings-close" type="button">Kapat</button><button id="tv-settings-player" type="button">Oynatıcı Ayarları</button><button id="tv-settings-profiles" type="button">Profiller</button><button id="tv-settings-connection" type="button">Bağlantı Ayarları</button><button id="tv-settings-diagnostics" type="button">Geliştirici Araçları</button></div><button id="iptv-hide" type="button" style="display:none">TV Menüsünü Kapat</button>
 <div id="iptv-login">
 <p>Xtream Codes bağlantısı — bilgiler yalnızca bu oturumda tutulur.</p>
 <p><label>Sunucu adresi <input id="iptv-server" type="url" placeholder="http://sunucu:port" autocomplete="off" style="font-size:22px;padding:10px;width:55%" /> <button id="iptv-server-keyboard" type="button">Klavye Aç</button></label></p>
