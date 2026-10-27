@@ -441,12 +441,33 @@ export default function App() {
         const verify=await withDeadline(XtreamClientService.verifyConnection(target.serverUrl,target.username,target.password),35000);
         if(!verify.success)
           throw Error('IPTV bağlantısı doğrulanamadı: '+(verify.error || 'Sunucu yanıt vermedi.'));
-        const result=await withDeadline(XtreamClientService.fetchCatalog(
+        const persistedCatalog = await StorageService.loadPlaylistItemsPersistent(id);
+        let retainedCatalog = StorageService.getPlaylistItems(id);
+        if(persistedCatalog && persistedCatalog.length > retainedCatalog.length) retainedCatalog = persistedCatalog;
+        const result=await XtreamClientService.fetchCatalog(
           verify.effectiveServerUrl||target.serverUrl,target.username,target.password,target.id,
           stage => {
             catalogStage = stage;
-            setPlaylists(prev=>prev.map(p=>p.id===id?{...p,statusLabel:stage+' indiriliyor...'}:p));
-          }),420000);
+            setPlaylists(prev=>prev.map(p=>p.id===id?{...p,statusLabel:stage+' alınıyor...'}:p));
+          },
+          (type, sectionItems) => {
+            if(!StorageService.getPlaylists().some(p=>p.id===id))return;
+            const previous = retainedCatalog;
+            const merged = [...previous.filter(item=>item.type!==type), ...sectionItems];
+            retainedCatalog = merged;
+            StorageService.savePlaylistItems(id,merged);
+            const sectionCounts = {
+              liveCount: merged.filter(item=>item.type==='live').length,
+              movieCount: merged.filter(item=>item.type==='movie').length,
+              seriesCount: merged.filter(item=>item.type==='series').length
+            };
+            setPlaylists(prev=>prev.map(p=>p.id===id?{...p,...sectionCounts,isCached:true}:p));
+            if(isSelected()){
+              setCatalogItems(merged);
+              setIsCatalogLoading(false);
+              setActivePlaylist(prev=>prev?.id===id?{...prev,...sectionCounts,isCached:true}:prev);
+            }
+          });
         items=result.items;counts=result.counts;
         workingServer=result.workingServer || verify.effectiveServerUrl || target.serverUrl;
         expiryDays=verify.expiryDays??expiryDays;

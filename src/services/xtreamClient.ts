@@ -23,6 +23,7 @@ export interface XtreamCatalogResult {
 }
 
 export class XtreamClientService {
+  private static partialCatalogs = new Map<string, Record<string, any>>();
   /**
    * Normalizes an IPTV URL ensuring a protocol exists and removing trailing slashes.
    */
@@ -155,14 +156,15 @@ export class XtreamClientService {
     username: string,
     password: string,
     playlistId: string,
-    onProgress?: (stage: string) => void
+    onProgress?: (stage: string) => void,
+    onSection?: (type: 'live' | 'movie' | 'series', items: MediaItem[]) => void
   ): Promise<XtreamCatalogResult> {
     const cleanUrl = this.normalizeServerUrl(serverUrl);
 
     if (isNative()) {
       try {
-        const fetchNativeAction = async (action: string): Promise<any[]> => {
-          const url = `${cleanUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=${action}`;
+        const fetchNativeAction = async (action: string, categoryId?: string): Promise<any[]> => {
+          const url = `${cleanUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=${action}${categoryId === undefined ? '' : '&category_id=' + encodeURIComponent(categoryId)}`;
           const labels: Record<string, string> = {
             get_live_categories: 'Canlı TV kategorileri',
             get_live_streams: 'Canlı TV listesi',
@@ -186,24 +188,52 @@ export class XtreamClientService {
           throw new Error(`IPTV sunucusu ${action} için beklenmeyen veri döndürdü.`);
         };
 
-        // 70k+ IPTV archives may exhaust the Android WebView bridge when all six
-        // large JSON responses are transferred simultaneously. Read one by one.
-        const liveCategories = await fetchNativeAction('get_live_categories');
-        const liveStreams = await fetchNativeAction('get_live_streams');
-        const vodCategories = await fetchNativeAction('get_vod_categories');
-        const vodStreams = await fetchNativeAction('get_vod_streams');
-        const seriesCategories = await fetchNativeAction('get_series_categories');
-        const seriesList = await fetchNativeAction('get_series');
-
-        const data = {
-          liveCategories,
-          liveStreams,
-          vodCategories,
-          vodStreams,
-          seriesCategories,
-          seriesList,
-          workingServer: cleanUrl,
-        };
+        const cacheKey = JSON.stringify([playlistId, cleanUrl, username, password]);
+        const data: Record<string, any> = this.partialCatalogs.get(cacheKey) || {};
+        this.partialCatalogs.set(cacheKey, data);
+        const errors: string[] = [];
+        const sections = [
+          { type: 'live', categories: 'liveCategories', list: 'liveStreams', catAction: 'get_live_categories', action: 'get_live_streams' },
+          { type: 'movie', categories: 'vodCategories', list: 'vodStreams', catAction: 'get_vod_categories', action: 'get_vod_streams' },
+          { type: 'series', categories: 'seriesCategories', list: 'seriesList', catAction: 'get_series_categories', action: 'get_series' },
+        ] as const;
+        for (const section of sections) {
+          try {
+            if (!data[section.list]) {
+              const categories = await fetchNativeAction(section.catAction);
+              let entries: any[];
+              if (section.type !== 'live' && categories.length) {
+                // Keep each bridge response small on older Android devices.
+                const combined = new Map<string, any>();
+                const deadline = Date.now() + 180000;
+                for (const category of categories) {
+                  if (Date.now() > deadline) throw new Error('Kategori listeleri için süre sınırı aşıldı; tekrar deneyin.');
+                  const id = String(category.category_id ?? '');
+                  if (!id) throw new Error('Sunucu geçersiz kategori kimliği döndürdü.');
+                  const batch = await fetchNativeAction(section.action, id);
+                  for (const entry of batch) {
+                    const key = entry.stream_id ?? entry.series_id;
+                    if (key == null) throw new Error('Sunucu eksik içerik kimliği döndürdü.');
+                    combined.set(String(key), entry);
+                  }
+                }
+                entries = [...combined.values()];
+              } else {
+                entries = await fetchNativeAction(section.action);
+              }
+              if (!entries.length) throw new Error('Sunucu boş içerik listesi döndürdü; mevcut kayıtlar korundu.');
+              data[section.categories] = categories;
+              data[section.list] = entries;
+            }
+            const sectionData = { [section.categories]: data[section.categories], [section.list]: data[section.list] };
+            const parsed = this.processCatalogData(sectionData, cleanUrl, username, password, playlistId);
+            onSection?.(section.type, parsed.items);
+          } catch (error: any) {
+            errors.push(section.type + ': ' + (error?.message || 'Liste alınamadı.'));
+          }
+        }
+        if (errors.length) throw new Error(errors.join(' | '));
+        this.partialCatalogs.delete(cacheKey);
         return this.processCatalogData(data, cleanUrl, username, password, playlistId);
       } catch (err: any) {
         console.warn('[XtreamClient] Native catalog fetch failed:', err?.message || 'unknown');
