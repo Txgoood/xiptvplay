@@ -76,7 +76,7 @@ export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
    : <div className="bg-[#26333a] p-3 rounded-xl text-sm">
       <p className="font-bold text-[#00f0ff]">✓ {session.email}</p>
       <p className="text-[11px] text-[#b9cacb]">Kalıcı eşitleme açıksa bağlantı yeniden açılışta otomatik yenilenir.</p>
-      <button disabled={busy||syncStatus.busy||syncStatus.restoring} onClick={async()=>{try{await CloudSyncController.stop();await CloudDriveService.disconnect();setSession(null);setPassword('');setRemoteExists(null);}catch(e:any){setMessage(e.message);}} className="mt-2 px-3 py-1.5 rounded-lg bg-white/10 text-xs">Bağlantıyı Kes</button>
+      <button disabled={busy||syncStatus.busy||syncStatus.restoring} onClick={async()=>{try{await CloudSyncController.stop();await CloudDriveService.disconnect();setSession(null);setPassword('');setRemoteExists(null);}catch(e:any){setMessage(e.message);}}} className="mt-2 px-3 py-1.5 rounded-lg bg-white/10 text-xs">Bağlantıyı Kes</button>
     </div>}
    {session&&<div className="space-y-3">
     <label className="block text-sm"><LockKeyhole className="w-4 h-4 inline mr-1"/> Şifreli yedek parolası
@@ -92,7 +92,7 @@ export const CloudBackupModal:React.FC<Props>=({onClose,onRestored})=>{
         <p className="text-xs text-green-300">● Otomatik eşitleme açık{syncStatus.lastSync?' · Son: '+new Date(syncStatus.lastSync).toLocaleString('tr-TR'):''}</p>
         <div className="grid grid-cols-2 gap-2">
           <button type="button" disabled={syncStatus.busy||syncStatus.restoring} onClick={()=>void CloudSyncController.now()} className="rounded-lg bg-[#00f0ff] p-2.5 text-black text-xs font-bold">Şimdi Eşitle</button>
-          <button type="button" disabled={syncStatus.busy||syncStatus.restoring} onClick={async()=>{try{await CloudSyncController.stop();setSyncStatus(CloudSyncController.status());setMessage('Otomatik eşitleme kapatıldı; güvenli kayıt bu telefondan kaldırıldı.');}catch(e:any){setMessage(e.message);}} className="rounded-lg bg-white/10 p-2.5 text-xs">Otomatiği Kapat</button>
+          <button type="button" disabled={syncStatus.busy||syncStatus.restoring} onClick={async()=>{try{await CloudSyncController.stop();setSyncStatus(CloudSyncController.status());setMessage('Otomatik eşitleme kapatıldı; güvenli kayıt bu telefondan kaldırıldı.');}catch(e:any){setMessage(e.message);}}} className="rounded-lg bg-white/10 p-2.5 text-xs">Otomatiği Kapat</button>
         </div>
       </> : <button type="button" disabled={busy||mismatch} onClick={enableAutoSync} className="w-full rounded-lg bg-[#00f0ff] p-3 font-bold text-black disabled:opacity-40">Otomatik Eşitlemeyi Aç</button>}
       {syncStatus.lastError&&<p className="text-xs text-[#ffb4ab]">⚠️ {syncStatus.lastError}</p>}
