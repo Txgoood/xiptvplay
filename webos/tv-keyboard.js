@@ -2,13 +2,13 @@
 (function(){
 var box=document.getElementById('iptv-keyboard'),keys=document.getElementById('iptv-keys'),display=document.getElementById('iptv-keyboard-title');
 var target=null,upper=false,selection=0,buttons=[],cols=10;
-var names=['iptv-server','iptv-user','iptv-pass'];
+var names=['iptv-server','iptv-user','iptv-pass','tv-search','tv-profile-name','tv-profile-pin'];
 var lines=['1234567890','qwertyuiop','asdfghjkl','zxcvbnm'];
 var extra=['http://','https://','www.','.com','.net','.xyz',':8080','.',':','/','-','_','@','!','?','&','=','%','+','BOŞLUK','SİL','TÜMÜNÜ SİL','ABC ⇄ abc','SONRAKİ ALAN','TAMAM'];
 function visible(){return box.style.display!=='none';}
 function title(){
- var name=target.id==='iptv-server'?'Sunucu':target.id==='iptv-user'?'Kullanıcı':'Şifre';
- var value=target.id==='iptv-pass'?new Array(target.value.length+1).join('●'):target.value;
+ var name=target.id==='iptv-server'?'Sunucu':target.id==='iptv-user'?'Kullanıcı':target.id==='iptv-pass'?'Şifre':target.id==='tv-search'?'Arama':target.id==='tv-profile-name'?'Profil Adı':'PIN';
+ var value=target.type==='password'?new Array(target.value.length+1).join('●'):target.value;
  display.textContent=name+' | '+(upper?'BÜYÜK HARF':'küçük harf')+' | '+value;
 }
 function focusAt(n){
@@ -33,7 +33,8 @@ function paint(keep){
  for(var n=0;n<extra.length;n++)append(extra[n],extra[n]);
  focusAt(keep?selection:0);title();
 }
-function write(v){target.value+=v;title();}
+function notify(){try{var e=document.createEvent('Event');e.initEvent('input',true,true);target.dispatchEvent(e);}catch(x){if(target.onkeyup)target.onkeyup();}}
+function write(v){target.value+=v;notify();title();}
 function press(v){
  if(!target)return;
  if(v==='TAMAM'){box.style.display='none';target.focus();return;}
@@ -41,8 +42,8 @@ function press(v){
  if(v==='SONRAKİ ALAN'){
    var n=names.indexOf(target.id);open(names[(n+1)%names.length]);return;
  }
- if(v==='SİL')target.value=target.value.slice(0,-1);
- else if(v==='TÜMÜNÜ SİL')target.value='';
+ if(v==='SİL'){target.value=target.value.slice(0,-1);notify();}
+ else if(v==='TÜMÜNÜ SİL'){target.value='';notify();}
  else write(v==='BOŞLUK'?' ':v.length===1&&upper?v.toUpperCase():v);
  title();
  focusAt(selection);
@@ -52,7 +53,10 @@ function open(id){
  box.style.display='block';selection=0;paint(false);
 }
 for(var i=0;i<names.length;i++){
- (function(id){document.getElementById(id+'-keyboard').onclick=function(){open(id);};})(names[i]);
+ (function(id){var el=document.getElementById(id);if(!el)return;
+ var trigger=document.getElementById(id+'-keyboard');if(trigger)trigger.onclick=function(){open(id);};
+ el.addEventListener('click',function(){open(id);},false);
+ })(names[i]);
 }
 document.addEventListener('keydown',function(e){
  if(!visible())return;
