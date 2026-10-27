@@ -114,6 +114,8 @@
     var query=(document.getElementById('tv-search').value||'').toLowerCase();
     var sorting=document.getElementById('tv-sort').value;
     var list=channelList.slice(0);
+    var categoryNames={};for(var ca=0;ca<categoryList.length;ca++)categoryNames[String(categoryList[ca].category_id)]=String(categoryList[ca].category_name||'');
+    var batch=document.createDocumentFragment();
     if(sorting==='az')list.sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});
     if(sorting==='za')list.sort(function(a,b){return String(b.name||'').localeCompare(String(a.name||''));});
     for(var i=0;i<list.length;i++){
@@ -121,8 +123,7 @@
       if(selectedCategory!=='all' && String(ch.category_id)!==selectedCategory)continue;
       if(query&&String(ch.name||ch.title||'').toLowerCase().indexOf(query)<0)continue;
       if(!window.XIPTVTV.filterFavorite(mode,ch))continue;
-      var catLabel='';
-      for(var ci=0;ci<categoryList.length;ci++)if(String(categoryList[ci].category_id)===String(ch.category_id)){catLabel=String(categoryList[ci].category_name||'');break;}
+      var catLabel=categoryNames[String(ch.category_id)]||'';
       if(document.getElementById('tv-tr-only').checked && catLabel.toUpperCase().indexOf('TR')!==0)continue;
       if(document.getElementById('tv-hide-adult').checked && /^(XXX|18\+|ADULT|🔞|❤)/i.test(catLabel))continue;
       (function(item){
@@ -152,8 +153,10 @@
         }
         window.XIPTVTV.decorateItem(line,mode,item);
       })(ch);count++;
+      if(channels.lastChild)batch.appendChild(channels.lastChild);
       if(count>=350)break;
     }
+    channels.appendChild(batch);
     say(count+' kanal listelendi'+(count===350?' (ilk 350)':'')+'. Kumandayla veya işaretçiyle seçim yap.');
   }
   function renderCategories(){
