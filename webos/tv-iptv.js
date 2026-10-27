@@ -98,6 +98,7 @@
     var suffix=ext|| (kind==='live'?'m3u8':'mp4');
     var url=server.replace(/\/$/,'')+'/'+kind+'/'+encodeURIComponent(username)+'/'+encodeURIComponent(password)+'/'+encodeURIComponent(id)+'.'+suffix;
     document.getElementById('tv-now-playing').textContent=String(name||'Video');
+    window.XIPTVTV.beforePlay(kind,id,url,name);
     try{
       video.pause();video.removeAttribute('src');
       while(video.firstChild)video.removeChild(video.firstChild);
@@ -108,15 +109,22 @@
   function renderChannels(){
     clear(channels);
     var count=0;
-    for(var i=0;i<channelList.length;i++){
-      var ch=channelList[i];
+    var query=(document.getElementById('tv-search').value||'').toLowerCase();
+    var sorting=document.getElementById('tv-sort').value;
+    var list=channelList.slice(0);
+    if(sorting==='az')list.sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});
+    if(sorting==='za')list.sort(function(a,b){return String(b.name||'').localeCompare(String(a.name||''));});
+    for(var i=0;i<list.length;i++){
+      var ch=list[i];
       if(selectedCategory!=='all' && String(ch.category_id)!==selectedCategory)continue;
+      if(query&&String(ch.name||ch.title||'').toLowerCase().indexOf(query)<0)continue;
       (function(item){
-        action(channels,(count+1)+'. '+String(item.name||item.title||'İsimsiz'),function(){
+        var line=action(channels,(count+1)+'. '+String(item.name||item.title||'İsimsiz'),function(){
           if(mode==='live')playChannel(item);
           else if(mode==='movie')playStream('movie',item.stream_id,String(item.container_extension||'mp4').replace(/[^a-zA-Z0-9]/g,''),item.name);
           else showSeries(item);
         });
+        window.XIPTVTV.decorateItem(line,mode,item);
       })(ch);count++;
       if(count>=350)break;
     }
@@ -143,6 +151,9 @@
     if(!lastLive){say('Önce bir canlı kanal seç.');return;}
     playStream('live',lastLive.stream_id,'m3u8',lastLive.name);
   };
+  document.getElementById('tv-search').onkeyup=renderChannels;
+  document.getElementById('tv-sort').onchange=renderChannels;
+  window.XIPTVTV.refresh=renderChannels;
   document.getElementById('tv-tab-live').onclick=function(){chooseMode('live');};
   document.getElementById('tv-tab-movie').onclick=function(){chooseMode('movie');};
   document.getElementById('tv-tab-series').onclick=function(){chooseMode('series');};
@@ -220,6 +231,7 @@
       request('/api/iptv/xtream/catalog',{serverUrl:server,username:username,password:password},function(error,catalog){
         if(error){say('Katalog hatası: '+error.message);return;}
         catalogData=catalog;
+        window.XIPTVTV.catalogReady();
         hide(login);show(browser);
         chooseMode('live');
       });
