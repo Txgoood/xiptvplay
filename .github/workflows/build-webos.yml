@@ -62,12 +62,14 @@ jobs:
           grep -q 'Yerel Video' webos-package/index.html
           grep -q 'sample.mp4' webos-package/index.html
           grep -q 'Proxy MP4' webos-package/index.html
-          grep -q 'HLS Testi' webos-package/index.html
+          grep -q 'HLS Source' webos-package/index.html
+          grep -q 'MP4 Source' webos-package/index.html
+          grep -q 'Blob MP4' webos-package/index.html
           if grep -q 'type="module"' webos-package/index.html; then
             echo "Unsupported modern JavaScript module found in webOS 2 package"
             exit 1
           fi
-          node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv'||f.version!=='0.2.7') process.exit(1)"
+          node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv'||f.version!=='0.2.8') process.exit(1)"
 
       - name: Run remote-control and playback UI smoke tests
         run: node webos/legacy-smoke-test.mjs
