@@ -31,3 +31,18 @@ body.tv-mode #tv-episodes-list button{display:block;width:94%;text-align:left;pa
 
 body.tv-mode #tv-4k-options{position:absolute;right:1%;top:105px;width:43%;height:48px;z-index:4;white-space:nowrap}
 body.tv-mode #tv-4k-options button{font-size:16px;padding:7px 12px;margin:0 10px 0 0}
+
+/* Full-screen playback: legacy webOS 2 WebKit, keep native hardware video element. */
+body.tv-mode #tv-player-controls{position:absolute;right:1%;top:57px;width:43%;height:48px;z-index:9;white-space:nowrap}
+body.tv-mode #tv-player-controls button{font-size:16px;padding:7px 12px;margin:0 8px 0 0}
+body.tv-mode.tv-fullscreen #video{position:fixed!important;left:0!important;right:0!important;top:0!important;bottom:0!important;width:100%!important;height:100%!important;max-height:none!important;margin:0!important;border:0!important;z-index:100!important;object-fit:contain}
+body.tv-mode.tv-fullscreen #tv-player-controls{position:fixed!important;top:10px;right:10px;width:auto;z-index:103;background:rgba(4,14,24,.76);padding:5px}
+body.tv-mode.tv-fullscreen #tv-player-controls button{font-size:19px}
+body.tv-mode.tv-fullscreen #iptv-panel{z-index:auto}
+body.tv-mode.tv-fullscreen #iptv-browser{z-index:auto}
+body.tv-mode.tv-fullscreen #tv-now-playing{display:none}
+body.tv-mode.tv-fullscreen #tv-4k-options{display:none}
+body.tv-mode.tv-fullscreen #iptv-categories,body.tv-mode.tv-fullscreen #iptv-channels{visibility:hidden}
+body.tv-mode.tv-fullscreen #iptv-message{display:none}
+body.tv-mode.tv-fill #video{object-fit:cover;-webkit-transform:scale(1.18);transform:scale(1.18)}
+body.tv-mode.tv-fill.tv-fullscreen #video{-webkit-transform:scale(1.18);transform:scale(1.18)}
