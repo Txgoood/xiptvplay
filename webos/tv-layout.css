@@ -1,0 +1,20 @@
+/* TV dashboard for legacy WebKit 538 / webOS 2: no grid, no CSS variables */
+body.tv-mode{overflow:hidden;background:#101923}
+body.tv-mode main{padding:0!important}
+body.tv-mode h1{position:absolute;top:0;left:0;right:0;height:56px;margin:0;padding:14px 3%;font-size:30px;background:#142536;z-index:4;box-sizing:border-box;border-bottom:2px solid #22a0b6}
+body.tv-mode main>p,body.tv-mode main>button:not(#iptv-open),body.tv-mode #status,body.tv-mode #events{display:none!important}
+body.tv-mode #iptv-open{position:absolute;right:3%;top:6px;z-index:5;font-size:16px;padding:7px}
+body.tv-mode #iptv-panel{display:block!important;position:absolute;left:0;right:0;top:58px;bottom:0;margin:0!important;padding:14px 2%!important;border:0!important;background:#101923!important;box-sizing:border-box;overflow:hidden}
+body.tv-mode #iptv-hide{position:absolute;right:2%;top:10px;z-index:7;font-size:16px;padding:8px 10px}
+body.tv-mode #iptv-message{position:absolute;bottom:4px;left:3%;right:3%;height:28px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:16px!important;margin:0;z-index:6}
+body.tv-mode #iptv-browser{position:absolute;left:2%;right:2%;top:57px;bottom:46px;overflow:hidden}
+body.tv-mode #iptv-browser>p{display:none}
+body.tv-mode #tv-now-playing{position:absolute;right:1%;top:0;width:43%;height:34px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#9eeeff;font-size:23px;font-weight:bold}
+body.tv-mode #iptv-categories{position:absolute;left:0;top:0;bottom:0;width:21%;max-height:none!important;overflow-y:auto!important;padding:5px;box-sizing:border-box;border-right:1px solid #365769}
+body.tv-mode #iptv-channels{position:absolute;left:22%;top:0;bottom:0;width:32%;max-height:none!important;overflow-y:auto!important;padding:5px;box-sizing:border-box}
+body.tv-mode #iptv-categories button,body.tv-mode #iptv-channels button{display:block!important;width:97%;font-size:17px!important;margin:2px 0 7px!important;padding:12px 8px!important;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:6px}
+body.tv-mode #video{position:absolute;right:2.5%;top:165px;width:42%;height:53vh;max-height:53vh;background:#02060a;z-index:2;border:2px solid #284959;box-sizing:border-box}
+body.tv-mode #iptv-login{position:absolute;left:4%;top:5%;right:4%;bottom:40px;overflow-y:auto;background:#182b3e;padding:12px 20px;box-sizing:border-box}
+body.tv-mode #iptv-login p{font-size:18px;margin:10px 0}
+body.tv-mode #iptv-login input{max-width:45%;font-size:20px!important}
+body.tv-mode #iptv-keyboard{top:5%;height:88%;left:5%;width:90%}
