@@ -1,27 +1,49 @@
 <!doctype html>
-<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>XIPTV Play TV</title>
-<style>html,body{margin:0;background:#111820;color:#effaff;font-family:Arial,sans-serif}main{padding:5%;}h1{color:#00dfef;font-size:42px}p{font-size:24px;line-height:1.5}button,input{font-size:25px;padding:16px;margin:12px 8px 12px 0;background:#1b2935;color:white;border:2px solid #4d7485}button:focus,input:focus,.selected{outline:5px solid #00f0ff;background:#285568}#video{width:80%;max-height:52vh;background:black}#status{color:#ffe092}small{font-size:18px;color:#bcd}</style></head><body>
-<main><h1>XIPTV Play — LG webOS 2</h1><p>Eski televizyonlar için uyumluluk testi (v0.2.5)</p>
-<p id="status">Açılış başarılı: JavaScript kontrol ediliyor...</p>
-<button id="check">Sistem Kontrolü</button><button id="play">Video Testi</button><button id="stop">Durdur</button><button id="network">Bağlantı Testi</button>
-<p><small>Bu tanılama sürümü henüz playlist ve profil içermez. Video Testi 10 saniyelik H.264 MP4 kullanır. İnternet gereklidir.</small></p>
-<video id="video" controls playsinline></video><p id="detail"></p></main>
-<script>
+<html lang="tr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XIPTV Play TV — Uyumluluk Testi</title>
+<style>
+html,body{margin:0;padding:0;background:#121922;color:#effaff;font-family:Arial,sans-serif}
+main{padding:3% 5%}h1{font-size:40px;color:#2ce8fb;margin:12px 0}
+p{font-size:22px;line-height:1.4}small{font-size:17px;color:#cddae2}
+button{background:#233647;color:#fff;padding:15px 18px;font-size:22px;border:2px solid #527188;margin:0 10px 12px 0}
+button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-offset:2px}
+#status{background:#233142;padding:13px;white-space:pre-wrap;line-height:1.5;min-height:70px;font-size:21px}
+#video{display:block;width:75%;height:44vh;background:#000;margin:15px 0}
+#events{font-size:18px;color:#b7e7f1;white-space:pre-wrap}
+</style></head>
+<body><main>
+<h1>XIPTV Play — LG webOS 2</h1>
+<p>Video oynatma tanılama sürümü <b>v0.2.6</b></p>
+<button id="system">Sistem Kontrolü</button>
+<button id="local">Yerel Video</button>
+<button id="remote">İnternet Video</button>
+<button id="network">Bağlantı Testi</button>
+<button id="stop">Durdur</button>
+<div id="status">Uygulama başlatılıyor...</div>
+<video id="video" controls preload="none"></video>
+<div id="events"></div>
+<p><small>Önce Yerel Video düğmesini dene. Test videosu uygulamanın içinde, internete ihtiyaç duymaz. Ardından İnternet Video düğmesini deneyebilirsin. Bu sürüm henüz playlist/profil içermez.</small></p>
+</main><script>
 (function(){
-var buttons=[document.getElementById('check'),document.getElementById('play'),document.getElementById('stop'),document.getElementById('network')];
-var video=document.getElementById('video'),status=document.getElementById('status'),detail=document.getElementById('detail'),selected=0,events=0,lastAction='Yok',lastKey='Yok';
-function report(){detail.innerHTML='Olay: '+events+' | Son tuş: '+lastKey+' | Son işlem: '+lastAction;}
-function focusButton(n){selected=(n+buttons.length)%buttons.length;for(var i=0;i<buttons.length;i++)buttons[i].className=(i===selected?'selected':'');try{if(document.activeElement!==buttons[selected])buttons[selected].focus();}catch(x){}}
-function networkCheck(){var urls=['https://xiptvplay.onrender.com/api/health','https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4'];var pos=0;function next(){if(pos>=urls.length)return;var url=urls[pos++],xhr=new XMLHttpRequest();status.innerHTML='Bağlantı kontrolü '+pos+'/'+urls.length;try{xhr.open('GET',url,true);xhr.timeout=12000;if(pos===2)xhr.setRequestHeader('Range','bytes=0-1023');xhr.onreadystatechange=function(){if(xhr.readyState===4){status.innerHTML='Bağlantı '+pos+': HTTP '+xhr.status+' | '+(xhr.getResponseHeader('Content-Type')||'tip bilinmiyor');next();}};xhr.onerror=function(){status.innerHTML='Bağlantı hatası: '+pos;next();};xhr.ontimeout=function(){status.innerHTML='Bağlantı zaman aşımı: '+pos;next();};xhr.send(null);}catch(e){status.innerHTML='Bağlantı test hatası: '+e.message;next();}}next();}
-function execute(n,source){events++;lastAction=buttons[n].innerHTML+' ('+source+')';focusButton(n);
-if(n===0){status.innerHTML='Sistem kontrolü çalıştı! | XHR: '+(window.XMLHttpRequest?'EVET':'HAYIR')+' | MP4: '+(video.canPlayType('video/mp4')||'belirsiz');}
-if(n===1){status.innerHTML='Video testi başlatıldı (HTTPS MP4)';video.src='https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4';try{video.load();video.play();}catch(ex){status.innerHTML='Video oynatma hatası: '+ex.message;}}
-if(n===2){try{video.pause();video.removeAttribute('src');video.load();}catch(ex){}status.innerHTML='Video durduruldu';}if(n===3){networkCheck();}report();}
-for(var i=0;i<buttons.length;i++){(function(n){buttons[n].onclick=function(){execute(n,'tıklama');};buttons[n].onfocus=function(){selected=n;for(var j=0;j<buttons.length;j++)buttons[j].className=(j===n?'selected':'');};})(i);}
-document.addEventListener('keydown',function(e){var k=e.keyCode||e.which;lastKey=String(k);events++;if(k===37||k===38||k===39||k===40){focusButton(selected+((k===37||k===38)?-1:1));if(e.preventDefault)e.preventDefault();}
-else if(k===13||k===16777220){execute(selected,'OK keydown');if(e.preventDefault)e.preventDefault();}
-else if(k===461||k===27){status.innerHTML='Geri tuşu algılandı';}report();},false);
-video.onerror=function(){status.innerHTML='Video hata kodu: '+(video.error?video.error.code:'bilinmiyor')+' | Ağ durumu: '+video.networkState+' | Kaynak: '+video.currentSrc;};video.onplaying=function(){status.innerHTML='Video oynuyor! Görüntü ve sesi kontrol et.';};video.onwaiting=function(){status.innerHTML='Video tamponlanıyor...';};
-focusButton(0);status.innerHTML='XIPTV Play TV 0.2.5 açıldı. OK veya işaretçi ile Sistem Kontrolü seç.';report();
+var video=document.getElementById('video'),status=document.getElementById('status'),events=document.getElementById('events');
+var ids=['system','local','remote','network','stop'],buttons=[],selected=0,lastKey='yok',actions=0;
+var remoteUrl='https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4';
+for(var i=0;i<ids.length;i++){buttons[i]=document.getElementById(ids[i]);}
+function message(text){status.innerHTML=text;}
+function update(){events.innerHTML='Tuş: '+lastKey+' | İşlem sayısı: '+actions+' | video.readyState='+video.readyState+' | networkState='+video.networkState;}
+function focus(n){selected=(n+buttons.length)%buttons.length;for(var i=0;i<buttons.length;i++)buttons[i].className=i===selected?'active':'';try{if(document.activeElement!==buttons[selected])buttons[selected].focus();}catch(e){}}
+function system(){var mime='video/mp4; codecs="avc1.42E01E, mp4a.40.2"';message('Sistem çalışıyor | XMLHttpRequest: '+(window.XMLHttpRequest?'EVET':'HAYIR')+' | H.264/AAC: '+(video.canPlayType(mime)||'belirsiz'));}
+function play(src,label){message(label+' yükleniyor...');try{video.pause();video.removeAttribute('src');video.load();video.src=src;video.load();var p=video.play();if(p&&p.catch)p.catch(function(e){message(label+' play() hatası: '+e.message);});}catch(e){message(label+' başlatma hatası: '+e.message);}update();}
+function network(){var x=new XMLHttpRequest();var started=new Date().getTime();message('İnternet video kaynağı test ediliyor...');try{x.open('GET',remoteUrl,true);x.timeout=12000;x.setRequestHeader('Range','bytes=0-1023');x.onreadystatechange=function(){if(x.readyState===4){message('İnternet GET: HTTP '+x.status+' | '+(x.getResponseHeader('Content-Type')||'tür bilinmiyor')+' | '+(new Date().getTime()-started)+'ms');}};x.onerror=function(){message('İnternet bağlantısı başarısız (XHR)');};x.ontimeout=function(){message('İnternet bağlantısı zaman aşımı');};x.send(null);}catch(e){message('İnternet bağlantı hatası: '+e.message);}}
+function execute(n){actions++;focus(n);if(n===0)system();if(n===1)play('./sample.mp4','Yerel MP4 (H.264 Baseline + AAC-LC)');if(n===2)play(remoteUrl,'İnternet MP4');if(n===3)network();if(n===4){video.pause();video.removeAttribute('src');video.load();message('Durduruldu');}update();}
+for(var j=0;j<buttons.length;j++){(function(n){buttons[n].onclick=function(){execute(n);};buttons[n].onfocus=function(){selected=n;for(var k=0;k<buttons.length;k++)buttons[k].className=k===n?'active':'';};})(j);}
+document.addEventListener('keydown',function(e){var k=e.keyCode||e.which;lastKey=String(k);if(k===37||k===38||k===39||k===40){focus(selected+((k===37||k===38)?-1:1));if(e.preventDefault)e.preventDefault();}else if(k===13||k===16777220){execute(selected);if(e.preventDefault)e.preventDefault();}else if(k===461||k===27){video.pause();message('Geri tuşu: Video duraklatıldı');}update();},false);
+video.onloadedmetadata=function(){message('Medya yüklendi: '+video.videoWidth+'x'+video.videoHeight+' | '+Math.round(video.duration)+' saniye');update();};
+video.oncanplay=function(){message('Medya oynatmaya hazır');update();};
+video.onplaying=function(){message('Video OYNUYOR! Görüntü ve sesi kontrol et.');update();};
+video.onerror=function(){var code=video.error?video.error.code:'?';message('VIDEO HATASI '+code+' | networkState='+video.networkState+' | readyState='+video.readyState+' | Kaynak: '+video.currentSrc);update();};
+video.onended=function(){message('Video başarıyla sona erdi.');update();};
+focus(0);system();update();
 })();
 </script></body></html>
