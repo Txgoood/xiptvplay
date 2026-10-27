@@ -24,7 +24,7 @@ assert(html.includes('id="tv-home"'));
 assert(html.includes('id="tv-home-films"'));
 assert(html.includes('id="stitch-side"'));
 assert(html.includes('id="tv-video-favorite"'));
-assert(layout.includes('persistent Stitch sidebar'));
+assert(layout.includes('Stitch shell persists'));
 assert(html.includes('id="tv-home-live"'));
 assert(html.includes('viewBox="0 0 24 24"'));
 assert(html.includes('stroke="currentColor"'));
