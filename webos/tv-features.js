@@ -2,11 +2,11 @@
 (function(){
 var video=document.getElementById('video'),currentKey='',scope='default',playingItem=null,playingMode='live';
 var favButton=document.getElementById('tv-video-favorite');
-var prefix='xiptv_webos2_media_v1_';
+var prefix='xiptv_webos2_media_v1_',favoriteCache=null;
 function read(k,fallback){try{return JSON.parse(localStorage.getItem(prefix+scope+'_'+k))||fallback;}catch(e){return fallback;}}
 function save(k,value){try{localStorage.setItem(prefix+scope+'_'+k,JSON.stringify(value));}catch(e){}}
 function key(mode,item){return mode+':'+String(item.stream_id||item.series_id||item.id||'');}
-function favs(){return read('favorites',{});}
+function favs(){if(!favoriteCache)favoriteCache=read('favorites',{});return favoriteCache;}
 function isFavorite(mode,item){return !!favs()[key(mode,item)];}
 function toggleFavorite(mode,item){
  var f=favs(),k=key(mode,item);if(f[k])delete f[k];else f[k]={name:String(item.name||''),type:mode};save('favorites',f);
@@ -89,8 +89,9 @@ window.XIPTVTV={
  var text=String(item.name||item.title||'İçerik');var plot=item.plot||item.description||item.storyline||item.info&&item.info.plot||'';
  info.textContent=text+(plot?' — '+String(plot):' — Kaynakta açıklama bulunmuyor.');
  },
- setProfile:function(id,child){scope=id||'default';document.getElementById('tv-hide-adult').checked=!!child;updateHeart();if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();},
+ setProfile:function(id,child){scope=id||'default';favoriteCache=null;document.getElementById('tv-hide-adult').checked=!!child;updateHeart();if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();},
  isFavorite:isFavorite,
+ getResume:function(){return read('positions',{});},
  decorateItem:decorateItem,
  beforePlay:function(kind,id,url,name){
    currentKey=kind+':'+String(id);
