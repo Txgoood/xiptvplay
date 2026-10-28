@@ -16,7 +16,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install bundled FFprobe and FFmpeg for integration tests
+        run: npm install --prefix lg-media-service --omit=dev
       - name: Verify isolated server syntax
         run: node --check lg-media-service/server.mjs
       - name: Run security and track parsing tests
-        run: node --test lg-media-service/test.mjs
+        run: node --test lg-media-service/test.mjs lg-media-service/integration.test.mjs
