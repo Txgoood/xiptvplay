@@ -84,7 +84,7 @@ function collect(executable,args,timeout=PROBE_TIMEOUT,maxBytes=256000){
   proc.on('close',code=>{if(code!==0)finish(Error('Medya analizi başarısız oldu; kaynak veya codec desteklenmiyor.'));else finish(null,Buffer.concat(chunks).toString('utf8'));});
  });
 }
-function probeArgs(url){return ['-v','error','-rw_timeout','12000000','-probesize','3000000','-analyzeduration','5000000','-show_entries','stream=index,codec_type,codec_name,disposition:stream_tags=language,title,LANGUAGE','-of','json',url];}
+function probeArgs(url){return ['-v','error','-user_agent','VLC/3.0.18','-rw_timeout','12000000','-probesize','3000000','-analyzeduration','5000000','-show_entries','stream=index,codec_type,codec_name,disposition:stream_tags=language,title,LANGUAGE','-of','json',url];}
 function normalizeStreams(raw){
  const streams=(raw.streams||[]).filter(s=>s.codec_type==='audio'||s.codec_type==='subtitle');
  return streams.map(s=>({index:Number(s.index),type:s.codec_type,codec:String(s.codec_name||'unknown'),language:String(s.tags?.language||s.tags?.LANGUAGE||'und').slice(0,32),title:String(s.tags?.title||'').slice(0,60),externalVtt: s.codec_type==='subtitle'&&['subrip','ass','ssa','mov_text','webvtt','text'].includes(String(s.codec_name||'').toLowerCase())})).filter(s=>Number.isInteger(s.index)&&s.index>=0&&s.index<256).slice(0,40);
@@ -145,7 +145,7 @@ const server=http.createServer(async(req,res)=>{
   activeStreams++;
   if(type==='stream'){
    const start=Math.max(0,Math.min(14400,Number(new URL(req.url,'http://localhost').searchParams.get('start'))||0));
-   const args=['-nostdin','-v','error','-rw_timeout','12000000','-ss',String(start),'-i',s.url,'-map','0:v:0','-map','0:'+index,'-c:v','copy','-c:a','copy','-f','mpegts','pipe:1'];
+   const args=['-nostdin','-v','error','-user_agent','VLC/3.0.18','-rw_timeout','12000000','-ss',String(start),'-i',s.url,'-map','0:v:0','-map','0:'+index,'-c:v','copy','-c:a','copy','-f','mpegts','pipe:1'];
    sendStream(res,req,args,'video/mp2t',STREAM_SECONDS*1000);
   }else{
    const args=['-nostdin','-v','error','-rw_timeout','12000000','-i',s.url,'-map','0:'+index,'-c:s','webvtt','-f','webvtt','pipe:1'];
