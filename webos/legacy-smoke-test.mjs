@@ -6,7 +6,7 @@ const html=fs.readFileSync('webos-package/index.html','utf8');
 const match=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(match,'inline legacy script is missing');
 assert(!html.includes('type="module"'),'webOS 2 must not use JS modules');
-assert(html.includes('v1.0.5'),'wrong TV build version');
+assert(html.includes('v1.0.6'),'wrong TV build version');
 const layout=fs.readFileSync('webos-package/tv-layout.css','utf8');
 assert(layout.includes('v0.7: Android XIPTV visual language'));
 assert(layout.includes('#00f0ff'));
