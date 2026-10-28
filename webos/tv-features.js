@@ -69,18 +69,25 @@ function tracksMenu(){
    (!texts.length?'altyazı kanallarını':'')+
    ' uygulamaya bildirmiyor. Kaynakta parça bulunsa bile burada listelenmeyebilir. Bu durumda otomatik dil tercihi de uygulanamaz.':'';
 }
-var autoAppliedFor='';
-function applyTracks(){if(currentKey!==autoAppliedFor){autoAppliedFor=currentKey;applyLanguagePolicy();}tracksMenu();}
+var manualTrackChoice=false,autoAppliedTracks=false;
+function applyTracks(){
+ if(!manualTrackChoice&&!autoAppliedTracks&&(trackList('audioTracks').length||trackList('textTracks').length)){
+  applyLanguagePolicy();autoAppliedTracks=true;
+ }
+ tracksMenu();
+}
 var ctrl=document.getElementById('tv-controls');
 document.getElementById('tv-controls-toggle').onclick=function(){
  ctrl.style.display=ctrl.style.display==='none'?'block':'none';tracksMenu();
 };
 document.getElementById('tv-subtitles').onchange=function(){
+ manualTrackChoice=true;
  var n=this.value,tracks=trackList('textTracks');
  for(var i=0;i<tracks.length;i++)try{tracks[i].mode=String(i)===n?'showing':'disabled';}catch(e){}
  tracksMenu();
 };
 document.getElementById('tv-audio').onchange=function(){
+ manualTrackChoice=true;
  var n=this.value,tracks=trackList('audioTracks');
  if(n==='auto'){tracksMenu();return;}
  for(var i=0;i<tracks.length;i++)try{tracks[i].enabled=String(i)===n;}catch(e){}
