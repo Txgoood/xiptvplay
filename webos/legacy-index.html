@@ -93,7 +93,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <label>Altyazı <select id="tv-subtitles"><option value="off">Kapalı</option></select></label>
 <label>Ses <select id="tv-audio"><option value="auto">Otomatik / Türkçe öncelikli</option></select></label>
 <p id="tv-track-notice" style="font-size:16px;color:#f4db9e;line-height:1.4"></p>
-<button id="tv-track-scan" type="button">TV medya kanallarını tara</button><div id="tv-track-scan-results" role="status" aria-live="polite"></div><label>Hız <select id="tv-speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="1.5">1.5x</option><option value="2">2x</option><option value="4">4x</option><option value="8">8x</option><option value="16">16x</option></select></label>
+<button id="tv-track-scan" type="button">TV medya kanallarını tara</button><button id="tv-lg-media-scan" type="button">Tüm ses/altyazı akışlarını analiz et</button><div id="tv-lg-media-status" role="status"></div><div id="tv-track-scan-results" role="status" aria-live="polite"></div><label>Hız <select id="tv-speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="1.5">1.5x</option><option value="2">2x</option><option value="4">4x</option><option value="8">8x</option><option value="16">16x</option></select></label>
 <button id="tv-seek-back" type="button">-10 sn</button><button id="tv-seek-forward" type="button">+10 sn</button>
 </div>
 <div id="tv-mode-tabs"><button id="tv-tab-live" type="button">Canlı TV</button><button id="tv-tab-movie" type="button">Filmler</button><button id="tv-tab-series" type="button">Diziler</button></div>
@@ -106,7 +106,7 @@ button:focus,button.active{background:#167c9b;outline:4px solid #8af4ff;outline-
 <p id="iptv-message" style="color:#89eaf9"></p>
 </section>
 <div id="status">Uygulama başlatılıyor...</div>
-<video id="video" controls preload="none"></video>
+<video id="video" controls preload="none"></video><div id="tv-lg-subtitle-overlay" style="display:none"></div>
 <button id="tv-video-favorite" type="button" title="Favorilere ekle/kaldır" style="display:none">♡</button>
 <div id="events"></div>
 <p><small>Önce Yerel Video düğmesini dene. Test videosu uygulamanın içinde, internete ihtiyaç duymaz. Ardından HLS Source, MP4 Source ve Blob MP4 seçeneklerini deneyebilirsin. Blob testi yalnızca kısa test videosu içindir. MDN çiçek videosu sessiz olabilir; ses doğrulaması için AAC Sesli MP4 düğmesini dene. Bu sürüm henüz playlist/profil içermez.</small></p>
@@ -181,4 +181,4 @@ video.addEventListener('error',function(){var code=video.error?video.error.code:
 video.addEventListener('ended',function(){message('Video başarıyla sona erdi.');update();},false);
 focus(0);system();update();
 })();
-</script><script src="./tv-features.js"></script><script src="./tv-iptv.js"></script><script src="./tv-profiles.js"></script><script src="./tv-keyboard.js"></script><script src="./tv-home.js"></script></body></html>
+</script><script src="./tv-features.js"></script><script src="./tv-iptv.js"></script><script src="./tv-profiles.js"></script><script src="./tv-keyboard.js"></script><script src="./lg-media-config.js"></script><script src="./tv-lg-media.js"></script><script src="./tv-home.js"></script></body></html>
