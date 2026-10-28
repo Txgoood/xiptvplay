@@ -136,6 +136,7 @@
     var list=sortedCache[cacheKey];
     if(!list){list=channelList.slice(0);if(sorting==='old'||sorting==='new')list.sort(function(a,b){var x=Number(a.added||a.release_date||a.year||0),y=Number(b.added||b.release_date||b.year||0);return sorting==='old'?x-y:y-x;});if(sorting==='az')list.sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});if(sorting==='za')list.sort(function(a,b){return String(b.name||'').localeCompare(String(a.name||''));});sortedCache[cacheKey]=list;}
     var matches=[];
+    var totalStreams=channelList.length;
     var categoryNames={};for(var ca=0;ca<categoryList.length;ca++)categoryNames[String(categoryList[ca].category_id)]=String(categoryList[ca].category_name||'');
     var batch=document.createDocumentFragment();
     if(selectedCategory!=='all'){
@@ -194,7 +195,13 @@
     }
     channels.appendChild(batch);
     if(currentPage+1<totalPages)action(channels,'Sonraki sayfa ▶ ('+(currentPage+2)+'/'+totalPages+')',function(){currentPage++;renderChannels();channels.scrollTop=0;});
-    say(matches.length+' içerik bulundu. Sayfa '+(currentPage+1)+'/'+totalPages+'.');
+    if(!matches.length){
+      var empty=document.createElement('div');empty.className='tv-empty-results';
+      empty.textContent=totalStreams===0?'Canlı TV kanal verisi sunucudan boş geldi. Katalog yeniden yüklenmeli.':'Bu kategoride eşleşen kanal bulunamadı ('+totalStreams+' kayıt yüklendi).';
+      channels.appendChild(empty);
+      if(mode==='live')action(channels,'Kanal listesini yeniden yükle',function(){document.getElementById('iptv-connect').click();});
+    }
+    say(matches.length+' içerik bulundu; '+totalStreams+' kayıt yüklü. Sayfa '+(currentPage+1)+'/'+totalPages+'.');
   }
   function renderCategories(){
     focusCache=null;
