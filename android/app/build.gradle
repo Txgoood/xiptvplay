@@ -4,7 +4,7 @@ android {
     namespace = "com.xiptvplay.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.xiptvplay.app"
+        applicationId "com.xiptvplay.tvtester"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
