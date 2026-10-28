@@ -20,6 +20,7 @@ Bu servis **normal Android backend'ine eklenmez**. Ayrı Render web hizmeti olar
 - Build command: `npm install --prefix lg-media-service --omit=dev`
 - Start command: `node lg-media-service/server.mjs`
 - Environment: `LG_MEDIA_ALLOWED_HOSTS` (virgülle ayrılmış **yalnız IPTV sunucu alan adları**), `LG_MEDIA_ALLOWED_ORIGINS=null`
+- Opsiyonel test sınırları: `LG_MEDIA_MAX_STREAM_SECONDS=120`, `LG_MEDIA_MAX_STREAM_MB=60`. Bunlar üst sınırı 5 dakika / 100 MB olacak şekilde kodda kısıtlıdır.
 - `/health` erişilebilir olmalıdır. DNS özel ağlara çözülüyorsa istek reddedilir.
 
 **Maliyet:** Media dönüştürme (ses kopyalama bile) sürekli CPU, ağ ve bant genişliği kullanır. Render ücretsiz plan kısıtları/aktif kotası ayrı doğrulanmalı. Hiçbir hizmet kullanıcı onayı olmadan ücretli plana geçirilmemelidir.
