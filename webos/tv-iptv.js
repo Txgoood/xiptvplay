@@ -11,7 +11,7 @@
   var categories=document.getElementById('iptv-categories');
   var channels=document.getElementById('iptv-channels');
   var categoryList=[], channelList=[], selectedCategory='all', mode='live';
-  var catalogData=null, lastLive=null, connecting=false, startup=true, lastSeries=null, seriesCache={};
+  var catalogData=null, lastLive=null, connecting=false, startup=true, lastSeries=null, seriesCache={}, liveRetryCount=0, liveRetryPending=false;
   var PAGE_SIZE=60, currentPage=0, searchTimer=null, sortedCache={}, focusCache=null, categoryCache={};
   var server='',username='',password='';
   var SAVE_KEY='xiptv_webos2_xtream_local_v1';
@@ -56,6 +56,37 @@
       xhr.ontimeout=function(){callback(new Error('Sunucu zaman aşımı'));};
       xhr.send(JSON.stringify(data));
     }catch(e){callback(e);}
+  }
+  // Some Xtream sources return categories before their live streams on cold start.
+  // Retry ONLY the live data in memory; never erase the working film/series catalogue.
+  function liveCategoryMatches(data){
+    var cats=data.liveCategories||[],streams=data.liveStreams||[],ids={};
+    for(var i=0;i<cats.length;i++)ids[String(cats[i].category_id)]=true;
+    for(var j=0;j<streams.length;j++)if(ids[String(streams[j].category_id)])return true;
+    return !cats.length&&streams.length>0;
+  }
+  function retryLiveCatalog(){
+    if(liveRetryPending||liveRetryCount>=2||!catalogData||connecting)return;
+    liveRetryPending=true;liveRetryCount++;
+    say('Canlı TV kanalları tamamlanıyor ('+liveRetryCount+'/2)...');
+    request('/api/iptv/xtream/catalog',{serverUrl:server,username:username,password:password},function(err,data){
+      liveRetryPending=false;
+      if(err||!data||!data.liveStreams||!data.liveStreams.length){
+        if(liveRetryCount<2)setTimeout(retryLiveCatalog,1500);
+        else say('Canlı TV ilk yüklemesi tamamlanamadı. Kanal listesini yeniden yükle seçeneğini kullanabilirsin.');
+        return;
+      }
+      catalogData.liveStreams=data.liveStreams;
+      if(data.liveCategories&&data.liveCategories.length)catalogData.liveCategories=data.liveCategories;
+      sortedCache={};categoryCache={};focusCache=null;
+      if(window.XIPTVTVHome&&window.XIPTVTVHome.render)window.XIPTVTVHome.render(catalogData);
+      if(mode==='live'&&panel.style.display!=='none'){
+        categoryList=catalogData.liveCategories||[];
+        channelList=catalogData.liveStreams||[];
+        selectedCategory='all';currentPage=0;renderCategories();
+      }
+      if(!liveCategoryMatches(catalogData)&&liveRetryCount<2)setTimeout(retryLiveCatalog,1500);
+    });
   }
   function chooseMode(next){
     focusCache=null;
@@ -196,6 +227,7 @@
     channels.appendChild(batch);
     if(currentPage+1<totalPages)action(channels,'Sonraki sayfa ▶ ('+(currentPage+2)+'/'+totalPages+')',function(){currentPage++;renderChannels();channels.scrollTop=0;});
     if(!matches.length){
+      if(mode==='live' && !document.getElementById('tv-search').value && !document.getElementById('tv-favorite-only').checked && liveRetryCount<2) setTimeout(retryLiveCatalog,700);
       var empty=document.createElement('div');empty.className='tv-empty-results';
       empty.textContent=totalStreams===0?'Canlı TV kanal verisi sunucudan boş geldi. Katalog yeniden yüklenmeli.':'Bu kategoride eşleşen kanal bulunamadı ('+totalStreams+' kayıt yüklendi).';
       channels.appendChild(empty);
@@ -340,6 +372,7 @@
         connecting=false;
         if(error){show(panel);show(login);hide(browser);document.getElementById('tv-home').style.display='none';say('Katalog hatası: '+error.message);return;}
         catalogData=catalog;sortedCache={};categoryCache={};focusCache=null;currentPage=0;
+        if(!liveCategoryMatches(catalog))setTimeout(retryLiveCatalog,900);
         if(window.XIPTVTVHome&&window.XIPTVTVHome.render)window.XIPTVTVHome.render(catalog);
         window.XIPTVTV.catalogReady();
         hide(login);show(browser);
