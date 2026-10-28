@@ -12,6 +12,8 @@ fs.copyFileSync(path.join(root,'webos/tv-features.js'),path.join(out,'tv-feature
 fs.copyFileSync(path.join(root,'webos/tv-profiles.js'),path.join(out,'tv-profiles.js'));
 fs.copyFileSync(path.join(root,'webos/tv-home.js'),path.join(out,'tv-home.js'));
 fs.copyFileSync(path.join(root,'webos/tv-keyboard.js'),path.join(out,'tv-keyboard.js'));
+fs.copyFileSync(path.join(root,'webos/tv-lg-media.js'),path.join(out,'tv-lg-media.js'));
+fs.copyFileSync(path.join(root,'webos/lg-media-config.js'),path.join(out,'lg-media-config.js'));
 fs.copyFileSync(path.join(root,'webos/tv.css'),path.join(out,'tv.css'));
 fs.copyFileSync(path.join(root,'webos/tv-layout.css'),path.join(out,'tv-layout.css'));
 const file=path.join(out,'index.html');let html=fs.readFileSync(file,'utf8');html=html.replace('</head>','<link rel="stylesheet" href="./tv.css" /></head>').replace('</body>','<script src="./tv-remote.js"></script></body>');// React başlamazsa siyah ekran yerine görülebilir hata kodu göster.
