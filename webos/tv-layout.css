@@ -290,3 +290,5 @@ body.tv-mode #tv-favorites-panel button{display:block;width:100%;font-size:20px;
 body.tv-mode #tv-favorites-panel h2{font-size:24px;color:#00daf3}
 body.tv-mode #iptv-channels{overflow-y:scroll!important;-webkit-overflow-scrolling:touch}
 body.tv-mode #iptv-channels .tv-item-wrap{min-height:45px}
+
+body.tv-mode #iptv-channels .tv-empty-results{padding:18px 12px;color:#f2d8a8;font-size:18px;line-height:1.5;white-space:normal}
