@@ -263,3 +263,18 @@ body.tv-mode #tv-episodes{left:auto!important;right:1%!important;width:43%!impor
 body.tv-mode #tv-episodes-list{height:75%!important;overflow-y:auto!important}
 body.tv-mode #tv-episodes-list button{font-size:15px!important;padding:7px!important;margin:3px 0!important}
 body.tv-mode.tv-fullscreen #tv-episodes{position:fixed!important;left:16%!important;right:16%!important;width:auto!important;top:28%!important;bottom:16%!important;z-index:112!important;background:#16202c!important}
+
+/* Legacy TV: bottom-right media details and remote keyboard dismiss. */
+body.tv-mode #tv-detail-below{position:absolute;right:1%;top:calc(245px + 43vh + 12px);width:43%;height:21vh;overflow-y:auto;background:#17202b;border:1px solid #304451;border-radius:8px;padding:10px;box-sizing:border-box;font-size:15px}
+body.tv-mode #tv-detail-summary{max-height:75px;overflow-y:auto;font-size:15px;line-height:1.3;margin:6px 0}
+body.tv-mode #tv-season-tools select{font-size:15px;padding:5px}
+body.tv-mode #tv-season-episodes{max-height:90px;overflow-y:auto}
+body.tv-mode #tv-season-episodes button{font-size:13px;padding:5px;margin:3px}
+body.tv-mode #tv-episodes{display:none!important}
+body.tv-mode #tv-episodes[style*="block"]{display:none!important}
+body.tv-mode #tv-4k-options{display:none!important}
+body.tv-mode #tv-video-favorite{display:none!important}
+#iptv-keyboard-close{position:absolute;right:15px;top:9px;z-index:20;background:#384858;color:#fff;border:1px solid #00daf3;border-radius:6px;padding:5px 13px;font-size:18px}
+#tv-settings-panel label{display:block;font-size:16px;margin:12px 3px;color:#e5f5f9}
+body.tv-mode #tv-filter-panel #tv-search{max-width:23%}
+body.tv-mode #tv-filter-panel #tv-advanced-search{font-size:13px;padding:4px}
