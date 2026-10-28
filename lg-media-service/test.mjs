@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 process.env.NODE_ENV='test';
-const {safeIp,normalizeStreams,sourcePath,probeArgs}=await import('./server.mjs');
+const {safeIp,normalizeStreams,sourcePath,probeArgs,isXtreamAuthorized,validateHost}=await import('./server.mjs');
 test('blocks loopback, RFC1918 and link-local addresses',()=>{
  for(const ip of ['127.0.0.1','10.0.0.1','172.16.1.1','192.168.2.4','169.254.169.254','::1','fc00::2'])assert.equal(safeIp(ip),false,ip);
  assert.equal(safeIp('1.1.1.1'),true);
@@ -21,4 +21,42 @@ test('probe uses bounded analysis and JSON metadata',()=>{
  let args=probeArgs('https://host.invalid/movie/u/p/1.mkv');
  assert.ok(args.includes('-probesize'));assert.ok(args.includes('-analyzeduration'));
  assert.equal(args.at(-1),'https://host.invalid/movie/u/p/1.mkv');
+});
+
+test('automatically accepts an active Xtream account on a new public server',async()=>{
+ const called=[];
+ const mock={
+  lookup:async(host)=>{assert.equal(host,'updated-iptv.example');return [{address:'8.8.8.8'}];},
+  fetch:async(url,options)=>{
+   const parsed=new URL(url);
+   assert.equal(parsed.hostname,'updated-iptv.example');
+   assert.equal(parsed.pathname,'/player_api.php');
+   assert.equal(parsed.searchParams.get('username'),'sample-user');
+   assert.equal(parsed.searchParams.get('password'),'sample-pass');
+   assert.equal(options.redirect,'manual');
+   called.push(1);
+   return {ok:true,status:200,headers:{get:()=>null},text:async()=>JSON.stringify({user_info:{auth:1,status:'Active'}})};
+  }
+ };
+ assert.equal(await validateHost('http://updated-iptv.example:8080',{username:'sample-user',password:'sample-pass'},mock),'http://updated-iptv.example:8080');
+ assert.equal(called.length,1);
+});
+test('does not accept expired accounts or redirects as host authorization',async()=>{
+ const mock={
+  lookup:async()=>[{address:'8.8.4.4'}],
+  fetch:async()=>({ok:true,status:200,headers:{get:()=>null},text:async()=>JSON.stringify({user_info:{auth:1,status:'Expired'}})})
+ };
+ assert.equal(isXtreamAuthorized({user_info:{auth:'1',status:'Active'}}),true);
+ assert.equal(isXtreamAuthorized({user_info:{auth:1,status:'Expired'}}),false);
+ await assert.rejects(validateHost('http://another.example:8080',{username:'u',password:'p'},mock),/Xtream hesabı aktif değil/);
+ mock.fetch=async()=>({ok:false,status:302});
+ await assert.rejects(validateHost('http://another.example:8080',{username:'u',password:'p'},mock),/Xtream hesabı/);
+});
+test('forbids private or loopback DNS even with active Xtream credentials',async()=>{
+ const mock={
+  lookup:async()=>[{address:'127.0.0.1'}],
+  fetch:async()=>{throw Error('must not verify private DNS');}
+ };
+ await assert.rejects(validateHost('http://internal.example:8080',{username:'u',password:'p'},mock),/özel ağa/);
+ await assert.rejects(validateHost('http://internal.example:8080/path',{username:'u',password:'p'},mock),/geçersiz/);
 });
