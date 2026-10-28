@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">XIPTV Play</string>
-    <string name="title_activity_main">XIPTV Play</string>
-    <string name="package_name">com.xiptvplay.app</string>
-    <string name="custom_url_scheme">com.xiptvplay.app</string>
+    <string name="app_name">XIPTV TV Test</string>
+    <string name="title_activity_main">XIPTV TV Test</string>
+    <string name="package_name">com.xiptvplay.tvtester</string>
+    <string name="custom_url_scheme">com.xiptvplay.tvtester</string>
 </resources>
