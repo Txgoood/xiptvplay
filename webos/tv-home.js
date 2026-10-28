@@ -3,10 +3,14 @@
 var home=document.getElementById('tv-home'),diag=document.getElementById('tv-diagnostics');
 /* Keep Stitch navigation visible in every catalog view, not just launcher. */
 var side=document.getElementById('stitch-side');home.parentNode.insertBefore(side,home);
+/* Drawer must live outside hidden IPTV panel to work on home. */
+var favoritesPanel=document.getElementById('tv-favorites-panel');
+home.parentNode.insertBefore(favoritesPanel,home);
 var ids=['tv-nav-home','tv-home-live','tv-home-films','tv-home-series','tv-nav-fav','tv-nav-search','tv-nav-profile','tv-nav-settings','tv-feature-play','tv-feature-detail','tv-show-diagnostics'];
 var nodes=[],i;for(i=0;i<ids.length;i++)nodes.push(document.getElementById(ids[i]));
 function markActive(id){var all=['tv-nav-home','tv-home-live','tv-home-films','tv-home-series','tv-nav-fav','tv-nav-search','tv-nav-profile','tv-nav-settings'];for(var j=0;j<all.length;j++)document.getElementById(all[j]).className=all[j]===id?'selected':'';}
 function open(section){
+ favoritesPanel.style.display='none';
  markActive(section==='films'?'tv-home-films':section==='series'?'tv-home-series':'tv-home-live');
  home.style.display='none';
  document.body.className='tv-mode tv-catalog';
@@ -49,13 +53,13 @@ window.XIPTVTVHome={catalog:null,refresh:function(){if(this.catalog)this.render(
  document.getElementById('stitch-feature-title').textContent=String(lead.name||'İçerikleri Keşfet');
  document.getElementById('stitch-feature-description').textContent='Film ve dizi koleksiyonun büyük ekranda. Kategorileri keşfet, oynatmaya başla.';
 }};
-document.getElementById('tv-nav-home').onclick=function(){markActive('tv-nav-home');window.XIPTVTVHome.refresh();document.getElementById('iptv-panel').style.display='none';document.body.className='';home.style.display='block';};
+document.getElementById('tv-nav-home').onclick=function(){favoritesPanel.style.display='none';markActive('tv-nav-home');window.XIPTVTVHome.refresh();document.getElementById('iptv-panel').style.display='none';document.body.className='';home.style.display='block';};
 document.getElementById('tv-home-live').onclick=function(){open('live');};
 document.getElementById('tv-home-films').onclick=function(){open('films');};
 document.getElementById('tv-home-series').onclick=function(){open('series');};
 document.getElementById('tv-feature-play').onclick=function(){open('films');var d=window.XIPTVTVHome.data;if(d&&d.movies.length)window.XIPTVTV.openItem('movie',d.movies[0]);};
 document.getElementById('tv-feature-detail').onclick=function(){open('films');};
-document.getElementById('tv-nav-fav').onclick=function(){var p=document.getElementById('tv-favorites-panel');var show=p.style.display==='none';p.style.display=show?'block':'none';if(show){document.getElementById('tv-settings-panel').style.display='none';markActive('tv-nav-fav');}};
+document.getElementById('tv-nav-fav').onclick=function(){var p=favoritesPanel;var show=p.style.display==='none';p.style.display=show?'block':'none';if(show){document.getElementById('tv-settings-panel').style.display='none';markActive('tv-nav-fav');}};
 function favMode(mode){document.getElementById('tv-favorites-panel').style.display='none';open(mode==='movie'?'films':mode==='series'?'series':'live');document.getElementById('tv-favorite-only').checked=true;if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();markActive('tv-nav-fav');}
 document.getElementById('tv-fav-live').onclick=function(){favMode('live');};document.getElementById('tv-fav-movie').onclick=function(){favMode('movie');};document.getElementById('tv-fav-series').onclick=function(){favMode('series');};
 document.getElementById('tv-nav-search').onclick=function(){open('films');document.getElementById('tv-search').click();};
