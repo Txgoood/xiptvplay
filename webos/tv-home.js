@@ -30,7 +30,11 @@ window.XIPTVTVHome={render:function(catalog){
  var favorites=[],recent=[];
  for(var c=0;c<channels.length&&favorites.length<8;c++)if(window.XIPTVTV.isFavorite('live',channels[c]))favorites.push(channels[c]);
  shelf(document.getElementById('stitch-favorites'),favorites,'live',8);
- shelf(document.getElementById('stitch-continue'),series,'series',4);
+ var resume=window.XIPTVTV.getResume(),continuing=[];
+ for(var r=0;r<movies.length&&continuing.length<8;r++)if(Number(resume['movie:'+String(movies[r].stream_id)]||0)>20)continuing.push(movies[r]);
+ shelf(document.getElementById('stitch-continue'),continuing,'films',8);
+ shelf(document.getElementById('stitch-series'),series,'series',8);
+ shelf(document.getElementById('stitch-live'),channels,'live',8);
  window.XIPTVTVHome.data={movies:movies,series:series,channels:channels};
  var lead=movies[0];if(!lead)return;
  var cover=String(lead.stream_icon||lead.cover||'');
