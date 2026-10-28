@@ -122,7 +122,7 @@
    autoSelect();
   });
  }
- scanButton.onclick=function(){manual=true;scan();};
+ scanButton.onclick=function(){manual=false;scan();};
  returnButton.onclick=function(){if(ctx&&ctx.originalUrl){var pos=(video.currentTime||0)+offset;revert(ctx.originalUrl,pos);say('Önceki çalışan TV oynatıcısı geri açıldı.');}};
  video.addEventListener('timeupdate',paintSubtitles,false);
  video.addEventListener('pause',paintSubtitles,false);
