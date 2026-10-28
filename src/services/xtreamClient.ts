@@ -1,5 +1,5 @@
 import { MediaItem, XtreamUserInfo, XtreamServerInfo, SeriesDetail, SeriesEpisode, SeriesSeason } from '../types';
-import { isNative, httpGetJson } from './net';
+import { isNative, httpGetJson, apiUrl } from './net';
 
 export interface XtreamVerificationResult {
   success: boolean;
@@ -47,7 +47,7 @@ export class XtreamClientService {
     if (rawUrl.startsWith('/api/')) return rawUrl;
     // Route any remote HTTP or HTTPS stream through the proxy layer
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-      return `/api/iptv/proxy?url=${encodeURIComponent(rawUrl)}`;
+      return apiUrl(`/api/iptv/proxy?url=${encodeURIComponent(rawUrl)}`);
     }
     return rawUrl;
   }
