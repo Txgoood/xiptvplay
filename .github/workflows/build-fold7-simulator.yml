@@ -46,6 +46,7 @@ jobs:
       - name: Exclude unrelated download service from this isolated simulator
         run: |
           rm -f android/app/src/main/java/com/xiptvplay/app/DownloadForegroundService.java
+          rm -f android/app/src/main/java/com/xiptvplay/app/NativeDownloadPlugin.java
           python3 - <<'PY'
           from pathlib import Path
           p=Path('android/app/src/main/AndroidManifest.xml')
@@ -56,6 +57,10 @@ jobs:
           assert end>=0, 'Invalid download service XML'
           s=s[:start]+s[end+2:]
           p.write_text(s)
+          main=Path('android/app/src/main/java/com/xiptvplay/app/MainActivity.java')
+          m=main.read_text()
+          m=m.replace('        registerPlugin(NativeDownloadPlugin.class);', '')
+          main.write_text(m)
           PY
 
       - name: Build simulator debug APK
