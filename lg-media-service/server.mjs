@@ -98,7 +98,7 @@ function sendStream(res,req,args,contentType,maxMs){
   if(!res.write(chunk)){proc.stdout.pause();res.once('drain',()=>proc.stdout.resume());}
  });
  proc.on('close',code=>{if(first&&!res.headersSent)error(res,502,'Bu medya akışı mevcut codec veya dosya biçimiyle açılamadı.');else res.end();done();});
- req.on('close',()=>{if(!res.writableEnded)proc.kill('SIGKILL');});
+ res.on('close',()=>{if(!res.writableEnded)proc.kill('SIGKILL');});
 }
 function cleanup(){for(const [k,v] of sessions)if(v.expiry<Date.now())sessions.delete(k);}
 const server=http.createServer(async(req,res)=>{
