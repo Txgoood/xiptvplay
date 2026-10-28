@@ -1,2 +1,2 @@
-/* Configure after a separate Render LG media service is created and approved. */
-window.XIPTV_LG_MEDIA_URL = '';
+/* LG media companion: isolated, free Render service; permitted Xtream host is configured server-side. */
+window.XIPTV_LG_MEDIA_URL = 'https://xiptvplay-lg-media.onrender.com';
