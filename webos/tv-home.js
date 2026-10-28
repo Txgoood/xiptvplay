@@ -12,6 +12,8 @@ function open(section){
  document.body.className='tv-mode tv-catalog';
  window.XIPTVTV.startMode=section==='films'?'movie':section==='series'?'series':'live';
  document.getElementById('tv-favorite-only').checked=false;
+ document.getElementById('tv-search').value='';
+ document.getElementById('tv-search-scope').value='all';
  window.XIPTVTV.openSection(window.XIPTVTV.startMode);
 }
 function clear(node){while(node.firstChild)node.removeChild(node.firstChild);}
