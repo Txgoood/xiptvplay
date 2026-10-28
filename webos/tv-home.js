@@ -56,6 +56,9 @@ document.getElementById('tv-nav-search').onclick=function(){open('films');docume
 document.getElementById('tv-nav-profile').onclick=function(){open('live');document.getElementById('tv-profile-switch').click();};
 function settings(show){document.getElementById('tv-settings-panel').style.display=show?'block':'none';if(show)document.getElementById('tv-settings-close').focus();}
 document.getElementById('tv-nav-settings').onclick=function(){settings(true);};
+function syncFilters(){document.getElementById('tv-tr-only').checked=document.getElementById('tv-settings-tr').checked;document.getElementById('tv-hide-adult').checked=document.getElementById('tv-settings-adult').checked;if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();}
+document.getElementById('tv-settings-tr').onchange=syncFilters;
+document.getElementById('tv-settings-adult').onchange=syncFilters;
 document.getElementById('tv-settings-close').onclick=function(){settings(false);document.getElementById('tv-nav-settings').focus();};
 document.getElementById('tv-settings-player').onclick=function(){settings(false);open('live');document.getElementById('tv-controls-toggle').click();};
 document.getElementById('tv-settings-profiles').onclick=function(){settings(false);open('live');document.getElementById('tv-profile-switch').click();};
