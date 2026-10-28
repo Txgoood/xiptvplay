@@ -5,6 +5,7 @@ var target=null,upper=false,selection=0,buttons=[],cols=10;
 var names=['iptv-server','iptv-user','iptv-pass','tv-search','tv-profile-name','tv-profile-pin'];
 var lines=['1234567890','qwertyuiop','asdfghjkl','zxcvbnm'];
 var extra=['http://','https://','www.','.com','.net','.xyz',':8080','.',':','/','-','_','@','!','?','&','=','%','+','BOŞLUK','SİL','TÜMÜNÜ SİL','ABC ⇄ abc','SONRAKİ ALAN','TAMAM'];
+document.getElementById('iptv-keyboard-close').onclick=function(){box.style.display='none';};
 function visible(){return box.style.display!=='none';}
 function title(){
  var name=target.id==='iptv-server'?'Sunucu':target.id==='iptv-user'?'Kullanıcı':target.id==='iptv-pass'?'Şifre':target.id==='tv-search'?'Arama':target.id==='tv-profile-name'?'Profil Adı':'PIN';
