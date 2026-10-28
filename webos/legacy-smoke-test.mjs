@@ -6,7 +6,7 @@ const html=fs.readFileSync('webos-package/index.html','utf8');
 const match=html.match(/<script>([\s\S]*?)<\/script>/);
 assert(match,'inline legacy script is missing');
 assert(!html.includes('type="module"'),'webOS 2 must not use JS modules');
-assert(html.includes('v1.0.3'),'wrong TV build version');
+assert(html.includes('v1.0.4'),'wrong TV build version');
 const layout=fs.readFileSync('webos-package/tv-layout.css','utf8');
 assert(layout.includes('v0.7: Android XIPTV visual language'));
 assert(layout.includes('#00f0ff'));
@@ -15,6 +15,9 @@ assert(layout.includes('tv-poster-list'));
 assert(layout.includes('body.tv-mode'));
 assert(layout.includes('body.tv-mode #video'));
 assert(html.includes('id="tv-now-playing"'));
+assert(html.includes('id="tv-player-tracks"'));
+assert(html.includes('id="tv-player-episodes"'));
+
 const metadata=JSON.parse(fs.readFileSync('webos-package/appinfo.json','utf8'));
 assert.equal(metadata.trustLevel,'netcast');
 assert.equal(metadata.vendorExtension?.allowCrossDomain,true);
