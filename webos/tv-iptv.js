@@ -61,6 +61,7 @@
     focusCache=null;
     if(mode===next&&catalogData&&channels.childNodes.length&&selectedCategory==='all')return;
     mode=next;selectedCategory='all';currentPage=0;
+    document.getElementById('tv-episodes').style.display='none';
     channels.className=mode==='live'?'tv-live-list':'tv-poster-list';
     var tabNames=['live','movie','series'];
     for(var t=0;t<tabNames.length;t++){
@@ -82,6 +83,9 @@
     function onSeries(err,data){
       if(err){say('Bölümler alınamadı: '+err.message);return;}
       seriesCache[String(id)]=data;
+      var metadata=data.info||data;
+      var description=metadata.plot||metadata.description||metadata.storyline||'';
+      if(description)document.getElementById('tv-media-info-text').textContent=String(item.name||'Dizi')+' — '+String(description);
       var seasons=data.episodes||{}, episodes=[];
       for(var season in seasons){if(Object.prototype.hasOwnProperty.call(seasons,season)){
         var group=seasons[season];
