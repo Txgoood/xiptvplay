@@ -201,7 +201,7 @@
     clear(categories);
     action(categories,'Tümü',function(){selectedCategory='all';currentPage=0;renderChannels();});
     for(var i=0;i<categoryList.length;i++){
-      (function(c){action(categories,String(c.category_name||'Kategori'),function(){selectedCategory=String(c.category_id);currentPage=0;renderChannels();});})(categoryList[i]);
+      (function(c){var label=String(c.category_name||'Kategori');if(document.getElementById('tv-tr-only').checked&&label.toUpperCase().indexOf('TR')!==0)return;if(document.getElementById('tv-hide-adult').checked&&/^(XXX|18\\+|ADULT|🔞|❤)/i.test(label))return;action(categories,label,function(){selectedCategory=String(c.category_id);currentPage=0;renderChannels();});})(categoryList[i]);
     }
     renderChannels();
   }
@@ -226,8 +226,8 @@
   document.getElementById('tv-search').onkeyup=function(){clearTimeout(searchTimer);searchTimer=setTimeout(function(){currentPage=0;renderChannels();},250);};
   document.getElementById('tv-favorite-type').onchange=function(){document.getElementById('tv-favorite-only').checked=true;chooseMode(this.value);};
   document.getElementById('tv-sort').onchange=function(){currentPage=0;renderChannels();};
-  document.getElementById('tv-tr-only').onchange=function(){currentPage=0;renderChannels();};
-  document.getElementById('tv-hide-adult').onchange=function(){currentPage=0;renderChannels();};
+  document.getElementById('tv-tr-only').onchange=function(){currentPage=0;selectedCategory='all';renderCategories();};
+  document.getElementById('tv-hide-adult').onchange=function(){currentPage=0;selectedCategory='all';renderCategories();};
   window.XIPTVTV.refresh=renderChannels;
   document.getElementById('tv-tab-live').onclick=function(){chooseMode('live');};
   document.getElementById('tv-tab-movie').onclick=function(){chooseMode('movie');};
