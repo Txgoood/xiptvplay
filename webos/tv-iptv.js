@@ -58,6 +58,7 @@
     }catch(e){callback(e);}
   }
   function chooseMode(next){
+    focusCache=null;
     if(mode===next&&catalogData&&channels.childNodes.length&&selectedCategory==='all')return;
     mode=next;selectedCategory='all';currentPage=0;
     channels.className=mode==='live'?'tv-live-list':'tv-poster-list';
@@ -233,6 +234,7 @@
   aspectBtn.onclick=function(){setClass('tv-fill',!hasClass('tv-fill'));updatePlayerButtons();};
   // Catch D-pad before the legacy diagnostic menu handler; traverse visible controls.
   document.addEventListener('keydown',function(e){
+    if(document.getElementById('tv-home').style.display!=='none')return;
     if(document.getElementById('iptv-keyboard').style.display!=='none')return;
     var key=e.keyCode||e.which;
     if(key!==37&&key!==38&&key!==39&&key!==40&&key!==13&&key!==461&&key!==27)return;
@@ -247,7 +249,7 @@
     }
     var active=document.activeElement,idx=-1;
     for(i=0;i<list.length;i++)if(list[i]===active){idx=i;break;}
-    if(key===461 && panel.style.display!=='none'){hide(panel);document.body.className='';updatePlayerButtons();launcher.focus();e.preventDefault();e.stopImmediatePropagation();return;}
+    if(key===461 && panel.style.display!=='none'){hide(panel);document.body.className='';document.getElementById('tv-home').style.display='block';updatePlayerButtons();document.getElementById('tv-nav-home').focus();e.preventDefault();e.stopImmediatePropagation();return;}
     if(key===13 && active && active.tagName==='BUTTON'){
       active.click();e.preventDefault();e.stopImmediatePropagation();return;
     }
@@ -272,6 +274,7 @@
   };
   window.XIPTVTV.showSeriesEpisodes=function(){if(lastSeries)showSeries(lastSeries);};
   launcher.onclick=function(){
+    focusCache=null;
     // Reuse the active catalogue when changing sections from Stitch navigation.
     // Do not reset to the login/transition screen for every menu selection.
     if((' '+document.body.className+' ').indexOf(' tv-catalog ')<0){
