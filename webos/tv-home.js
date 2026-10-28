@@ -9,10 +9,7 @@ function open(section){
  home.style.display='none';
  document.body.className='tv-mode tv-catalog';
  window.XIPTVTV.startMode=section==='films'?'movie':section==='series'?'series':'live';
- document.getElementById('iptv-open').click();
- if(section==='films'||section==='series'){
-  var tab=document.getElementById('tv-tab-'+(section==='films'?'movie':'series'));if(tab)tab.click();
- }
+ window.XIPTVTV.openSection(window.XIPTVTV.startMode);
 }
 function clear(node){while(node.firstChild)node.removeChild(node.firstChild);}
 function shelf(node,items,type,limit){
@@ -23,15 +20,18 @@ function shelf(node,items,type,limit){
   var cover=String(item.stream_icon||item.cover_big||item.cover||'');
   if(/^https?:\/\//i.test(cover)){var img=document.createElement('img');img.src=cover;img.alt='';img.onerror=function(){this.style.display='none';};b.appendChild(img);}
   var title=document.createElement('span');title.textContent=String(item.name||item.title||'İçerik');b.appendChild(title);
-  b.onclick=function(){open(type);};
+  b.onclick=function(){open(type==='films'?'films':type==='series'?'series':'live');window.XIPTVTV.openItem(type==='films'?'movie':type==='series'?'series':'live',item);};
   node.appendChild(b);
  })(items[n]);}
 }
 window.XIPTVTVHome={render:function(catalog){
  var movies=catalog.vodStreams||[],series=catalog.seriesList||[],channels=catalog.liveStreams||[];
  shelf(document.getElementById('stitch-recent'),movies,'films',9);
- shelf(document.getElementById('stitch-favorites'),channels,'live',6);
+ var favorites=[],recent=[];
+ for(var c=0;c<channels.length&&favorites.length<8;c++)if(window.XIPTVTV.isFavorite('live',channels[c]))favorites.push(channels[c]);
+ shelf(document.getElementById('stitch-favorites'),favorites,'live',8);
  shelf(document.getElementById('stitch-continue'),series,'series',4);
+ window.XIPTVTVHome.data={movies:movies,series:series,channels:channels};
  var lead=movies[0];if(!lead)return;
  var cover=String(lead.stream_icon||lead.cover||'');
  var hero=document.getElementById('stitch-hero');
@@ -43,7 +43,7 @@ document.getElementById('tv-nav-home').onclick=function(){document.getElementByI
 document.getElementById('tv-home-live').onclick=function(){open('live');};
 document.getElementById('tv-home-films').onclick=function(){open('films');};
 document.getElementById('tv-home-series').onclick=function(){open('series');};
-document.getElementById('tv-feature-play').onclick=function(){open('films');};
+document.getElementById('tv-feature-play').onclick=function(){open('films');var d=window.XIPTVTVHome.data;if(d&&d.movies.length)window.XIPTVTV.openItem('movie',d.movies[0]);};
 document.getElementById('tv-feature-detail').onclick=function(){open('films');};
 document.getElementById('tv-nav-fav').onclick=function(){open('live');document.getElementById('tv-favorite-only').checked=true;if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();};
 document.getElementById('tv-nav-search').onclick=function(){open('films');document.getElementById('tv-search').click();};
