@@ -6,6 +6,7 @@
  * Credentials live only in short-lived memory and are never returned/logged.
  */
 import http from 'node:http';
+import https from 'node:https';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
@@ -23,7 +24,9 @@ const MAX_BODY=8192, PROBE_TIMEOUT=22000, MAX_SESSIONS=64, SESSION_TTL=90*60*100
 // Deliberate test-mode limits prevent accidental high-bandwidth bills on Render Free.
 const STREAM_SECONDS=Math.max(15,Math.min(300,Number(process.env.LG_MEDIA_MAX_STREAM_SECONDS||120)));
 const STREAM_BYTES=Math.max(5,Math.min(100,Number(process.env.LG_MEDIA_MAX_STREAM_MB||60)))*1024*1024;
-const sessions=new Map(),ratelimits=new Map();
+const sessions=new Map(),ratelimits=new Map(),mediaTickets=new Map();
+const MAX_UPSTREAM_BYTES=85*1024*1024;
+let mediaProxyPort=0;
 let activeProbes=0,activeStreams=0;
 function json(res,status,body){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body));}
 function error(res,status,message){json(res,status,{success:false,error:message});}
@@ -101,6 +104,68 @@ export function sourcePath(data,origin){
  if(!['mp4','mkv','avi','ts','mov','m4v'].includes(ext))throw Error('Dosya uzantısı desteklenmiyor.');
  return origin+'/'+data.kind+'/'+encodeURIComponent(user)+'/'+encodeURIComponent(pass)+'/'+id+'.'+ext;
 }
+/**
+ * Local-only media relay. FFprobe 5.2.0 lacks -max_redirects; passing media
+ * directly to it would allow unsafe redirects. Here the origin is validated,
+ * all DNS results must be public, the resolved IP is pinned for the request,
+ * and each redirect is validated again. Range requests are forwarded for
+ * seekable MP4/MKV streams. No public media proxy route is exposed.
+ */
+async function remotePublicAddress(u){
+ if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw Error('Medya kaynağında desteklenmeyen protokol.');
+ const records=await lookup(u.hostname,{all:true,verbatim:true});
+ if(!records.length||records.some(x=>!safeIp(x.address)))throw Error('Medya yönlendirmesi özel veya yerel bir IP adresine gidiyor.');
+ return records[0].address;
+}
+function relayMedia(url,req,res,ticket,remaining=2){
+ (async()=>{
+  const u=new URL(url),pinned=await remotePublicAddress(u);
+  if(!ticket||ticket.expiry<Date.now())throw Error('Medya oturumu süresi dolmuş.');
+  const transport=u.protocol==='https:'?https:http;
+  const headers={'User-Agent':'VLC/3.0.18','Accept':'*/*'};
+  if(req.headers.range&&/^bytes=\d*-\d*$/.test(String(req.headers.range)))headers.Range=req.headers.range;
+  const upstream=transport.request(u,{
+   method:'GET',headers,timeout:12000,agent:false,
+   lookup:(_host,_opts,cb)=>cb(null,pinned,isIP(pinned))
+  },response=>{
+   const status=Number(response.statusCode||502);
+   if([301,302,303,307,308].includes(status)){
+    response.resume();
+    const location=response.headers.location;
+    if(!location||remaining<=0){res.writeHead(502);res.end();return;}
+    try{const next=new URL(location,u).toString();relayMedia(next,req,res,ticket,remaining-1);}
+    catch(e){if(!res.headersSent){res.writeHead(502);res.end();}}
+    return;
+   }
+   if(status!==200&&status!==206){
+    response.resume();if(!res.headersSent){res.writeHead(502);res.end();}return;
+   }
+   const outHeaders={'Content-Type':String(response.headers['content-type']||'application/octet-stream')};
+   for(const field of ['content-length','content-range','accept-ranges'])if(response.headers[field])outHeaders[field]=response.headers[field];
+   res.writeHead(status,outHeaders);
+   response.on('data',chunk=>{
+    ticket.bytes+=chunk.length;
+    if(ticket.bytes>MAX_UPSTREAM_BYTES){
+     upstream.destroy();
+     if(!res.destroyed)res.destroy();
+    }
+   });
+   response.pipe(res);
+  });
+  upstream.on('timeout',()=>upstream.destroy(Error('Yayın sunucusu yanıt vermedi.')));
+  upstream.on('error',()=>{if(!res.headersSent){res.writeHead(502);res.end();}else res.destroy();});
+  res.on('close',()=>upstream.destroy());
+  upstream.end();
+ })().catch(()=>{if(!res.headersSent){res.writeHead(502);res.end();}});
+}
+const mediaProxy=http.createServer((req,res)=>{
+ const match=String(req.url||'').match(/^\/([a-f0-9]{48})$/);
+ if(req.method!=='GET'||!match){res.writeHead(404);res.end();return;}
+ const ticket=mediaTickets.get(match[1]);
+ if(!ticket||ticket.expiry<Date.now()){res.writeHead(404);res.end();return;}
+ relayMedia(ticket.url,req,res,ticket);
+});
+function proxyUrl(token){return 'http://127.0.0.1:'+mediaProxyPort+'/'+token;}
 function limited(req,res){
  const addr=String(req.socket.remoteAddress||'unknown'),now=Date.now();
  const entry=ratelimits.get(addr)||{time:now,count:0};
@@ -132,7 +197,7 @@ function collect(executable,args,timeout=PROBE_TIMEOUT,maxBytes=256000){
 function probeArgs(url,fallback=false){
  // First pass requests only essential stream fields; alternate pass uses the
  // full stream object for providers whose metadata is incomplete or nonstandard.
- const args=['-v','error','-user_agent','VLC/3.0.18','-protocol_whitelist','http,https,tcp,tls,crypto','-max_redirects','0','-rw_timeout',fallback?'15000000':'9500000','-probesize',fallback?'8000000':'3000000','-analyzeduration',fallback?'9000000':'5000000'];
+ const args=['-v','error','-user_agent','VLC/3.0.18','-protocol_whitelist','http,https,tcp,tls,crypto','-rw_timeout',fallback?'15000000':'9500000','-probesize',fallback?'8000000':'3000000','-analyzeduration',fallback?'9000000':'5000000'];
  if(fallback)args.push('-show_streams');
  else args.push('-show_entries','stream=index,codec_type,codec_name:stream_tags=language,title,LANGUAGE');
  args.push('-of','json',url);
@@ -170,7 +235,7 @@ function normalizeStreams(raw){
  const streams=(raw.streams||[]).filter(s=>s.codec_type==='audio'||s.codec_type==='subtitle');
  return streams.map(s=>({index:Number(s.index),type:s.codec_type,codec:String(s.codec_name||'unknown'),language:String(s.tags?.language||s.tags?.LANGUAGE||'und').slice(0,32),title:String(s.tags?.title||'').slice(0,60),externalVtt: s.codec_type==='subtitle'&&['subrip','ass','ssa','mov_text','webvtt','text'].includes(String(s.codec_name||'').toLowerCase())})).filter(s=>Number.isInteger(s.index)&&s.index>=0&&s.index<256).slice(0,40);
 }
-function getSession(token){const s=sessions.get(token);if(!s||s.expiry<Date.now()){sessions.delete(token);return null;}return s;}
+function getSession(token){const s=sessions.get(token);if(!s||s.expiry<Date.now()){sessions.delete(token);mediaTickets.delete(token);return null;}return s;}
 function sendStream(res,req,args,contentType,maxMs){
  let first=true,finished=false,bytesSent=0;
  const proc=spawn(FFMPEG,args,{stdio:['ignore','pipe','ignore'],windowsHide:true});
@@ -186,7 +251,7 @@ function sendStream(res,req,args,contentType,maxMs){
  proc.on('close',code=>{if(first&&!res.headersSent)error(res,502,'Bu medya akışı mevcut codec veya dosya biçimiyle açılamadı.');else res.end();done();});
  res.on('close',()=>{if(!res.writableEnded)proc.kill('SIGKILL');});
 }
-function cleanup(){for(const [k,v] of sessions)if(v.expiry<Date.now())sessions.delete(k);}
+function cleanup(){for(const [k,v] of sessions)if(v.expiry<Date.now()){sessions.delete(k);mediaTickets.delete(k);}for(const [k,v] of mediaTickets)if(v.expiry<Date.now())mediaTickets.delete(k);}
 const server=http.createServer(async(req,res)=>{
  const origin=req.headers.origin;
  if(origin&&allowOrigins.includes(origin)){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');}
@@ -203,12 +268,16 @@ const server=http.createServer(async(req,res)=>{
    const data=await readBody(req);
    const base=await validateHost(String(data.serverUrl||''),{username:data.username,password:data.password});
    const url=sourcePath(data,base);
-   const parsed=await probeMedia(url);
-   const streams=normalizeStreams(parsed);
    const token=randomBytes(24).toString('hex');
+   const ticket={url,expiry:Date.now()+SESSION_TTL,bytes:0};
+   mediaTickets.set(token,ticket);
+   let parsed;
+   try{parsed=await probeMedia(proxyUrl(token));}
+   catch(e){mediaTickets.delete(token);throw e;}
+   const streams=normalizeStreams(parsed);
    cleanup();
    if(sessions.size>=MAX_SESSIONS)sessions.delete(sessions.keys().next().value);
-   sessions.set(token,{url,expiry:Date.now()+SESSION_TTL,streams});
+   sessions.set(token,{url,proxyUrl:proxyUrl(token),expiry:Date.now()+SESSION_TTL,streams});
    json(res,200,{success:true,token,expiresIn:Math.floor(SESSION_TTL/1000),tracks:streams,playback:{method:'mpegts-copy',experimental:true}});
   }catch(e){error(res,400,String(e.message||'Analiz başarısız').slice(0,150));}
   finally{activeProbes--;}
@@ -225,7 +294,7 @@ const server=http.createServer(async(req,res)=>{
   activeStreams++;
   if(type==='stream'){
    const start=Math.max(0,Math.min(14400,Number(new URL(req.url,'http://localhost').searchParams.get('start'))||0));
-   const args=['-nostdin','-v','error','-user_agent','VLC/3.0.18','-rw_timeout','12000000','-ss',String(start),'-i',s.url,'-map','0:v:0','-map','0:'+index,'-c:v','copy','-c:a','copy','-f','mpegts','pipe:1'];
+   const args=['-nostdin','-v','error','-user_agent','VLC/3.0.18','-rw_timeout','12000000','-ss',String(start),'-i',s.proxyUrl,'-map','0:v:0','-map','0:'+index,'-c:v','copy','-c:a','copy','-f','mpegts','pipe:1'];
    sendStream(res,req,args,'video/mp2t',STREAM_SECONDS*1000);
   }else{
    const args=['-nostdin','-v','error','-rw_timeout','12000000','-i',s.url,'-map','0:'+index,'-c:s','webvtt','-f','webvtt','pipe:1'];
@@ -235,5 +304,8 @@ const server=http.createServer(async(req,res)=>{
  }
  error(res,404,'Uç nokta bulunamadı.');
 });
-if(process.env.NODE_ENV!=='test')server.listen(PORT,'0.0.0.0',()=>console.log('[lg-media] listening on port '+PORT+'; allowed upstream hosts: '+allowHosts.length));
-export {server,probeArgs,normalizeStreams,safeIp};
+if(process.env.NODE_ENV!=='test')mediaProxy.listen(0,'127.0.0.1',()=>{
+ mediaProxyPort=mediaProxy.address().port;
+ server.listen(PORT,'0.0.0.0',()=>console.log('[lg-media] listening on port '+PORT+'; allowed upstream hosts: '+allowHosts.length+'; safe local relay ready'));
+});
+export {server,probeArgs,normalizeStreams,safeIp,mediaProxy};
