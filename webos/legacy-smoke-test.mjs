@@ -16,7 +16,7 @@ assert(layout.includes('body.tv-mode'));
 assert(layout.includes('body.tv-mode #video'));
 assert(html.includes('id="tv-now-playing"'));
 assert(html.includes('id="tv-player-tracks"'));
-assert(html.includes('id="tv-player-episodes"'));
+assert(html.includes('id="tv-season-select"'));
 
 const metadata=JSON.parse(fs.readFileSync('webos-package/appinfo.json','utf8'));
 assert.equal(metadata.trustLevel,'netcast');
