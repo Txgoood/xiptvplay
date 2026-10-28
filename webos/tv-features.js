@@ -11,6 +11,7 @@ function isFavorite(mode,item){return !!favs()[key(mode,item)];}
 function toggleFavorite(mode,item){
  var f=favs(),k=key(mode,item);if(f[k])delete f[k];else f[k]={name:String(item.name||''),type:mode};save('favorites',f);
  if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();
+ if(window.XIPTVTVHome&&window.XIPTVTVHome.refresh)window.XIPTVTVHome.refresh();
 }
 function decorateItem(button,mode,item){
  var wrapper=document.createElement('div');wrapper.className='tv-item-wrap';
@@ -91,7 +92,7 @@ window.XIPTVTV={
  document.getElementById('tv-detail-summary').textContent=info.textContent;
  if(mode!=='series')document.getElementById('tv-season-tools').style.display='none';
  },
- setProfile:function(id,child){scope=id||'default';favoriteCache=null;document.getElementById('tv-hide-adult').checked=!!child;updateHeart();if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();},
+ setProfile:function(id,child){scope=id||'default';favoriteCache=null;document.getElementById('tv-hide-adult').checked=!!child;updateHeart();if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();if(window.XIPTVTVHome&&window.XIPTVTVHome.refresh)window.XIPTVTVHome.refresh();},
  isFavorite:isFavorite,
  getResume:function(){return read('positions',{});},
  decorateItem:decorateItem,
