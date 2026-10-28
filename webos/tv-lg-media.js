@@ -4,7 +4,7 @@
  var video=document.getElementById('video'),url=String(window.XIPTV_LG_MEDIA_URL||'').replace(/\/+$/,'');
  var ctx=null,session=null,busy=false,manual=false,started=false,offset=0;
  var playerOverlay=document.getElementById('tv-lg-subtitle-overlay'),cues=[],lastCue=-1,sourceKey='';
- var scanButton=document.getElementById('tv-lg-media-scan'),summary=document.getElementById('tv-lg-media-status');
+ var scanButton=document.getElementById('tv-lg-media-scan'),summary=document.getElementById('tv-lg-media-status'),returnButton=document.getElementById('tv-lg-native-return');
  function say(s){summary.textContent=String(s||'');}
  function request(method,path,data,cb){
   var x=new XMLHttpRequest();
@@ -76,13 +76,14 @@
    var once=function(){video.removeEventListener('loadedmetadata',once,false);try{video.currentTime=oldPosition;}catch(e){}video.play();};
    video.addEventListener('loadedmetadata',once,false);
   }catch(e){}
-  offset=0;
+  offset=0;returnButton.style.display='none';
   say('Alternatif ses oynatılamadı. Önceki çalışan oynatıcıya geri dönüldü.');
  }
  function audio(index){
   var t=track('audio',index);
   if(!t||!ctx){say('Ses parçası bulunamadı.');return;}
-  var oldSrc=video.currentSrc||video.src,oldPosition=(video.currentTime||0)+offset;
+  var oldSrc=ctx.originalUrl||video.currentSrc||video.src,oldPosition=(video.currentTime||0)+offset;
+  returnButton.style.display='inline-block';
   var next=url+'/stream/'+session.token+'/'+index+'?start='+Math.floor(oldPosition);
   var failed=false,ok=false;
   var timer=setTimeout(function(){if(!ok&&!failed){failed=true;video.removeEventListener('error',failure,false);revert(oldSrc,oldPosition);}},16000);
@@ -122,6 +123,7 @@
   });
  }
  scanButton.onclick=function(){manual=true;scan();};
+ returnButton.onclick=function(){if(ctx&&ctx.originalUrl){var pos=(video.currentTime||0)+offset;revert(ctx.originalUrl,pos);say('Önceki çalışan TV oynatıcısı geri açıldı.');}};
  video.addEventListener('timeupdate',paintSubtitles,false);
  video.addEventListener('pause',paintSubtitles,false);
  document.getElementById('tv-subtitles').addEventListener('change',function(){
@@ -132,7 +134,7 @@
   if(this.value.indexOf('lg:a:')===0){manual=true;audio(Number(this.value.split(':')[2]));}
  },false);
  window.XIPTVLGMedia={
-  setSource:function(data){ctx=data;session=null;manual=false;busy=false;started=false;offset=0;cues=[];lastCue=-1;playerOverlay.style.display='none';scanButton.disabled=false;summary.textContent='';},
+  setSource:function(data){ctx=data;session=null;manual=false;busy=false;started=false;offset=0;cues=[];lastCue=-1;playerOverlay.style.display='none';scanButton.disabled=false;returnButton.style.display='none';summary.textContent='';},
   extendMenus:extendMenus,
   scan:scan
  };
