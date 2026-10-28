@@ -19,6 +19,9 @@ const FFPROBE=process.env.LG_FFPROBE_PATH||path.join(here,'node_modules/@ffprobe
 const allowHosts=(process.env.LG_MEDIA_ALLOWED_HOSTS||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
 const allowOrigins=(process.env.LG_MEDIA_ALLOWED_ORIGINS||'null').split(',').map(x=>x.trim()).filter(Boolean);
 const MAX_BODY=8192, PROBE_TIMEOUT=22000, MAX_SESSIONS=64, SESSION_TTL=90*60*1000;
+// Deliberate test-mode limits prevent accidental high-bandwidth bills on Render Free.
+const STREAM_SECONDS=Math.max(15,Math.min(300,Number(process.env.LG_MEDIA_MAX_STREAM_SECONDS||120)));
+const STREAM_BYTES=Math.max(5,Math.min(100,Number(process.env.LG_MEDIA_MAX_STREAM_MB||60)))*1024*1024;
 const sessions=new Map(),ratelimits=new Map();
 let activeProbes=0,activeStreams=0;
 function json(res,status,body){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body));}
@@ -88,12 +91,14 @@ function normalizeStreams(raw){
 }
 function getSession(token){const s=sessions.get(token);if(!s||s.expiry<Date.now()){sessions.delete(token);return null;}return s;}
 function sendStream(res,req,args,contentType,maxMs){
- let first=true,finished=false;
+ let first=true,finished=false,bytesSent=0;
  const proc=spawn(FFMPEG,args,{stdio:['ignore','pipe','ignore'],windowsHide:true});
  const timeout=setTimeout(()=>proc.kill('SIGKILL'),maxMs);
  function done(){if(finished)return;finished=true;clearTimeout(timeout);activeStreams=Math.max(0,activeStreams-1);}
  proc.on('error',()=>{if(!res.headersSent)error(res,503,'FFmpeg çalıştırılamadı.');else res.end();done();});
  proc.stdout.on('data',chunk=>{
+  bytesSent+=chunk.length;
+  if(bytesSent>STREAM_BYTES){proc.kill('SIGKILL');return;}
   if(first){res.writeHead(200,{'Content-Type':contentType,'Cache-Control':'no-store','Access-Control-Expose-Headers':'Content-Type'});first=false;}
   if(!res.write(chunk)){proc.stdout.pause();res.once('drain',()=>proc.stdout.resume());}
  });
@@ -141,7 +146,7 @@ const server=http.createServer(async(req,res)=>{
   if(type==='stream'){
    const start=Math.max(0,Math.min(14400,Number(new URL(req.url,'http://localhost').searchParams.get('start'))||0));
    const args=['-nostdin','-v','error','-rw_timeout','12000000','-ss',String(start),'-i',s.url,'-map','0:v:0','-map','0:'+index,'-c:v','copy','-c:a','copy','-f','mpegts','pipe:1'];
-   sendStream(res,req,args,'video/mp2t',2*60*60*1000);
+   sendStream(res,req,args,'video/mp2t',STREAM_SECONDS*1000);
   }else{
    const args=['-nostdin','-v','error','-rw_timeout','12000000','-i',s.url,'-map','0:'+index,'-c:s','webvtt','-f','webvtt','pipe:1'];
    sendStream(res,req,args,'text/vtt; charset=utf-8',90000);
