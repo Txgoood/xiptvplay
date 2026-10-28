@@ -62,6 +62,7 @@ function tracksMenu(){
    opt.text='Ses '+(i+1)+(audios[i].label?' · '+audios[i].label:'')+(audios[i].language?' ('+audios[i].language+')':'');
    audio.appendChild(opt);if(audios[i].enabled){audio.value=String(i);enabled=true;}
  }
+ if(window.XIPTVLGMedia&&window.XIPTVLGMedia.extendMenus)window.XIPTVLGMedia.extendMenus(sub,audio);
  var help=document.getElementById('tv-track-notice');
  if(help)help.textContent=(!audios.length||!texts.length)?
    'TV oynatıcısı '+(!audios.length?'gömülü ses kanallarını': 'ses kanallarını')+
@@ -142,12 +143,14 @@ document.getElementById('tv-controls-toggle').onclick=function(){
 document.getElementById('tv-subtitles').onchange=function(){
  manualTrackChoice=true;
  var n=this.value,tracks=trackList('textTracks');
+ if(n.indexOf('lg:s:')===0)return;
  for(var i=0;i<tracks.length;i++)try{tracks[i].mode=String(i)===n?'showing':'disabled';}catch(e){}
  tracksMenu();
 };
 document.getElementById('tv-audio').onchange=function(){
  manualTrackChoice=true;
  var n=this.value,tracks=trackList('audioTracks');
+ if(n.indexOf('lg:a:')===0)return;
  if(n==='auto'){tracksMenu();return;}
  for(var i=0;i<tracks.length;i++)try{tracks[i].enabled=String(i)===n;}catch(e){}
  tracksMenu();
@@ -178,6 +181,7 @@ showPlayerBar();
 document.getElementById('tv-favorite-only').onchange=function(){if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();};
 window.XIPTVTV={
  refresh:null,
+ refreshTracks:tracksMenu,
  catalogReady:function(){if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();},
  setPlayingItem:function(mode,item){playingMode=mode;playingItem=item;updateHeart();
 
