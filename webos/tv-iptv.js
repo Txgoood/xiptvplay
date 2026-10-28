@@ -224,6 +224,7 @@
   document.getElementById('tv-search-scope').onchange=function(){currentPage=0;renderChannels();};
   document.getElementById('tv-advanced-search').onclick=function(){var x=document.getElementById('tv-search-scope');x.style.display=x.style.display==='none'?'inline-block':'none';};
   document.getElementById('tv-search').onkeyup=function(){clearTimeout(searchTimer);searchTimer=setTimeout(function(){currentPage=0;renderChannels();},250);};
+  document.getElementById('tv-favorite-type').onchange=function(){document.getElementById('tv-favorite-only').checked=true;chooseMode(this.value);};
   document.getElementById('tv-sort').onchange=function(){currentPage=0;renderChannels();};
   document.getElementById('tv-tr-only').onchange=function(){currentPage=0;renderChannels();};
   document.getElementById('tv-hide-adult').onchange=function(){currentPage=0;renderChannels();};
