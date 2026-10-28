@@ -48,11 +48,13 @@ jobs:
           rm -f android/app/src/main/java/com/xiptvplay/app/DownloadForegroundService.java
           python3 - <<'PY'
           from pathlib import Path
-          import re
           p=Path('android/app/src/main/AndroidManifest.xml')
           s=p.read_text()
-          s,n=re.subn(r'<service\\b[^>]*?/>', '', s, flags=re.S)
-          assert n==1, 'Expected one unused download service entry'
+          start=s.find('<service')
+          assert start>=0, 'Download service entry is missing'
+          end=s.find('/>', start)
+          assert end>=0, 'Invalid download service XML'
+          s=s[:start]+s[end+2:]
           p.write_text(s)
           PY
 
