@@ -59,7 +59,7 @@
   }
   function chooseMode(next){
     focusCache=null;
-    if(mode===next&&catalogData&&channels.childNodes.length&&selectedCategory==='all')return;
+    if(mode===next&&catalogData&&channels.childNodes.length&&selectedCategory==='all'&&!document.getElementById('tv-favorite-only').checked)return;
     mode=next;selectedCategory='all';currentPage=0;
     document.getElementById('tv-episodes').style.display='none';
     channels.className=mode==='live'?'tv-live-list':'tv-poster-list';
@@ -86,7 +86,10 @@
       var metadata=data.info||data;
       var description=metadata.plot||metadata.description||metadata.storyline||'';
       if(description)document.getElementById('tv-media-info-text').textContent=String(item.name||'Dizi')+' — '+String(description);
-      var seasons=data.episodes||{}, episodes=[];
+      var seasons=data.episodes||{}, episodes=[],selector=document.getElementById('tv-season-select'),seasonTools=document.getElementById('tv-season-tools');
+      while(selector.firstChild)selector.removeChild(selector.firstChild);
+      for(var sn in seasons)if(Object.prototype.hasOwnProperty.call(seasons,sn)){var option=document.createElement('option');option.value=sn;option.text='Sezon '+sn;selector.appendChild(option);}
+      seasonTools.style.display='block';
       for(var season in seasons){if(Object.prototype.hasOwnProperty.call(seasons,season)){
         var group=seasons[season];
         if(group&&group.length)for(var i=0;i<group.length;i++)episodes.push({season:season,item:group[i]});
@@ -103,6 +106,8 @@
           playStream('series',ep.item.id,ext,ep.item.title||'Dizi Bölümü');
         });
       })(episodes[x]);}
+      function paintSeason(){var target=document.getElementById('tv-season-episodes');clear(target);var chosen=seasons[selector.value]||[];for(var z=0;z<chosen.length;z++)(function(ep){action(target,String(ep.title||ep.episode_num||'Bölüm'),function(){var ext=String(ep.container_extension||'mp4').replace(/[^a-zA-Z0-9]/g,'');playStream('series',ep.id,ext,ep.title||'Dizi Bölümü');});})(chosen[z]);}
+      selector.onchange=paintSeason;paintSeason();
       say(episodes.length+' bölüm bulundu. Bölüm seç.');
     }
     if(cached)onSeries(null,cached);
@@ -125,11 +130,11 @@
     focusCache=null;
     clear(channels);
     var count=0;
-    var query=(document.getElementById('tv-search').value||'').toLowerCase();
+    var query=(document.getElementById('tv-search').value||'').toLowerCase(),searchScope=document.getElementById('tv-search-scope').value;
     var sorting=document.getElementById('tv-sort').value;
     var cacheKey=mode+'|'+sorting;
     var list=sortedCache[cacheKey];
-    if(!list){list=channelList.slice(0);if(sorting==='az')list.sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});if(sorting==='za')list.sort(function(a,b){return String(b.name||'').localeCompare(String(a.name||''));});sortedCache[cacheKey]=list;}
+    if(!list){list=channelList.slice(0);if(sorting==='old'||sorting==='new')list.sort(function(a,b){var x=Number(a.added||a.release_date||a.year||0),y=Number(b.added||b.release_date||b.year||0);return sorting==='old'?x-y:y-x;});if(sorting==='az')list.sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});if(sorting==='za')list.sort(function(a,b){return String(b.name||'').localeCompare(String(a.name||''));});sortedCache[cacheKey]=list;}
     var matches=[];
     var categoryNames={};for(var ca=0;ca<categoryList.length;ca++)categoryNames[String(categoryList[ca].category_id)]=String(categoryList[ca].category_name||'');
     var batch=document.createDocumentFragment();
@@ -145,7 +150,7 @@
     for(var i=0;i<list.length;i++){
       var ch=list[i];
       if(selectedCategory!=='all' && String(ch.category_id)!==selectedCategory)continue;
-      if(query&&String(ch.name||ch.title||'').toLowerCase().indexOf(query)<0)continue;
+      if(query){var inName=String(ch.name||ch.title||'').toLowerCase().indexOf(query)>=0;var inCategory=String(categoryNames[String(ch.category_id)]||'').toLowerCase().indexOf(query)>=0;if(searchScope==='name'&&!inName||searchScope==='category'&&!inCategory||searchScope==='all'&&!inName&&!inCategory)continue;}
       if(!window.XIPTVTV.filterFavorite(mode,ch))continue;
       var catLabel=categoryNames[String(ch.category_id)]||'';
       if(document.getElementById('tv-tr-only').checked && catLabel.toUpperCase().indexOf('TR')!==0)continue;
@@ -210,10 +215,14 @@
     playStream('live',lastLive.stream_id,'ts',lastLive.name);
     say('Alternatif MPEG-TS akışı deneniyor. Bu biçim de desteklenmeyebilir.');
   };
+  document.getElementById('tv-try-ts-inplayer').onclick=function(){document.getElementById('tv-try-ts').click();};
+  document.getElementById('tv-try-hls-inplayer').onclick=function(){document.getElementById('tv-try-hls').click();};
   document.getElementById('tv-try-hls').onclick=function(){
     if(!lastLive){say('Önce bir canlı kanal seç.');return;}
     playStream('live',lastLive.stream_id,'m3u8',lastLive.name);
   };
+  document.getElementById('tv-search-scope').onchange=function(){currentPage=0;renderChannels();};
+  document.getElementById('tv-advanced-search').onclick=function(){var x=document.getElementById('tv-search-scope');x.style.display=x.style.display==='none'?'inline-block':'none';};
   document.getElementById('tv-search').onkeyup=function(){clearTimeout(searchTimer);searchTimer=setTimeout(function(){currentPage=0;renderChannels();},250);};
   document.getElementById('tv-sort').onchange=function(){currentPage=0;renderChannels();};
   document.getElementById('tv-tr-only').onchange=function(){currentPage=0;renderChannels();};
