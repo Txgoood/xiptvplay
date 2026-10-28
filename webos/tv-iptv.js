@@ -268,6 +268,7 @@
   document.getElementById('tv-tr-only').onchange=function(){currentPage=0;selectedCategory='all';renderCategories();};
   document.getElementById('tv-hide-adult').onchange=function(){currentPage=0;selectedCategory='all';renderCategories();};
   window.XIPTVTV.refresh=renderChannels;
+  window.XIPTVTV.refreshCategories=renderCategories;
   document.getElementById('tv-tab-live').onclick=function(){chooseMode('live');};
   document.getElementById('tv-tab-movie').onclick=function(){chooseMode('movie');};
   document.getElementById('tv-tab-series').onclick=function(){chooseMode('series');};
