@@ -109,17 +109,39 @@
   if(turAudio){audio(turAudio.index);cues=[];playerOverlay.style.display='none';}
   else if(turSub)subtitle(turSub.index);
  }
+ function scanNativeTracks(){
+  var aud=document.getElementById('tv-audio'),sub=document.getElementById('tv-subtitles');
+  var countA=0,countS=0,tracks=null,i,t,label;
+  // webOS 2 may not expose these standard HTMLMediaElement collections.
+  // Access defensively and never replace a playing source while scanning.
+  try{
+   tracks=video.audioTracks;
+   if(tracks)for(i=0;i<tracks.length;i++){
+    t=tracks[i];label=t.label||t.language||('Ses '+(i+1));
+    addOption(aud,'TV: '+label,'native:a:'+i);countA++;
+   }
+  }catch(e){}
+  try{
+   tracks=video.textTracks;
+   if(tracks)for(i=0;i<tracks.length;i++){
+    t=tracks[i];if(t.kind&&t.kind!=='subtitles'&&t.kind!=='captions')continue;
+    label=t.label||t.language||('Altyazı '+(i+1));
+    addOption(sub,'TV: '+label,'native:s:'+i);countS++;
+   }
+  }catch(e){}
+  return {audio:countA,subtitle:countS};
+ }
  function scan(){
   if(busy||!ctx)return;
   if(!url){say('LG alternatif medya hizmeti henüz Render üzerinde yapılandırılmadı. Mevcut TV oynatıcı kullanılmaya devam ediyor.');return;}
   busy=true;scanButton.disabled=true;say('Ses ve altyazı parçaları analiz ediliyor…');
   request('POST','/tracks',{serverUrl:ctx.serverUrl,username:ctx.username,password:ctx.password,kind:ctx.kind,id:ctx.id,extension:ctx.extension},function(err,data){
    busy=false;scanButton.disabled=false;
-   if(err){say('Analiz başarısız: '+err.message);return;}
+   if(err){var fallback=scanNativeTracks();say('Sunucu analizi kullanılamadı: '+err.message+'. TV yerel taraması: '+fallback.audio+' ses, '+fallback.subtitle+' altyazı. Video oynatılmaya devam ediyor.');return;}
    if(!data||!data.tracks){say('Parça listesi alınamadı.');return;}
    session=data;say(data.tracks.length+' parça bulundu: '+data.tracks.filter(function(t){return t.type==='audio';}).length+' ses, '+data.tracks.filter(function(t){return t.type==='subtitle';}).length+' altyazı. Desteklenmeyen altyazılar yalnızca bilgi amaçlıdır.');
    if(window.XIPTVTV&&window.XIPTVTV.refreshTracks)window.XIPTVTV.refreshTracks();
-   autoSelect();
+   // Never silently replace a working stream. User chooses a track explicitly.
   });
  }
  scanButton.onclick=function(){manual=false;scan();};
@@ -129,9 +151,11 @@
  document.getElementById('tv-subtitles').addEventListener('change',function(){
   if(this.value==='off'){cues=[];lastCue=-1;playerOverlay.style.display='none';return;}
   if(this.value.indexOf('lg:s:')===0){manual=true;subtitle(Number(this.value.split(':')[2]));}
+  if(this.value.indexOf('native:s:')===0){var n=Number(this.value.split(':')[2]);try{for(var i=0;i<video.textTracks.length;i++)video.textTracks[i].mode=i===n?'showing':'disabled';say('TV altyazısı seçildi.');}catch(e){say('TV altyazı geçişini desteklemiyor.');}}
  },false);
  document.getElementById('tv-audio').addEventListener('change',function(){
   if(this.value.indexOf('lg:a:')===0){manual=true;audio(Number(this.value.split(':')[2]));}
+  if(this.value.indexOf('native:a:')===0){var n=Number(this.value.split(':')[2]);try{for(var i=0;i<video.audioTracks.length;i++)video.audioTracks[i].enabled=i===n;say('TV ses kanalı seçildi.');}catch(e){say('TV ses kanalı geçişini desteklemiyor.');}}
  },false);
  window.XIPTVLGMedia={
   setSource:function(data){ctx=data;session=null;manual=false;busy=false;started=false;offset=0;cues=[];lastCue=-1;playerOverlay.style.display='none';scanButton.disabled=false;returnButton.style.display='none';summary.textContent='';},
