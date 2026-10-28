@@ -59,7 +59,7 @@
   }
   function chooseMode(next){
     focusCache=null;
-    if(mode===next&&catalogData&&channels.childNodes.length&&selectedCategory==='all'&&!document.getElementById('tv-favorite-only').checked)return;
+    // Always repaint the selected mode: a previously active favorites filter may have emptied it.
     mode=next;selectedCategory='all';currentPage=0;
     document.getElementById('tv-episodes').style.display='none';
     channels.className=mode==='live'?'tv-live-list':'tv-poster-list';
