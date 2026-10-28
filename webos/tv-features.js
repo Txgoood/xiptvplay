@@ -73,7 +73,7 @@ function showPlayerBar(){
 document.getElementById('tv-player-rewind').onclick=function(){try{video.currentTime=Math.max(0,video.currentTime-10);}catch(e){}showPlayerBar();};
 document.getElementById('tv-player-forward').onclick=function(){try{video.currentTime=video.currentTime+10;}catch(e){}showPlayerBar();};
 document.getElementById('tv-player-tracks').onclick=function(){document.getElementById('tv-controls-toggle').click();showPlayerBar();};
-document.getElementById('tv-player-episodes').onclick=function(){if(window.XIPTVTV.showSeriesEpisodes)window.XIPTVTV.showSeriesEpisodes();showPlayerBar();};
+
 var infoButton=document.getElementById('tv-player-info');if(infoButton)infoButton.onclick=function(){document.getElementById('tv-media-info').style.display='block';showPlayerBar();};
 document.getElementById('tv-media-info-close').onclick=function(){document.getElementById('tv-media-info').style.display='none';showPlayerBar();};
 video.addEventListener('click',showPlayerBar,false);
@@ -84,7 +84,7 @@ window.XIPTVTV={
  refresh:null,
  catalogReady:function(){if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();},
  setPlayingItem:function(mode,item){playingMode=mode;playingItem=item;updateHeart();
- var e=document.getElementById('tv-player-episodes');e.style.display=mode==='series'?'inline-block':'none';
+
  var info=document.getElementById('tv-media-info-text');
  var text=String(item.name||item.title||'İçerik');var plot=item.plot||item.description||item.storyline||item.info&&item.info.plot||'';
  info.textContent=text+(plot?' — '+String(plot):' — Kaynakta açıklama bulunmuyor.');
