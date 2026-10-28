@@ -32,7 +32,7 @@ favButton.onclick=function(){if(!playingItem)return;toggleFavorite(playingMode,p
 var trackNotice=null;
 var trackPolicyKey='xiptv_webos2_language_policy_v1';
 function isTurkish(lang){lang=String(lang||'').toLowerCase();return lang==='tr'||lang==='tur'||lang==='tr-tr'||lang.indexOf('turkish')>=0||lang.indexOf('türk')>=0;}
-function languagePolicy(){try{return localStorage.getItem(trackPolicyKey)!=='off';}catch(e){return true;}}
+function languagePolicy(){return true;}
 function applyLanguagePolicy(){
  if(!languagePolicy())return;
  var aud=trackList('audioTracks'),subs=trackList('textTracks'),trAudio=-1,trSub=-1,i;
@@ -69,13 +69,12 @@ function tracksMenu(){
    (!texts.length?'altyazı kanallarını':'')+
    ' uygulamaya bildirmiyor. Kaynakta parça bulunsa bile burada listelenmeyebilir. Bu durumda otomatik dil tercihi de uygulanamaz.':'';
 }
-function applyTracks(){applyLanguagePolicy();tracksMenu();}
+var autoAppliedFor='';
+function applyTracks(){if(currentKey!==autoAppliedFor){autoAppliedFor=currentKey;applyLanguagePolicy();}tracksMenu();}
 var ctrl=document.getElementById('tv-controls');
 document.getElementById('tv-controls-toggle').onclick=function(){
  ctrl.style.display=ctrl.style.display==='none'?'block':'none';tracksMenu();
 };
-document.getElementById('tv-language-auto').checked=languagePolicy();
-document.getElementById('tv-language-auto').onchange=function(){try{localStorage.setItem(trackPolicyKey,this.checked?'on':'off');}catch(e){}if(this.checked)applyTracks();};
 document.getElementById('tv-subtitles').onchange=function(){
  var n=this.value,tracks=trackList('textTracks');
  for(var i=0;i<tracks.length;i++)try{tracks[i].mode=String(i)===n?'showing':'disabled';}catch(e){}
