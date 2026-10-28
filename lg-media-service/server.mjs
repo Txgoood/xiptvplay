@@ -154,7 +154,7 @@ export function parseProbePayload(text){
  if(!value||!Array.isArray(value.streams))throw Error('Medya analizi akış listesini döndürmedi.');
  return value;
 }
-async function probeMedia(url,runner=collect){
+export async function probeMedia(url,runner=collect){
  let firstError;
  for(let attempt=0;attempt<2;attempt++){
   try{
