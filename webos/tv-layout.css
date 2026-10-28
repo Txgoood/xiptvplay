@@ -257,3 +257,9 @@ body.tv-mode.tv-fullscreen #tv-player-controls{width:auto!important;max-width:88
 body.tv-mode #tv-media-info{position:fixed;left:24%;right:6%;bottom:11%;padding:18px 22px;background:#111e2b;color:#e5f6fc;border:2px solid #00daf3;border-radius:10px;z-index:115;max-height:50%;overflow-y:auto;font-size:19px}
 body.tv-mode #tv-media-info-close{float:right;padding:6px 13px;font-size:16px}
 body.tv-mode #tv-media-info-text{white-space:pre-wrap;line-height:1.5}
+
+/* Episode picker directly beneath the video, with legacy-friendly scrolling. */
+body.tv-mode #tv-episodes{left:auto!important;right:1%!important;width:43%!important;top:calc(245px + 43vh + 12px)!important;bottom:32px!important;overflow:hidden!important;z-index:72!important;padding:8px!important}
+body.tv-mode #tv-episodes-list{height:75%!important;overflow-y:auto!important}
+body.tv-mode #tv-episodes-list button{font-size:15px!important;padding:7px!important;margin:3px 0!important}
+body.tv-mode.tv-fullscreen #tv-episodes{position:fixed!important;left:16%!important;right:16%!important;width:auto!important;top:28%!important;bottom:16%!important;z-index:112!important;background:#16202c!important}
