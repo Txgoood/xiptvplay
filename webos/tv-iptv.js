@@ -12,7 +12,7 @@
   var channels=document.getElementById('iptv-channels');
   var categoryList=[], channelList=[], selectedCategory='all', mode='live';
   var catalogData=null, lastLive=null, connecting=false, startup=true, lastSeries=null, seriesCache={};
-  var PAGE_SIZE=60, currentPage=0, searchTimer=null, sortedCache={};
+  var PAGE_SIZE=60, currentPage=0, searchTimer=null, sortedCache={}, focusCache=null, categoryCache={};
   var server='',username='',password='';
   var SAVE_KEY='xiptv_webos2_xtream_local_v1';
   function savedCredentials(){try{return JSON.parse(localStorage.getItem(SAVE_KEY)||'null');}catch(e){return null;}}
@@ -88,6 +88,7 @@
       }}
       if(!episodes.length){say('Bu dizi için bölüm bulunamadı');return;}
       var popup=document.getElementById('tv-episodes'),list=document.getElementById('tv-episodes-list');
+      focusCache=null;
       clear(list);popup.style.display='block';
       document.getElementById('tv-episodes-title').textContent=item.name||'Dizi Bölümleri';
       for(var x=0;x<episodes.length&&x<250;x++){(function(ep){
@@ -116,6 +117,7 @@
     }catch(e){say('Oynatma hatası: '+e.message);}
   }
   function renderChannels(){
+    focusCache=null;
     clear(channels);
     var count=0;
     var query=(document.getElementById('tv-search').value||'').toLowerCase();
@@ -126,6 +128,15 @@
     var matches=[];
     var categoryNames={};for(var ca=0;ca<categoryList.length;ca++)categoryNames[String(categoryList[ca].category_id)]=String(categoryList[ca].category_name||'');
     var batch=document.createDocumentFragment();
+    if(selectedCategory!=='all'){
+      var ck=cacheKey+'|'+selectedCategory;
+      if(!categoryCache[ck]){
+        var filtered=[];
+        for(var ix=0;ix<list.length;ix++)if(String(list[ix].category_id)===selectedCategory)filtered.push(list[ix]);
+        categoryCache[ck]=filtered;
+      }
+      list=categoryCache[ck];
+    }
     for(var i=0;i<list.length;i++){
       var ch=list[i];
       if(selectedCategory!=='all' && String(ch.category_id)!==selectedCategory)continue;
@@ -176,6 +187,7 @@
     say(matches.length+' içerik bulundu. Sayfa '+(currentPage+1)+'/'+totalPages+'.');
   }
   function renderCategories(){
+    focusCache=null;
     clear(categories);
     action(categories,'Tümü',function(){selectedCategory='all';currentPage=0;renderChannels();});
     for(var i=0;i<categoryList.length;i++){
@@ -225,15 +237,13 @@
     var key=e.keyCode||e.which;
     if(key!==37&&key!==38&&key!==39&&key!==40&&key!==13&&key!==461&&key!==27)return;
     if((key===461||key===27)&&hasClass('tv-fullscreen')){setClass('tv-fullscreen',false);updatePlayerButtons();fullBtn.focus();e.preventDefault();e.stopImmediatePropagation();return;}
-    var list=[],nodes=document.getElementsByTagName('button'),i,el;
-    for(i=0;i<nodes.length;i++){
-      el=nodes[i];
-      if(el.offsetWidth>0&&el.offsetHeight>0)list.push(el);
-    }
-    var inputs=document.getElementsByTagName('input');
-    for(i=0;i<inputs.length;i++){
-      el=inputs[i];
-      if(el.offsetWidth>0&&el.offsetHeight>0)list.push(el);
+    var list=focusCache,i,el;
+    if(!list){list=[];
+      var nodes=document.getElementsByTagName('button');
+      for(i=0;i<nodes.length;i++){el=nodes[i];if(el.offsetWidth>0&&el.offsetHeight>0)list.push(el);}
+      var inputs=document.getElementsByTagName('input');
+      for(i=0;i<inputs.length;i++){el=inputs[i];if(el.offsetWidth>0&&el.offsetHeight>0)list.push(el);}
+      focusCache=list;
     }
     var active=document.activeElement,idx=-1;
     for(i=0;i<list.length;i++)if(list[i]===active){idx=i;break;}
@@ -244,7 +254,12 @@
     if(key===37||key===38||key===39||key===40){
       // Keep text-field arrow navigation native while typing.
       if(active && active.tagName==='INPUT')return;
-      if(list.length){list[(idx+(key===37||key===38?-1:1)+list.length)%list.length].focus();}
+      if(list.length){
+        var next=list[(idx+(key===37||key===38?-1:1)+list.length)%list.length];
+        if(next.offsetWidth&&next.offsetHeight){next.focus();
+          if(next.parentNode===channels||next.parentNode&&next.parentNode.parentNode===channels){try{next.scrollIntoView(false);}catch(e){}}}
+        else focusCache=null;
+      }
       e.preventDefault();e.stopImmediatePropagation();
     }
   },true);
@@ -279,7 +294,7 @@
     document.getElementById('iptv-user').value='';
     document.getElementById('iptv-pass').value='';
     document.getElementById('iptv-remember').checked=false;
-    server='';username='';password='';categoryList=[];channelList=[];
+    server='';username='';password='';categoryList=[];channelList=[];catalogData=null;sortedCache={};categoryCache={};focusCache=null;
     hide(browser);show(login);say('Bu TV’deki kayıtlı giriş bilgileri temizlendi.');
   };
   document.getElementById('iptv-hide').onclick=function(){hide(panel);document.body.className='';updatePlayerButtons();launcher.focus();};
@@ -300,7 +315,7 @@
       request('/api/iptv/xtream/catalog',{serverUrl:server,username:username,password:password},function(error,catalog){
         connecting=false;
         if(error){show(panel);show(login);hide(browser);document.getElementById('tv-home').style.display='none';say('Katalog hatası: '+error.message);return;}
-        catalogData=catalog;sortedCache={};currentPage=0;
+        catalogData=catalog;sortedCache={};categoryCache={};focusCache=null;currentPage=0;
         if(window.XIPTVTVHome&&window.XIPTVTVHome.render)window.XIPTVTVHome.render(catalog);
         window.XIPTVTV.catalogReady();
         hide(login);show(browser);
