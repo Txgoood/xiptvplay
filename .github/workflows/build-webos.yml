@@ -27,6 +27,12 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Test isolated LG media service
+        run: |
+          node --check lg-media-service/server.mjs
+          node --test lg-media-service/test.mjs
+          node --check webos/tv-lg-media.js
+
       - name: Prepare standalone webOS 2 app
         run: |
           set -euo pipefail
@@ -76,7 +82,7 @@ jobs:
             echo "Unsupported modern JavaScript module found in webOS 2 package"
             exit 1
           fi
-          node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv'||f.version!=='1.0.7'||f.trustLevel!=='netcast'||f.vendorExtension?.allowCrossDomain!==true) process.exit(1)"
+          node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv'||f.version!=='1.0.8'||f.trustLevel!=='netcast'||f.vendorExtension?.allowCrossDomain!==true) process.exit(1)"
 
       - name: Run remote-control and playback UI smoke tests
         run: node webos/legacy-smoke-test.mjs
