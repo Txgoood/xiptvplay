@@ -5,7 +5,7 @@ import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 process.env.NODE_ENV='test';
-const {probeMedia,normalizeStreams}=await import('./server.mjs');
+const {probeMedia,normalizeStreams,probeArgs}=await import('./server.mjs');
 const binary=path.join(path.dirname(fileURLToPath(import.meta.url)),'node_modules/@ffprobe-installer/linux-x64/ffprobe');
 function rawProbe(args){
  return new Promise(resolve=>{
@@ -40,6 +40,8 @@ test('production FFprobe binary reads real audio over HTTP as JSON',async()=>{
   const version=await rawProbe(['-version']);
   assert.ok(version.stdout.includes('ffprobe version'),'Wrong probe binary: '+version.stderr.slice(0,150));
   assert.ok(minimal.stdout.includes('"streams"'),'Minimal probe failed code '+minimal.code+'; stdout='+minimal.stdout.slice(0,100)+' stderr='+minimal.stderr.slice(0,250));
+  const full=await rawProbe(probeArgs(source));
+  assert.ok(full.stdout.includes('"streams"'),'Full flags probe failed code='+full.code+' stdout='+full.stdout.slice(0,130)+' stderr='+full.stderr.slice(0,350));
   const data=await probeMedia(source);
   const audio=normalizeStreams(data).filter(t=>t.type==='audio');
   assert.ok(audio.length>=1,'FFprobe did not find PCM audio');
