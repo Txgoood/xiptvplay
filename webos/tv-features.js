@@ -30,6 +30,19 @@ function updateHeart(){
 favButton.onclick=function(){if(!playingItem)return;toggleFavorite(playingMode,playingItem);updateHeart();};
 /* webOS 2 may decode embedded MKV/TS tracks without exposing them as HTML5 track lists. */
 var trackNotice=null;
+var trackPolicyKey='xiptv_webos2_language_policy_v1';
+function isTurkish(lang){lang=String(lang||'').toLowerCase();return lang==='tr'||lang==='tur'||lang==='tr-tr'||lang.indexOf('turkish')>=0||lang.indexOf('türk')>=0;}
+function languagePolicy(){try{return localStorage.getItem(trackPolicyKey)!=='off';}catch(e){return true;}}
+function applyLanguagePolicy(){
+ if(!languagePolicy())return;
+ var aud=trackList('audioTracks'),subs=trackList('textTracks'),trAudio=-1,trSub=-1,i;
+ for(i=0;i<aud.length;i++)if(isTurkish(aud[i].language)||isTurkish(aud[i].label)){trAudio=i;break;}
+ for(i=0;i<subs.length;i++)if(isTurkish(subs[i].language)||isTurkish(subs[i].label)){trSub=i;break;}
+ if(trAudio>=0){for(i=0;i<aud.length;i++)try{aud[i].enabled=i===trAudio;}catch(e){}
+  for(i=0;i<subs.length;i++)try{subs[i].mode='disabled';}catch(e){}
+ }else if(trSub>=0){for(i=0;i<subs.length;i++)try{subs[i].mode=i===trSub?'showing':'disabled';}catch(e){}}
+}
+
 function trackList(name){
  try{return video[name]||[];}catch(e){return [];}
 }
@@ -54,13 +67,15 @@ function tracksMenu(){
    'TV oynatıcısı '+(!audios.length?'gömülü ses kanallarını': 'ses kanallarını')+
    (!audios.length&&!texts.length?' ve ':'')+
    (!texts.length?'altyazı kanallarını':'')+
-   ' uygulamaya bildirmiyor. Kaynakta parça bulunsa bile burada listelenmeyebilir.':'';
+   ' uygulamaya bildirmiyor. Kaynakta parça bulunsa bile burada listelenmeyebilir. Bu durumda otomatik dil tercihi de uygulanamaz.':'';
 }
-function applyTracks(){tracksMenu();}
+function applyTracks(){applyLanguagePolicy();tracksMenu();}
 var ctrl=document.getElementById('tv-controls');
 document.getElementById('tv-controls-toggle').onclick=function(){
  ctrl.style.display=ctrl.style.display==='none'?'block':'none';tracksMenu();
 };
+document.getElementById('tv-language-auto').checked=languagePolicy();
+document.getElementById('tv-language-auto').onchange=function(){try{localStorage.setItem(trackPolicyKey,this.checked?'on':'off');}catch(e){}if(this.checked)applyTracks();};
 document.getElementById('tv-subtitles').onchange=function(){
  var n=this.value,tracks=trackList('textTracks');
  for(var i=0;i<tracks.length;i++)try{tracks[i].mode=String(i)===n?'showing':'disabled';}catch(e){}
@@ -72,9 +87,9 @@ document.getElementById('tv-audio').onchange=function(){
  for(var i=0;i<tracks.length;i++)try{tracks[i].enabled=String(i)===n;}catch(e){}
  tracksMenu();
 };
-video.addEventListener('loadedmetadata',tracksMenu,false);
-video.addEventListener('loadeddata',tracksMenu,false);
-video.addEventListener('canplay',tracksMenu,false);
+video.addEventListener('loadedmetadata',function(){applyTracks();},false);
+video.addEventListener('loadeddata',function(){applyTracks();},false);
+video.addEventListener('canplay',function(){applyTracks();},false);
 try{if(video.audioTracks&&video.audioTracks.addEventListener)video.audioTracks.addEventListener('addtrack',tracksMenu,false);}catch(e){}
 try{if(video.textTracks&&video.textTracks.addEventListener)video.textTracks.addEventListener('addtrack',tracksMenu,false);}catch(e){}
 document.getElementById('tv-speed').onchange=function(){try{video.playbackRate=Number(this.value);}catch(e){}};
