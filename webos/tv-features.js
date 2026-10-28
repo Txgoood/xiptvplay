@@ -76,9 +76,68 @@ function applyTracks(){
  }
  tracksMenu();
 }
+/* Read-only TV media pipeline inspection. Never select an unknown native index:
+   older webOS firmware may report success and then stop playback on invalid tracks. */
+var scanGeneration=0,activeNativeBridge=null;
+function scanNativeTracks(){
+ var output=document.getElementById('tv-track-scan-results');
+ var mediaId='';
+ try{mediaId=String(video.mediaId||'');}catch(e){}
+ if(!mediaId){
+  output.textContent='Bu oynatma motoru mediaId vermedi. HTML5 ses ve altyazı listeleri dışında yerel TV bilgisi okunamıyor.';
+  return;
+ }
+ var generation=++scanGeneration;
+ output.textContent='TV medya motorundan parça bilgileri okunuyor…';
+ function result(payload){
+  if(generation!==scanGeneration)return;
+  var obj=payload||{},details=obj.data||obj;
+  if(typeof details==='string')try{details=JSON.parse(details);}catch(e){details={};}
+  if(obj.returnValue===false){
+   output.textContent='TV medya motoru erişime izin vermedi: '+String(obj.errorText||obj.errorCode||'erişim reddedildi').slice(0,120);
+   return;
+  }
+  var source=(details&&details.sourceInfo)||(details&&details.source_info)||{},audio=source.audio_streams||source.audioTracks||[],
+      subtitles=source.subtitle_streams||source.text_streams||source.subtitles||[];
+  if(!(audio instanceof Array))audio=[];
+  if(!(subtitles instanceof Array))subtitles=[];
+  if(!audio.length&&!subtitles.length){
+   output.textContent='TV medya motoru yanıt verdi fakat dil/parça listesi vermedi. HTML5: '+trackList('audioTracks').length+' ses, '+trackList('textTracks').length+' altyazı.';
+   return;
+  }
+  var lines=['TV medya motoru: '+audio.length+' ses, '+subtitles.length+' altyazı kanalı bildiriyor.'];
+  function append(items,prefix){
+   for(var i=0;i<items.length&&i<32;i++){
+    var t=items[i]||{},tags=t.tags||{},lang=t.language||t.lang||tags.language||tags.LANGUAGE||'dil belirtilmemiş';
+    lines.push(prefix+' '+(i+1)+': '+String(lang).slice(0,45)+(t.codec_name?' · '+String(t.codec_name).slice(0,25):''));
+   }
+  }
+  append(audio,'Ses');append(subtitles,'Altyazı');
+  lines.push('Bunlar yalnızca bilgi amaçlıdır; TV seçme API’si doğrulanmadığı için oynatma değiştirilmez.');
+  output.textContent=lines.join('\n');
+ }
+ function failure(err){
+  if(generation!==scanGeneration)return;
+  output.textContent='TV medya servisinden parça listesi alınamadı: '+String(err&&err.errorText||err&&err.message||'erişim desteklenmiyor').slice(0,120);
+ }
+ var args={mediaId:mediaId};
+ try{
+  if(window.webOS&&webOS.service&&typeof webOS.service.request==='function'){
+   webOS.service.request('luna://com.webos.media',{method:'getPipelineState',parameters:args,onSuccess:result,onFailure:failure});
+  }else if(typeof window.PalmServiceBridge==='function'){
+   activeNativeBridge=new window.PalmServiceBridge();
+   activeNativeBridge.onservicecallback=function(raw){try{result(JSON.parse(raw));}catch(e){failure(e);}};
+   activeNativeBridge.call('luna://com.webos.media/getPipelineState',JSON.stringify(args));
+  }else{
+   output.textContent='Bu uygulamada webOS medya servisi erişimi yok. Yerel TV parça listesi okunamıyor.';
+  }
+ }catch(e){failure(e);}
+}
+document.getElementById('tv-track-scan').onclick=scanNativeTracks;
 var ctrl=document.getElementById('tv-controls');
 document.getElementById('tv-controls-toggle').onclick=function(){
  ctrl.style.display=ctrl.style.display==='none'?'block':'none';tracksMenu();
+ if(ctrl.style.display!=='none'&&!trackList('audioTracks').length&&!trackList('textTracks').length)scanNativeTracks();
 };
 document.getElementById('tv-subtitles').onchange=function(){
  manualTrackChoice=true;
@@ -134,7 +193,10 @@ window.XIPTVTV={
  decorateItem:decorateItem,
  beforePlay:function(kind,id,url,name){
    currentKey=kind+':'+String(id);
-   applyTracks();tracksMenu();
+   scanGeneration++;
+   manualTrackChoice=false;autoAppliedTracks=false;
+   document.getElementById('tv-track-scan-results').textContent='';
+   tracksMenu();
    document.getElementById('tv-current-media').textContent=name||'';
    if(kind==='live')currentKey='';
  },
