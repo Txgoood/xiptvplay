@@ -48,12 +48,14 @@ jobs:
           rm -f android/app/src/main/java/com/xiptvplay/app/DownloadForegroundService.java
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p=Path('android/app/src/main/AndroidManifest.xml')
           s=p.read_text()
-          start=s.index('        <service\\n') if '        <service\\n' in s else s.index('        <service\n')
-          end=s.index('</service>',start)+len('</service>') if '</service>' in s[start:] else s.index('/>',start)+2
-          p.write_text(s[:start]+s[end:])
+          s,n=re.subn(r'<service\\b[^>]*?/>', '', s, flags=re.S)
+          assert n==1, 'Expected one unused download service entry'
+          p.write_text(s)
           PY
+
       - name: Build simulator debug APK
         run: |
           chmod +x android/gradlew
