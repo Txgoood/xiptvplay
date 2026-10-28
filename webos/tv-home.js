@@ -6,6 +6,8 @@ var side=document.getElementById('stitch-side');home.parentNode.insertBefore(sid
 /* Drawer must live outside hidden IPTV panel to work on home. */
 var favoritesPanel=document.getElementById('tv-favorites-panel');
 home.parentNode.insertBefore(favoritesPanel,home);
+var settingsPanel=document.getElementById('tv-settings-panel');
+home.parentNode.insertBefore(settingsPanel,home);
 var ids=['tv-nav-home','tv-home-live','tv-home-films','tv-home-series','tv-nav-fav','tv-nav-search','tv-nav-profile','tv-nav-settings','tv-feature-play','tv-feature-detail','tv-show-diagnostics'];
 var nodes=[],i;for(i=0;i<ids.length;i++)nodes.push(document.getElementById(ids[i]));
 function markActive(id){var all=['tv-nav-home','tv-home-live','tv-home-films','tv-home-series','tv-nav-fav','tv-nav-search','tv-nav-profile','tv-nav-settings'];for(var j=0;j<all.length;j++)document.getElementById(all[j]).className=all[j]===id?'selected':'';}
@@ -64,10 +66,12 @@ function favMode(mode){document.getElementById('tv-favorites-panel').style.displ
 document.getElementById('tv-fav-live').onclick=function(){favMode('live');};document.getElementById('tv-fav-movie').onclick=function(){favMode('movie');};document.getElementById('tv-fav-series').onclick=function(){favMode('series');};
 document.getElementById('tv-nav-search').onclick=function(){open('films');document.getElementById('tv-search').click();};
 document.getElementById('tv-nav-profile').onclick=function(){open('live');document.getElementById('tv-profile-switch').click();};
-function settings(show){document.getElementById('tv-settings-panel').style.display=show?'block':'none';if(show)document.getElementById('tv-settings-close').focus();}
+function settings(show){settingsPanel.style.display=show?'block':'none';if(show)document.getElementById('tv-settings-close').focus();}
 document.getElementById('tv-nav-settings').onclick=function(){var p=document.getElementById('tv-settings-panel');settings(p.style.display==='none');document.getElementById('tv-favorites-panel').style.display='none';};
 document.addEventListener('click',function(e){var p=document.getElementById('tv-settings-panel'),b=document.getElementById('tv-nav-settings');if(p.style.display!=='none'&&!p.contains(e.target)&&!b.contains(e.target))settings(false);var q=document.getElementById('tv-favorites-panel'),fb=document.getElementById('tv-nav-fav');if(q.style.display!=='none'&&!q.contains(e.target)&&!fb.contains(e.target))q.style.display='none';},false);
-function syncFilters(){document.getElementById('tv-tr-only').checked=document.getElementById('tv-settings-tr').checked;document.getElementById('tv-hide-adult').checked=document.getElementById('tv-settings-adult').checked;if(window.XIPTVTV.refresh)window.XIPTVTV.refresh();}
+var FILTER_KEY='xiptv_webos2_category_filters_v1';
+function syncFilters(){document.getElementById('tv-tr-only').checked=document.getElementById('tv-settings-tr').checked;document.getElementById('tv-hide-adult').checked=document.getElementById('tv-settings-adult').checked;try{localStorage.setItem(FILTER_KEY,JSON.stringify({tr:document.getElementById('tv-settings-tr').checked,adult:document.getElementById('tv-settings-adult').checked}));}catch(e){}if(window.XIPTVTV&&window.XIPTVTV.refresh)window.XIPTVTV.refresh();}
+try{var savedFilters=JSON.parse(localStorage.getItem(FILTER_KEY)||'{}');document.getElementById('tv-settings-tr').checked=!!savedFilters.tr;document.getElementById('tv-settings-adult').checked=!!savedFilters.adult;document.getElementById('tv-tr-only').checked=!!savedFilters.tr;document.getElementById('tv-hide-adult').checked=!!savedFilters.adult;}catch(e){}
 document.getElementById('tv-settings-tr').onchange=syncFilters;
 document.getElementById('tv-settings-adult').onchange=syncFilters;
 document.getElementById('tv-settings-close').onclick=function(){settings(false);document.getElementById('tv-nav-settings').focus();};
