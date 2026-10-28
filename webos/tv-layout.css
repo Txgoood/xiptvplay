@@ -298,3 +298,7 @@ body.tv-mode #iptv-channels .tv-empty-results{padding:18px 12px;color:#f2d8a8;fo
 #tv-favorites-panel button{display:block;width:100%;font-size:20px;padding:12px 8px;margin:7px 0;background:#253749;color:#fff;border:1px solid #456075;border-radius:7px}
 #tv-favorites-panel button:focus{outline:3px solid #00daf3}
 #tv-favorites-panel h2{font-size:24px;color:#00daf3}
+
+/* v1.0.7: optional read-only media track diagnostics; usable on old LG WebKit. */
+body.tv-mode #tv-track-scan{font-size:16px;padding:9px 15px;margin:7px 5px;background:#1e3643;color:#e8faff;border:1px solid #67c2d5}
+body.tv-mode #tv-track-scan-results{font-size:16px;line-height:1.55;white-space:pre-wrap;color:#c3e5ed;padding:7px;max-height:170px;overflow-y:auto}
