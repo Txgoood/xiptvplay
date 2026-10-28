@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 process.env.NODE_ENV='test';
-const {safeIp,normalizeStreams,sourcePath,probeArgs,isXtreamAuthorized,validateHost}=await import('./server.mjs');
+const {safeIp,normalizeStreams,sourcePath,probeArgs,parseProbePayload,isXtreamAuthorized,validateHost}=await import('./server.mjs');
 test('blocks loopback, RFC1918 and link-local addresses',()=>{
  for(const ip of ['127.0.0.1','10.0.0.1','172.16.1.1','192.168.2.4','169.254.169.254','::1','fc00::2'])assert.equal(safeIp(ip),false,ip);
  assert.equal(safeIp('1.1.1.1'),true);
@@ -59,4 +59,30 @@ test('forbids private or loopback DNS even with active Xtream credentials',async
  };
  await assert.rejects(validateHost('http://internal.example:8080',{username:'u',password:'p'},mock),/özel ağa/);
  await assert.rejects(validateHost('http://internal.example:8080/path',{username:'u',password:'p'},mock),/geçersiz/);
+});
+
+test('parses genuine ffprobe stream JSON, including Turkish audio and subtitle',()=>{
+ const data=parseProbePayload('\uFEFF  '+JSON.stringify({streams:[
+  {index:0,codec_type:'video',codec_name:'h264'},
+  {index:1,codec_type:'audio',codec_name:'aac',tags:{language:'eng'}},
+  {index:2,codec_type:'audio',codec_name:'aac',tags:{language:'tur'}},
+  {index:3,codec_type:'subtitle',codec_name:'subrip',tags:{language:'tur'}}
+ ]})+'\n');
+ const tracks=normalizeStreams(data);
+ assert.deepEqual(tracks.map(x=>x.language),['eng','tur','tur']);
+});
+test('recovers trailing FFprobe output but rejects non-stream JSON',()=>{
+ const value=parseProbePayload('notices\n{"streams":[{"index":2,"codec_type":"audio","codec_name":"ac3"}]}\n');
+ assert.equal(normalizeStreams(value)[0].index,2);
+ assert.throws(()=>parseProbePayload(''),/boş çıktı/);
+ assert.throws(()=>parseProbePayload('<html>unauthorized</html>'),/JSON yerine geçersiz veri/);
+ assert.throws(()=>parseProbePayload('{"error":"unauthorized"}'),/akış listesini döndürmedi/);
+});
+test('two-pass FFprobe has bounded timeouts and full-stream fallback',()=>{
+ const first=probeArgs('https://host.invalid/1.mkv');
+ const second=probeArgs('https://host.invalid/1.mkv',true);
+ assert.ok(first.includes('-show_entries'));
+ assert.ok(second.includes('-show_streams'));
+ assert.ok(first.includes('-max_redirects'));
+ assert.equal(second.at(-1),'https://host.invalid/1.mkv');
 });
