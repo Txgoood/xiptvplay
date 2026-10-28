@@ -24,7 +24,8 @@ function shelf(node,items,type,limit){
   node.appendChild(b);
  })(items[n]);}
 }
-window.XIPTVTVHome={render:function(catalog){
+window.XIPTVTVHome={catalog:null,refresh:function(){if(this.catalog)this.render(this.catalog);},render:function(catalog){
+ this.catalog=catalog;
  var movies=catalog.vodStreams||[],series=catalog.seriesList||[],channels=catalog.liveStreams||[];
  shelf(document.getElementById('stitch-recent'),movies,'films',9);
  var favorites=[],recent=[];
@@ -43,7 +44,7 @@ window.XIPTVTVHome={render:function(catalog){
  document.getElementById('stitch-feature-title').textContent=String(lead.name||'İçerikleri Keşfet');
  document.getElementById('stitch-feature-description').textContent='Film ve dizi koleksiyonun büyük ekranda. Kategorileri keşfet, oynatmaya başla.';
 }};
-document.getElementById('tv-nav-home').onclick=function(){document.getElementById('iptv-panel').style.display='none';document.body.className='';home.style.display='block';};
+document.getElementById('tv-nav-home').onclick=function(){window.XIPTVTVHome.refresh();document.getElementById('iptv-panel').style.display='none';document.body.className='';home.style.display='block';};
 document.getElementById('tv-home-live').onclick=function(){open('live');};
 document.getElementById('tv-home-films').onclick=function(){open('films');};
 document.getElementById('tv-home-series').onclick=function(){open('series');};
