@@ -1,7 +1,8 @@
 /**
  * XIPTV Play LG-only experimental media companion.
  * Separate process: NEVER runs in the Android/standard IPTV backend.
- * Requires explicit LG_MEDIA_ALLOWED_HOSTS, limiting upstreams to operator-approved hosts.
+ * Accepts approved hosts OR a verified active Xtream account on a public host.
+ * New IPTV server addresses are verified automatically; no per-host manual edits.
  * Credentials live only in short-lived memory and are never returned/logged.
  */
 import http from 'node:http';
@@ -37,14 +38,58 @@ function safeIp(ip){
   n[0]===192&&n[1]===0&&n[2]===0||
   n[0]===198&&n[1]>=18&&n[1]<=19);
 }
-export async function validateHost(serverUrl){
- const u=new URL(serverUrl);
- if(!['http:','https:'].includes(u.protocol)||u.username||u.password||u.search||u.hash||u.pathname!=='/'&&u.pathname!=='')throw Error('Sunucu adresi geçersiz.');
+/**
+ * Validate public DNS, then accept either a pre-approved upstream or an Xtream
+ * account that the upstream itself authenticates. A changed playlist URL does
+ * not require a Render environment-variable update.
+ *
+ * No anonymous/unverified arbitrary media URLs are accepted. Redirects are
+ * rejected during auth, and the media process is bounded separately.
+ */
+export function isXtreamAuthorized(data){
+ const user=data&&data.user_info;
+ if(!user||!(user.auth===1||user.auth==='1'))return false;
+ const status=String(user.status||'').trim().toLowerCase();
+ return status==='active'||status==='enabled'||status==='';
+}
+export async function validateHost(serverUrl, credentials, deps={}){
+ let u;
+ try{u=new URL(String(serverUrl||''));}catch(e){throw Error('Sunucu adresi geçersiz.');}
+ if(!['http:','https:'].includes(u.protocol)||u.username||u.password||u.search||u.hash||(u.pathname!=='/'&&u.pathname!==''))throw Error('Sunucu adresi geçersiz.');
  const h=u.hostname.replace(/^\[|\]$/g,'').toLowerCase().replace(/\.$/,'');
- if(!allowHosts.length||!allowHosts.includes(h))throw Error('Bu yayın sunucusu LG medya servisi için izinli değil.');
- const addresses=await lookup(h,{all:true,verbatim:true});
- if(!addresses.length||addresses.some(a=>!safeIp(a.address)))throw Error('Sunucu adresi yerel veya özel ağa yönlendiriliyor.');
- return u.origin;
+ if(!h||h.length>253)throw Error('Sunucu alan adı geçersiz.');
+ const resolver=deps.lookup||lookup;
+ let addresses;
+ try{addresses=await resolver(h,{all:true,verbatim:true});}
+ catch(e){throw Error('Yayın sunucusunun adresi çözümlenemedi.');}
+ if(!addresses.length||addresses.some(a=>!safeIp(a.address)))throw Error('Yayın sunucusu yerel veya özel ağa yönlendiriliyor.');
+ // Existing approved providers remain backwards-compatible.
+ if(allowHosts.includes(h))return u.origin;
+ const username=String(credentials&&credentials.username||'');
+ const password=String(credentials&&credentials.password||'');
+ if(!username||!password||username.length>160||password.length>160)throw Error('Otomatik sunucu doğrulaması için Xtream oturumu gerekli.');
+ const api=new URL('/player_api.php',u.origin);
+ api.searchParams.set('username',username);
+ api.searchParams.set('password',password);
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),9000);
+ try{
+  const fetcher=deps.fetch||fetch;
+  const response=await fetcher(api.toString(),{method:'GET',redirect:'manual',signal:controller.signal,headers:{'User-Agent':'VLC/3.0.18','Accept':'application/json'}});
+  // Never chase an arbitrary destination returned by the provider.
+  if(!response.ok||response.status>=300)throw Error('Xtream hesabı bu sunucuda doğrulanamadı.');
+  const max=128*1024,declared=Number(response.headers&&response.headers.get('content-length')||0);
+  if(declared>max)throw Error('Xtream doğrulama yanıtı sınırı aşıyor.');
+  const raw=await response.text();
+  if(raw.length>max)throw Error('Xtream doğrulama yanıtı sınırı aşıyor.');
+  let data;try{data=JSON.parse(raw);}catch(e){throw Error('Bu adres Xtream doğrulama yanıtı vermedi.');}
+  if(!isXtreamAuthorized(data))throw Error('Xtream hesabı aktif değil veya sunucu doğrulamayı reddetti.');
+  return u.origin;
+ }catch(e){
+  if(e.name==='AbortError')throw Error('Yayın sunucusu doğrulaması zaman aşımına uğradı.');
+  if(e.message&&(/Xtream|yanıtı sınırı|Bu adres/).test(e.message))throw e;
+  throw Error('Yayın sunucusunda hesap doğrulaması yapılamadı.');
+ }finally{clearTimeout(timer);}
 }
 export function sourcePath(data,origin){
  if(!['movie','series'].includes(data.kind))throw Error('Alternatif motor yalnızca Film/Dizi için kullanılabilir.');
@@ -120,7 +165,7 @@ const server=http.createServer(async(req,res)=>{
   activeProbes++;
   try{
    const data=await readBody(req);
-   const base=await validateHost(String(data.serverUrl||''));
+   const base=await validateHost(String(data.serverUrl||''),{username:data.username,password:data.password});
    const url=sourcePath(data,base);
    const text=await collect(FFPROBE,probeArgs(url));
    let parsed;try{parsed=JSON.parse(text);}catch(e){throw Error('Medya parça verisi okunamadı.');}
