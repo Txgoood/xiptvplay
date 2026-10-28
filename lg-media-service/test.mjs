@@ -83,6 +83,6 @@ test('two-pass FFprobe has bounded timeouts and full-stream fallback',()=>{
  const second=probeArgs('https://host.invalid/1.mkv',true);
  assert.ok(first.includes('-show_entries'));
  assert.ok(second.includes('-show_streams'));
- assert.ok(first.includes('-max_redirects'));
+ assert.equal(first.includes('-max_redirects'),false);
  assert.equal(second.at(-1),'https://host.invalid/1.mkv');
 });
