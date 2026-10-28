@@ -313,7 +313,7 @@
   if(hydrate()){
     show(panel);hide(login);hide(browser);say('Katalog otomatik yükleniyor...');document.getElementById('iptv-connect').click();
   }else{
-    startup=false;show(panel);show(login);hide(browser);
+    show(panel);show(login);hide(browser);
     document.getElementById('tv-home').style.display='none';
     say('Xtream hesabını ekleyerek başlayabilirsin.');
   }
