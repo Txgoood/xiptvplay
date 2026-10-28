@@ -129,7 +129,43 @@ function collect(executable,args,timeout=PROBE_TIMEOUT,maxBytes=256000){
   proc.on('close',code=>{if(code!==0)finish(Error('Medya analizi başarısız oldu; kaynak veya codec desteklenmiyor.'));else finish(null,Buffer.concat(chunks).toString('utf8'));});
  });
 }
-function probeArgs(url){return ['-v','error','-user_agent','VLC/3.0.18','-protocol_whitelist','http,https,tcp,tls,crypto','-max_redirects','0','-rw_timeout','12000000','-probesize','3000000','-analyzeduration','5000000','-show_entries','stream=index,codec_type,codec_name,disposition:stream_tags=language,title,LANGUAGE','-of','json',url];}
+function probeArgs(url,fallback=false){
+ // First pass requests only essential stream fields; alternate pass uses the
+ // full stream object for providers whose metadata is incomplete or nonstandard.
+ const args=['-v','error','-user_agent','VLC/3.0.18','-protocol_whitelist','http,https,tcp,tls,crypto','-max_redirects','0','-rw_timeout',fallback?'15000000':'9500000','-probesize',fallback?'8000000':'3000000','-analyzeduration',fallback?'9000000':'5000000'];
+ if(fallback)args.push('-show_streams');
+ else args.push('-show_entries','stream=index,codec_type,codec_name:stream_tags=language,title,LANGUAGE');
+ args.push('-of','json',url);
+ return args;
+}
+export function parseProbePayload(text){
+ // FFprobe JSON ordinarily starts with "{". Handle optional UTF-8 BOM and
+ // trailing non-JSON data without ever displaying or logging source URLs.
+ const normalized=String(text||'').replace(/^\uFEFF/,'').trim();
+ if(!normalized)throw Error('Medya analizi boş çıktı döndürdü.');
+ let value;
+ try{value=JSON.parse(normalized);}
+ catch(e){
+  const first=normalized.indexOf('{'),last=normalized.lastIndexOf('}');
+  if(first<0||last<=first)throw Error('Medya analizi JSON yerine geçersiz veri döndürdü.');
+  try{value=JSON.parse(normalized.slice(first,last+1));}
+  catch(e2){throw Error('Medya analizi geçerli parça verisi döndürmedi.');}
+ }
+ if(!value||!Array.isArray(value.streams))throw Error('Medya analizi akış listesini döndürmedi.');
+ return value;
+}
+async function probeMedia(url,runner=collect){
+ let firstError;
+ for(let attempt=0;attempt<2;attempt++){
+  try{
+   const text=await runner(FFPROBE,probeArgs(url,attempt===1),attempt===0?10500:15000);
+   const parsed=parseProbePayload(text);
+   if(parsed.streams.some(x=>x.codec_type==='audio'||x.codec_type==='subtitle'))return parsed;
+   firstError=Error('Kaynak ses veya altyazı parçası bildirmedi.');
+  }catch(e){firstError=e;}
+ }
+ throw firstError||Error('Medya analizi tamamlanamadı.');
+}
 function normalizeStreams(raw){
  const streams=(raw.streams||[]).filter(s=>s.codec_type==='audio'||s.codec_type==='subtitle');
  return streams.map(s=>({index:Number(s.index),type:s.codec_type,codec:String(s.codec_name||'unknown'),language:String(s.tags?.language||s.tags?.LANGUAGE||'und').slice(0,32),title:String(s.tags?.title||'').slice(0,60),externalVtt: s.codec_type==='subtitle'&&['subrip','ass','ssa','mov_text','webvtt','text'].includes(String(s.codec_name||'').toLowerCase())})).filter(s=>Number.isInteger(s.index)&&s.index>=0&&s.index<256).slice(0,40);
@@ -167,8 +203,7 @@ const server=http.createServer(async(req,res)=>{
    const data=await readBody(req);
    const base=await validateHost(String(data.serverUrl||''),{username:data.username,password:data.password});
    const url=sourcePath(data,base);
-   const text=await collect(FFPROBE,probeArgs(url));
-   let parsed;try{parsed=JSON.parse(text);}catch(e){throw Error('Medya parça verisi okunamadı.');}
+   const parsed=await probeMedia(url);
    const streams=normalizeStreams(parsed);
    const token=randomBytes(24).toString('hex');
    cleanup();
