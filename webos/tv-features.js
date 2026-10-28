@@ -28,40 +28,55 @@ function updateHeart(){
  favButton.title=isFavorite(playingMode,playingItem)?'Favorilerden çıkar':'Favorilere ekle';
 }
 favButton.onclick=function(){if(!playingItem)return;toggleFavorite(playingMode,playingItem);updateHeart();};
-function applyTracks(){
- var tracks=video.textTracks||[];
- for(var i=0;i<tracks.length;i++)try{tracks[i].mode='disabled';}catch(e){}
- document.getElementById('tv-subtitles').value='off';
- var audios=video.audioTracks;
- if(audios&&audios.length){
-   var preferred=-1;
-   for(var j=0;j<audios.length;j++){var lang=String(audios[j].language||'').toLowerCase();if(lang==='tr'||lang.indexOf('tur')===0){preferred=j;break;}}
-   if(preferred>=0)try{for(var k=0;k<audios.length;k++)audios[k].enabled=k===preferred;}catch(e){}
- }
+/* webOS 2 may decode embedded MKV/TS tracks without exposing them as HTML5 track lists. */
+var trackNotice=null;
+function trackList(name){
+ try{return video[name]||[];}catch(e){return [];}
 }
 function tracksMenu(){
  var sub=document.getElementById('tv-subtitles'),audio=document.getElementById('tv-audio');
+ var texts=trackList('textTracks'),audios=trackList('audioTracks'),i,opt,enabled=false;
  while(sub.options.length>1)sub.remove(1);
  while(audio.options.length>1)audio.remove(1);
- var i,opt;
- for(i=0;i<(video.textTracks||[]).length;i++){
-   opt=document.createElement('option');opt.value=String(i);opt.text='Altyazı '+(i+1)+' / '+String(video.textTracks[i].language||'');sub.appendChild(opt);
+ for(i=0;i<texts.length;i++){
+   opt=document.createElement('option');opt.value=String(i);
+   opt.text='Altyazı '+(i+1)+(texts[i].label?' · '+texts[i].label:'')+(texts[i].language?' ('+texts[i].language+')':'');
+   sub.appendChild(opt);
+   if(texts[i].mode==='showing')sub.value=String(i);
  }
- for(i=0;i<(video.audioTracks||[]).length;i++){
-   opt=document.createElement('option');opt.value=String(i);opt.text='Ses '+(i+1)+' / '+String(video.audioTracks[i].language||'');audio.appendChild(opt);
-   if(video.audioTracks[i].enabled)audio.value=String(i);
+ for(i=0;i<audios.length;i++){
+   opt=document.createElement('option');opt.value=String(i);
+   opt.text='Ses '+(i+1)+(audios[i].label?' · '+audios[i].label:'')+(audios[i].language?' ('+audios[i].language+')':'');
+   audio.appendChild(opt);if(audios[i].enabled){audio.value=String(i);enabled=true;}
  }
+ var help=document.getElementById('tv-track-notice');
+ if(help)help.textContent=(!audios.length||!texts.length)?
+   'TV oynatıcısı '+(!audios.length?'gömülü ses kanallarını': 'ses kanallarını')+
+   (!audios.length&&!texts.length?' ve ':'')+
+   (!texts.length?'altyazı kanallarını':'')+
+   ' uygulamaya bildirmiyor. Kaynakta parça bulunsa bile burada listelenmeyebilir.':'';
 }
+function applyTracks(){tracksMenu();}
 var ctrl=document.getElementById('tv-controls');
-document.getElementById('tv-controls-toggle').onclick=function(){ctrl.style.display=ctrl.style.display==='none'?'block':'none';tracksMenu();};
+document.getElementById('tv-controls-toggle').onclick=function(){
+ ctrl.style.display=ctrl.style.display==='none'?'block':'none';tracksMenu();
+};
 document.getElementById('tv-subtitles').onchange=function(){
- var n=this.value,tracks=video.textTracks||[];
+ var n=this.value,tracks=trackList('textTracks');
  for(var i=0;i<tracks.length;i++)try{tracks[i].mode=String(i)===n?'showing':'disabled';}catch(e){}
+ tracksMenu();
 };
 document.getElementById('tv-audio').onchange=function(){
- var n=this.value,tracks=video.audioTracks||[];
- for(var i=0;i<tracks.length;i++)try{tracks[i].enabled=(n==='auto'?tracks[i].enabled:String(i)===n);}catch(e){}
+ var n=this.value,tracks=trackList('audioTracks');
+ if(n==='auto'){tracksMenu();return;}
+ for(var i=0;i<tracks.length;i++)try{tracks[i].enabled=String(i)===n;}catch(e){}
+ tracksMenu();
 };
+video.addEventListener('loadedmetadata',tracksMenu,false);
+video.addEventListener('loadeddata',tracksMenu,false);
+video.addEventListener('canplay',tracksMenu,false);
+try{if(video.audioTracks&&video.audioTracks.addEventListener)video.audioTracks.addEventListener('addtrack',tracksMenu,false);}catch(e){}
+try{if(video.textTracks&&video.textTracks.addEventListener)video.textTracks.addEventListener('addtrack',tracksMenu,false);}catch(e){}
 document.getElementById('tv-speed').onchange=function(){try{video.playbackRate=Number(this.value);}catch(e){}};
 document.getElementById('tv-seek-back').onclick=function(){try{video.currentTime=Math.max(0,video.currentTime-10);}catch(e){}};
 document.getElementById('tv-seek-forward').onclick=function(){try{video.currentTime+=10;}catch(e){}};
