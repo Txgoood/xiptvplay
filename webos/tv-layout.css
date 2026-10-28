@@ -292,3 +292,9 @@ body.tv-mode #iptv-channels{overflow-y:scroll!important;-webkit-overflow-scrolli
 body.tv-mode #iptv-channels .tv-item-wrap{min-height:45px}
 
 body.tv-mode #iptv-channels .tv-empty-results{padding:18px 12px;color:#f2d8a8;font-size:18px;line-height:1.5;white-space:normal}
+
+/* Favorites drawer is shared by the home launcher and the catalogue. */
+#tv-favorites-panel{position:fixed;left:96px;top:25%;width:240px;z-index:125;background:#111c29;border:2px solid #00daf3;border-radius:9px;padding:12px;color:#fff;box-shadow:0 4px 22px #000}
+#tv-favorites-panel button{display:block;width:100%;font-size:20px;padding:12px 8px;margin:7px 0;background:#253749;color:#fff;border:1px solid #456075;border-radius:7px}
+#tv-favorites-panel button:focus{outline:3px solid #00daf3}
+#tv-favorites-panel h2{font-size:24px;color:#00daf3}
