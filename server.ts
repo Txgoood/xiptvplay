@@ -281,9 +281,9 @@ async function startServer() {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       ];
 
-      let response: Response | null = null;
+      let response: globalThis.Response | null = null;
       let finalUrl = targetUrl;
-      let lastErrorResponse: Response | null = null;
+      let lastErrorResponse: globalThis.Response | null = null;
 
       for (const ua of USER_AGENTS) {
         headers['User-Agent'] = ua;
@@ -648,6 +648,10 @@ async function startServer() {
         category_id: s.category_id,
         container_extension: s.container_extension || 'mp4',
         rating_5based: s.rating_5based,
+        rating: s.rating,
+        added: s.added,
+        releaseDate: s.releaseDate || s.release_date || s.releasedate,
+        genre: s.genre,
         year: s.year,
         custom_sid: s.custom_sid,
       }));
@@ -658,6 +662,11 @@ async function startServer() {
         cover: s.cover,
         category_id: s.category_id,
         rating: s.rating,
+        rating_5based: s.rating_5based,
+        added: s.added,
+        last_modified: s.last_modified,
+        releaseDate: s.releaseDate || s.release_date || s.releasedate,
+        genre: s.genre,
         year: s.year,
       }));
 
@@ -820,7 +829,7 @@ async function startServer() {
     const rawTitle = typeof req.query.title === 'string' ? req.query.title : '';
     const title = rawTitle.replace(/\b(19|20)\d{2}\b/g, '').replace(/\b(4k|uhd|1080p|720p|fhd|hdr|hevc|x265|x264|multi|dual|tr dublaj|altyazılı)\b/gi, '').replace(/[\[\]{}()|._-]+/g, ' ').replace(/\bTR\b/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 130);
     if (!title || title.length < 2) return res.status(400).json({ error: 'Geçerli bir film veya dizi adı bulunamadı.' });
-    const authHeaders = token.startsWith('eyJ') ? { Authorization: 'Bearer ' + token } : {};
+    const authHeaders: Record<string, string> = token.startsWith('eyJ') ? { Authorization: 'Bearer ' + token } : {};
     const keyParam = token.startsWith('eyJ') ? '' : '&api_key=' + encodeURIComponent(token);
     const fetchTmdb = async (endpoint: string) => {
       const response = await fetch('https://api.themoviedb.org/3' + endpoint + (endpoint.includes('?') ? '&' : '?') + 'language=tr-TR' + keyParam, {
@@ -989,3 +998,4 @@ startServer().catch((err) => {
   console.error('[xiptvplay Engine] Failed to start server:', err);
   process.exit(1);
 });
+

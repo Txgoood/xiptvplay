@@ -1,5 +1,6 @@
 import { MediaItem, XtreamUserInfo, XtreamServerInfo, SeriesDetail, SeriesEpisode, SeriesSeason } from '../types';
 import { isNative, httpGetJson, httpGetCatalogJson } from './net';
+import { catalogTimestamp, catalogRating, catalogReleaseDate } from './catalogDiscovery';
 
 export interface XtreamVerificationResult {
   success: boolean;
@@ -310,7 +311,10 @@ export class XtreamClientService {
             type: 'movie',
             resolution: vod.name?.toUpperCase().includes('4K') ? '4K UHD' : '1080p HEVC',
             year: vod.year ? parseInt(vod.year, 10) : undefined,
-            rating: vod.rating_5based ? String(vod.rating_5based) : undefined,
+            rating: catalogRating(vod.rating) || catalogRating(vod.rating_5based, true),
+            addedAt: catalogTimestamp(vod.added),
+            releaseDate: catalogReleaseDate(vod.releaseDate || vod.release_date || vod.releasedate),
+            genres: typeof vod.genre === 'string' ? vod.genre.split(/[,/]/).map((g: string) => g.trim()).filter(Boolean) : undefined,
             poster: vod.stream_icon || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&auto=format&fit=crop&q=80',
             streamUrl: this.getSafeStreamUrl(rawStreamUrl),
             rawStreamUrl,
@@ -337,7 +341,12 @@ export class XtreamClientService {
             category: categoryName,
             type: 'series',
             resolution: 'FHD 60P',
-            rating: series.rating ? String(series.rating) : undefined,
+            rating: catalogRating(series.rating) || catalogRating(series.rating_5based, true),
+            addedAt: catalogTimestamp(series.added),
+            updatedAt: catalogTimestamp(series.last_modified),
+            releaseDate: catalogReleaseDate(series.releaseDate || series.release_date || series.releasedate),
+            year: series.year ? parseInt(series.year, 10) : undefined,
+            genres: typeof series.genre === 'string' ? series.genre.split(/[,/]/).map((g: string) => g.trim()).filter(Boolean) : undefined,
             poster: series.cover || 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&auto=format&fit=crop&q=80',
             streamUrl: this.getSafeStreamUrl(rawStreamUrl),
             rawStreamUrl,
@@ -539,3 +548,4 @@ export class XtreamClientService {
     return { expiryDays, expiryDateStr };
   }
 }
+

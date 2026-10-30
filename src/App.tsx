@@ -1169,6 +1169,9 @@ export default function App() {
 
             {currentScreen === 'catalog' && (
               <CatalogScreen
+                key={historyProfileId}
+                profileId={historyProfileId}
+                watchHistory={watchHistory}
                 catalog={childVisibleCatalog.map((c) => ({
                   ...c,
                   isFavorite: activeFavoriteItems.some(f => f.id === c.id),
@@ -1521,3 +1524,4 @@ export default function App() {
     </div>
   );
 }
+

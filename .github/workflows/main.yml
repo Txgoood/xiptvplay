@@ -11,6 +11,8 @@ on:
       - 'scripts/android-emulator-smoke.sh'
       - 'android/**'
       - 'src/**'
+      - 'public/**'
+      - 'tests/**'
       - 'package.json'
       - 'package-lock.json'
 
@@ -36,6 +38,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Type check and catalog regression tests
+        run: |
+          npm run lint
+          node --import tsx --test tests/catalog-discovery.test.ts
 
       - name: Build web app
         run: npm run build
@@ -147,3 +154,4 @@ jobs:
           path: emulator-test-results/
           if-no-files-found: warn
           retention-days: 14
+

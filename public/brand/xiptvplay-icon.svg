@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108" role="img" aria-label="XIPTV Play">
+  <defs><linearGradient id="tile" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#162c37"/><stop offset="1" stop-color="#07121a"/></linearGradient><linearGradient id="cyan" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#0566d9"/><stop offset=".55" stop-color="#00c5f0"/><stop offset="1" stop-color="#00f0ff"/></linearGradient></defs>
+  <rect x="0" y="0" width="108" height="108" rx="24" fill="url(#tile)"/>
+  <rect x="7" y="7" width="94" height="94" rx="20" fill="none" stroke="#00f0ff" stroke-opacity=".2"/>
+  <path d="M29 29H42L54 46L66 29H79L61 54L79 79H66L54 62L42 79H29L47 54Z" fill="url(#cyan)"/>
+  <path d="M53 43L70 54L53 65Z" fill="#e9fdff"/>
+</svg>

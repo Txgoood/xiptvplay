@@ -1,26 +1,26 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { MediaItem, Playlist } from '../../types';
 import { StorageService } from '../../services/storage';
 import type { WatchHistoryEntry } from '../../services/watchHistory';
+import { CatalogMediaCard } from './CatalogMediaCard';
+import { buildDiscoveryShelves, readCatalogPreferences, saveCatalogPreferences, sortCatalog, SORT_OPTIONS, VIEW_OPTIONS, type CatalogSort, type CatalogView, type CatalogPreferences } from '../../services/catalogDiscovery';
 import {
   ArrowLeft,
   Search,
   X,
   Tv,
-  Heart,
-  Play,
-  Download,
-  Layers,
-  Film,
-  Info,
-  CalendarDays,
   Sparkles,
   ChevronDown,
   ListFilter,
+  ArrowDownUp,
+  LayoutGrid,
+  Check,
 } from 'lucide-react';
 
 interface CatalogScreenProps {
   catalog: MediaItem[];
+  profileId?: string;
+  watchHistory?: WatchHistoryEntry[];
   activePlaylist: Playlist | null;
   onBackToPlaylists: () => void;
   onRetryCatalog?: () => void;
@@ -40,6 +40,8 @@ const PAGE_CHUNK = 60;
 
 export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   catalog,
+  profileId = 'parent',
+  watchHistory = [],
   activePlaylist,
   onBackToPlaylists,
   onRetryCatalog,
@@ -61,6 +63,21 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [categorySort, setCategorySort] = useState<'az' | 'za' | 'oldest' | 'newest'>('az');
+  const [preferences, setPreferences] = useState(() => readCatalogPreferences(profileId));
+  const [openTools, setOpenTools] = useState<'sort' | 'view' | null>(null);
+  useEffect(() => { setPreferences(readCatalogPreferences(profileId)); setOpenTools(null); }, [profileId]);
+  useEffect(() => { setVisibleCount(PAGE_CHUNK); }, [catalog, preferences.sort, preferences.view]);
+  useEffect(() => {
+    if (!openTools) return;
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpenTools(null); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [openTools]);
+  const updatePreferences = (patch: Partial<CatalogPreferences>) => {
+    const next = { ...preferences, ...patch };
+    setPreferences(next); saveCatalogPreferences(profileId, next); setOpenTools(null);
+  };
+  const sortable = activeTab === 'movie' || activeTab === 'series';
   const appSettings = StorageService.getSettings();
   const hideAdultCategories = Boolean(appSettings.hideAdultCategories);
   const showOnlyTurkishCategories = Boolean(appSettings.showOnlyTurkishCategories);
@@ -128,10 +145,12 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
     const categories = categoriesForTab.filter((cat) => (!hideAdultCategories || cat.name === 'Tümü' || !isAdultCategory(cat.name)) && (!showOnlyTurkishCategories || cat.name === 'Tümü' || isTurkishCategory(cat.name)));
     const allCategory = categories.find((cat) => cat.name === 'Tümü');
     const children = categories.filter((cat) => cat.name !== 'Tümü');
-    const yearForCategory = (name: string) => {
-      const years = visibleCatalog.filter((item) => (item.category || 'Genel').trim() === name && typeof item.year === 'number' && item.year > 0).map((item) => item.year as number);
-      return years.length ? Math.min(...years) : null;
-    };
+    const categoryYears = new Map<string, number>();
+    for (const item of visibleCatalog) if (item.year) {
+      const name = (item.category || 'Genel').trim();
+      categoryYears.set(name, Math.min(categoryYears.get(name) ?? item.year, item.year));
+    }
+    const yearForCategory = (name: string) => categoryYears.get(name) ?? null;
     children.sort((a, b) => {
       if (categorySort === 'za') return b.name.localeCompare(a.name, 'tr', { sensitivity: 'base' });
       if (categorySort === 'oldest' || categorySort === 'newest') {
@@ -183,21 +202,23 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
     });
   }, [visibleCatalog, activeTab, selectedCategory, searchQuery]);
 
+  const orderedItems = useMemo(() => sortable ? sortCatalog(filteredItems, preferences.sort) : filteredItems,
+    [filteredItems, sortable, preferences.sort]);
+  const shelves = useMemo(() => buildDiscoveryShelves(itemsForActiveTab, watchHistory), [itemsForActiveTab, watchHistory]);
+  const hasAddedDates = filteredItems.some(item => Boolean(item.addedAt));
+
   // Performanslı DOM gösterimi için sayfalanmış içerik
   const visibleItems = useMemo(() => {
-    return filteredItems.slice(0, visibleCount);
-  }, [filteredItems, visibleCount]);
+    return orderedItems.slice(0, visibleCount);
+  }, [orderedItems, visibleCount]);
 
   const handleLoadMore = () => {
     setVisibleCount((prev) => Math.min(filteredItems.length, prev + PAGE_CHUNK));
   };
 
-  const handleLoadAll = () => {
-    setVisibleCount(filteredItems.length);
-  };
 
   return (
-    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-2 pb-28 gap-3.5 select-none">
+    <div className="flex flex-col w-full max-w-none mx-auto px-3 sm:px-4 lg:px-6 pt-2 pb-28 gap-3.5 select-none">
       {/* Active Playlist Header Strip */}
       <div className="flex items-center justify-between p-3 rounded-2xl bg-[#1c1b1d] border border-white/5 shadow-md">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -314,8 +335,31 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         </button>
       </div>
 
+      {!isCatalogLoading && catalog.length > 0 && activeTab !== 'live' && !searchQuery.trim() && selectedCategory === 'Tümü' && !shelves.some(shelf => shelf.title === 'Bu hafta çıkanlar') && (
+        <section className="rounded-2xl bg-[#1c1b1d] border border-white/5 p-3" aria-label="Bu hafta çıkanlar">
+          <h2 className="font-bold text-sm text-[#00f0ff]">Bu hafta çıkanlar</h2>
+          <p className="text-xs text-[#b9cacb] mt-1">Bu hafta için doğrulanmış ilk yayın tarihi bulunmuyor. Yeni eklenenler ve sana uygun seçimler aşağıda gösterilir.</p>
+        </section>
+      )}
+      {!isCatalogLoading && activeTab !== 'live' && !searchQuery.trim() && selectedCategory === 'Tümü' && shelves.map(shelf => (
+        <section key={shelf.title} className="catalog-shelf min-w-0" aria-label={shelf.title}>
+          <div className="flex items-center gap-2 mb-1"><Sparkles size={17} className="text-[#00f0ff]"/><h2 className="font-bold text-base">{shelf.title}</h2></div>
+          <p className="text-[11px] text-[#849495] mb-3">{shelf.subtitle}</p>
+          <div className="flex gap-3 overflow-x-auto pb-3 snap-x">
+            {shelf.items.map(item => <button type="button" key={item.id} onClick={() => item.type === 'series' ? onOpenSeriesDetail(item) : onOpenTmdbInfo(item)}
+              className="relative shrink-0 w-[32vw] sm:w-36 lg:w-44 snap-start text-left group" aria-label={`${item.title} keşfet`}>
+              <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-[#29292c]">
+                <img src={item.poster || '/brand/xiptvplay-icon.svg'} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = '/brand/xiptvplay-icon.svg'; }}/>
+                {shelf.badge && <span className="absolute bottom-0 inset-x-0 px-2 py-1 bg-[#00f0ff] text-[#00363a] font-bold text-[10px] text-center">{shelf.badge}</span>}
+              </div>
+              <span className="block text-xs font-bold mt-1.5 line-clamp-2">{item.title}</span>
+            </button>)}
+          </div>
+        </section>
+      ))}
+
       {/* Kategori çipleri ve tüm alt kategorileri açan menü */}
-      {categoriesForTab.length > 1 && (
+      {categoriesForTab.length > 0 && (
         <div className="flex items-center gap-2 min-w-0">
           <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
             {categoriesForTab.filter((cat) => (!hideAdultCategories || cat.name === 'Tümü' || !isAdultCategory(cat.name)) && (!showOnlyTurkishCategories || cat.name === 'Tümü' || isTurkishCategory(cat.name))).map((cat) => (
@@ -332,8 +376,26 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
           <button type="button" onClick={() => { setIsCategoryMenuOpen(true); setCategorySearch(''); }} aria-label="Alt kategorileri listele" title="Alt kategorileri listele" className="shrink-0 w-10 h-10 rounded-xl bg-[#201f21] border border-white/10 text-[#00f0ff] flex items-center justify-center hover:bg-[#2a2a2c]">
             <ListFilter className="w-5 h-5" />
           </button>
+          {sortable && <button type="button" onClick={() => setOpenTools(openTools === 'sort' ? null : 'sort')} aria-label="İçerikleri sırala" aria-expanded={openTools === 'sort'} title="İçerikleri sırala" className="shrink-0 min-h-10 px-2 rounded-xl bg-[#201f21] border border-[#00f0ff]/30 text-[#00f0ff] flex items-center gap-1.5 text-xs font-bold"><ArrowDownUp size={18}/><span className="hidden min-[400px]:inline">Sırala</span></button>}
+          <button type="button" onClick={() => setOpenTools(openTools === 'view' ? null : 'view')} aria-label="Katalog görünümü" aria-expanded={openTools === 'view'} title="Katalog görünümü" className="shrink-0 w-10 h-10 rounded-xl bg-[#201f21] border border-white/10 text-[#00f0ff] flex items-center justify-center"><LayoutGrid size={18}/></button>
         </div>
       )}
+      {sortable && <p className="text-[11px] text-[#849495] -mt-1" aria-live="polite">
+        {SORT_OPTIONS.find(([key]) => key === preferences.sort)?.[1]} · {VIEW_OPTIONS.find(([key]) => key === preferences.view)?.[1]}
+        {preferences.sort.startsWith('added-') && !hasAddedDates && ' · Eklenme tarihi yok; sağlayıcı sırası korunuyor. Kataloğu yenileyerek tarihleri alabilirsin.'}
+      </p>}
+      {openTools && <div className="fixed inset-0 z-[110] bg-black/70 flex items-end sm:items-center justify-center sm:p-4" onClick={() => setOpenTools(null)}>
+        <section role="dialog" aria-modal="true" aria-label={openTools === 'sort' ? 'İçerik sıralaması' : 'Katalog görünümü'} onClick={event => event.stopPropagation()} className="w-full sm:max-w-md max-h-[88dvh] overflow-auto rounded-t-3xl sm:rounded-3xl bg-[#171719] border border-white/10 p-4 pb-8">
+          <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-base">{openTools === 'sort' ? 'İçerikleri sırala' : 'Katalog görünümü'}</h2><button autoFocus type="button" onClick={() => setOpenTools(null)} aria-label="Seçenekleri kapat" className="min-h-10 min-w-10 flex items-center justify-center"><X size={20}/></button></div>
+          <p className="text-xs text-[#b9cacb] mb-3">Seçimin bu profil için hatırlanır.{openTools === 'sort' ? ' Film ve Dizi sekmelerinde, tüm alt kategorilerde uygulanır. Tarihi veya puanı olmayanlar sonda gösterilir.' : ''}</p>
+          {(openTools === 'sort' ? SORT_OPTIONS : VIEW_OPTIONS).map(([key, label]) => <button type="button" key={key} aria-pressed={key === (openTools === 'sort' ? preferences.sort : preferences.view)}
+            onClick={() => openTools === 'sort' ? updatePreferences({ sort: key as CatalogSort }) : updatePreferences({ view: key as CatalogView })}
+            className="w-full min-h-12 flex items-center justify-between gap-3 px-3 py-3 mb-1 rounded-xl bg-white/5 text-left text-sm">
+            {label}{key === (openTools === 'sort' ? preferences.sort : preferences.view) && <Check size={18} className="text-[#00f0ff]"/>}
+          </button>)}
+          {openTools === 'sort' && <p className="text-[11px] text-[#849495] mt-3">Puanlar sağlayıcının bildirdiği 10 üzerinden puanlardır; IMDb kaynağı doğrulanmış değildir. Eklenme tarihi ile yapım yılı farklıdır.</p>}
+        </section>
+      </div>}
 
       {isCategoryMenuOpen && (
         <div className="fixed inset-0 z-[100] bg-black/75 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setIsCategoryMenuOpen(false)}>
@@ -409,168 +471,10 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         </div>
       ) : (
         <>
-          {/* Catalog Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {visibleItems.map((item) => {
-              const isLive = item.type === 'live';
-              const isSeries = item.type === 'series';
-
-              return (
-                <div
-                  key={item.id}
-                  className="group relative flex flex-col rounded-2xl bg-[#1c1b1d] border border-white/5 p-3 shadow-md gap-2.5 transition-all hover:border-[#00f0ff]/30 overflow-hidden"
-                >
-                  {/* Poster / Thumbnail with click interaction */}
-                  <div
-                    onClick={() => {
-                      if (!isLive) onOpenTmdbInfo(item);
-                      else onPlayMedia(item);
-                    }}
-                    className="relative aspect-video rounded-xl bg-[#2a2a2c] overflow-hidden cursor-pointer"
-                  >
-                    <img
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      alt={item.title}
-                      src={item.poster}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80';
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e10] via-transparent to-transparent"></div>
-
-                    {/* Badges */}
-                    <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                      <span className="px-1.5 py-0.5 rounded bg-[#0e0e10]/90 text-[#00f0ff] font-headline text-[9px] font-bold tracking-normal shadow">
-                        {item.resolution}
-                      </span>
-                      {isLive && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-[#65f2b5]/20 text-[#4edea3] font-headline text-[9px] font-bold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#4edea3] animate-pulse"></span>
-                          CANLI
-                        </span>
-                      )}
-                      {isSeries && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-[#0566d9]/30 text-[#adc6ff] font-headline text-[9px] font-bold flex items-center gap-1">
-                          <Layers className="w-3 h-3 text-[#00f0ff]" />
-                          DİZİ
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Favorite Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleFavorite(item.id);
-                      }}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 flex items-center justify-center text-[#ffb4ab] transition-colors cursor-pointer"
-                      title={item.isFavorite ? 'Favorilerden Çıkar' : 'Favorilere Ekle'}
-                    >
-                      <Heart
-                        className={`w-4 h-4 ${
-                          item.isFavorite ? 'fill-[#ffb4ab] text-[#ffb4ab]' : 'text-[#ffb4ab]'
-                        }`}
-                      />
-                    </button>
-
-                    {/* Rating / Duration / Channel Number */}
-                    <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[11px] text-[#e5e1e4]">
-                      {item.channelNumber && (
-                        <span className="font-mono text-[#00f0ff] font-bold">#{item.channelNumber}</span>
-                      )}
-                      {item.duration && <span>{item.duration}</span>}
-                      {item.rating && (
-                        <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold flex items-center gap-0.5">
-                          ★ {item.rating}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Title & EPG Info */}
-                  <div className="flex flex-col min-w-0">
-                    <h4
-                      onClick={() => {
-                        if (!isLive) onOpenTmdbInfo(item);
-                        else onPlayMedia(item);
-                      }}
-                      className="font-headline text-[14px] font-bold text-[#e5e1e4] truncate cursor-pointer hover:text-[#00f0ff] transition-colors"
-                      title={item.title}
-                    >
-                      {item.title}
-                    </h4>
-                    {isLive && item.epgCurrent ? (
-                      <div className="flex flex-col gap-1 mt-1">
-                        <span className="text-[11px] text-[#4edea3] font-medium truncate">
-                          {item.epgCurrent}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-[#b9cacb] mt-0.5 truncate">
-                        {item.category} •{' '}
-                        {item.type === 'movie'
-                          ? 'Film'
-                          : item.type === 'series'
-                          ? 'Dizi (Çok Sezonlu)'
-                          : 'Yayın'}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 pt-1 border-t border-white/5">
-                    {isLive && <button
-                      onClick={() => onOpenEpgGuide(item)}
-                      className="h-9 px-3 rounded-full bg-[#201f21] text-[#00f0ff] border border-white/10 flex items-center justify-center gap-1 text-xs font-semibold"
-                      title="TV Yayın Rehberi"
-                    ><CalendarDays className="w-4 h-4" /><span>Rehber</span></button>}
-                    {!isLive && <button
-                      onClick={() => onOpenTmdbInfo(item)}
-                      className="h-9 px-3 rounded-full bg-[#201f21] text-[#00f0ff] border border-white/10 flex items-center justify-center gap-1 text-xs font-semibold"
-                      title="Film / dizi bilgileri"
-                    ><Info className="w-4 h-4" /><span>Bilgi</span></button>}
-                    {isSeries ? (
-                      <button
-                        onClick={() => onOpenSeriesDetail(item)}
-                        className="flex-1 h-9 rounded-full bg-gradient-to-r from-[#0566d9] to-[#00f0ff] text-[#002022] font-headline text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.35)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                      >
-                        <Layers className="w-3.5 h-3.5" />
-                        <span>Sezonlar &amp; Bölümler</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => onPlayMedia(item)}
-                        className="flex-1 h-9 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.35)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                      >
-                        <Play className="w-3.5 h-3.5 fill-current" />
-                        <span>{isLive ? 'İzle' : 'Oynat'}</span>
-                      </button>
-                    )}
-
-                    {!isChildMode && !isSeries && !isLive && <button
-                      onClick={() => onScheduleMedia(item)}
-                      title="Zamanlanmış İndirme"
-                      className="h-9 px-3 rounded-full bg-[#201f21] text-[#00f0ff] border border-white/10 text-xs font-semibold"
-                    ><CalendarDays className="w-4 h-4"/></button>}
-                    {!isChildMode && <button
-                      onClick={() => {
-                        if (isSeries) {
-                          onOpenSeriesDetail(item);
-                        } else {
-                          onDownloadMedia(item);
-                        }
-                      }}
-                      className="h-9 px-3 rounded-full bg-[#201f21] hover:bg-[#2a2a2c] text-[#e5e1e4] font-headline text-xs font-semibold flex items-center justify-center gap-1.5 border border-white/5 cursor-pointer active:scale-95"
-                      title={isSeries ? 'Bölüm Listesi ve İndirme' : 'İndir (Offline)'}
-                    >
-                      <Download className="w-3.5 h-3.5 text-[#00f0ff]" />
-                      <span className="hidden sm:inline">{isSeries ? 'Bölümler' : 'İndir'}</span>
-                    </button>}
-                  </div>
-                </div>
-              );
-            })}
+          <div className={`catalog-grid catalog-grid--${preferences.view}`} data-testid="catalog-grid">
+            {visibleItems.map(item => <CatalogMediaCard key={item.id} item={item} view={preferences.view} isChildMode={isChildMode}
+              onPlay={onPlayMedia} onSeries={onOpenSeriesDetail} onInfo={onOpenTmdbInfo} onEpg={onOpenEpgGuide}
+              onDownload={onDownloadMedia} onSchedule={onScheduleMedia} onFavorite={onToggleFavorite}/>) }
           </div>
 
           {/* Pagination & Load More Footer */}
@@ -587,14 +491,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
                   <ChevronDown className="w-4 h-4" />
                   <span>Daha Fazla Göster (+{PAGE_CHUNK})</span>
                 </button>
-                {filteredItems.length > visibleCount + PAGE_CHUNK && (
-                  <button
-                    onClick={handleLoadAll}
-                    className="px-4 py-2.5 rounded-full bg-[#201f21] hover:bg-[#2a2a2c] text-[#e5e1e4] font-headline text-xs font-medium border border-white/5 cursor-pointer transition-colors"
-                  >
-                    Tümünü Listele
-                  </button>
-                )}
+
               </div>
             </div>
           )}
@@ -603,3 +500,4 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
     </div>
   );
 };
+

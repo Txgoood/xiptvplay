@@ -37,6 +37,11 @@ export interface MediaItem {
   duration?: string;
   year?: number;
   rating?: string;
+  addedAt?: number;
+  updatedAt?: number;
+  releaseDate?: string;
+  genres?: string[];
+  offlineEpisodeQueue?: { uri: string; title: string }[];
   poster: string;
   backdrop?: string;
   streamUrl: string;
@@ -170,4 +175,5 @@ export interface AppSettings {
   bufferSeconds: number;
   hardwareDecoder?: string;
 }
+
 

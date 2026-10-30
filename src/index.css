@@ -94,3 +94,37 @@
 input[type="range"] {
   accent-color: #00f0ff;
 }
+
+
+/* Katalog ekranı genişliği kullanır; kart yoğunluğu kullanıcı tercihidir. */
+.catalog-grid { display: grid; gap: 14px; align-items: stretch; min-width: 0; }
+.catalog-grid--large { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.catalog-grid--medium { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.catalog-grid--small { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.catalog-grid--list, .catalog-grid--details { grid-template-columns: minmax(0, 1fr); }
+.catalog-card { display: flex; flex-direction: column; }
+.catalog-card-poster { aspect-ratio: 2 / 3; }
+.catalog-card--large .catalog-card-poster { aspect-ratio: 16 / 9; }
+.catalog-card-body { flex: 1; }
+.catalog-card--list, .catalog-card--details { flex-direction: row; }
+.catalog-card--list .catalog-card-poster { width: 72px; flex: 0 0 72px; aspect-ratio: 2 / 3; }
+.catalog-card--details .catalog-card-poster { width: 128px; flex: 0 0 128px; aspect-ratio: 2 / 3; }
+.catalog-card--list .catalog-card-actions, .catalog-card--details .catalog-card-actions { justify-content: flex-start; }
+.catalog-card--list .catalog-primary, .catalog-card--details .catalog-primary { flex: 0 1 140px; }
+@media (max-width: 599px) {
+  .catalog-grid { gap: 8px; }
+  .catalog-grid--medium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .catalog-card--small .catalog-card-body { padding: 5px; gap: 5px; }
+  .catalog-card--small h3 { font-size: 11px; }
+  .catalog-card--small .catalog-card-category { display: none; }
+  .catalog-card--small .catalog-card-actions { gap: 4px; }
+  .catalog-card--small .catalog-primary { flex-basis: 100%; }
+  .catalog-card--small .catalog-primary span { display: none; }
+  .catalog-card--small .catalog-card-actions button { min-width: 30px; flex-grow: 1; }
+  .catalog-card--small .catalog-schedule { flex-basis: 100%; }
+  .catalog-card--details .catalog-card-poster { width: 100px; flex-basis: 100px; }
+}
+/* Dar kartta oynat düğmesi diğer işlemler tarafından sıkıştırılmaz. */
+.catalog-card--large .catalog-primary,
+.catalog-card--medium .catalog-primary,
+.catalog-card--small .catalog-primary { flex-basis: 100%; }
