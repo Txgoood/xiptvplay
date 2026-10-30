@@ -56,7 +56,22 @@ export async function resolveTmdbDetails(input: { type: string; title: string; y
     cast: (details.credits?.cast || []).slice(0, 12).map((person: any) => ({ name: person.name, character: person.character,
       photo: person.profile_path ? 'https://image.tmdb.org/t/p/w185' + person.profile_path : null })),
     trailerKey: video?.key || null,
+    collection: type === 'movie' && Number.isInteger(details.belongs_to_collection?.id) ? {
+      id: details.belongs_to_collection.id, name: String(details.belongs_to_collection.name || 'Film Serisi'),
+    } : null,
   };
+}
+
+export async function resolveTmdbCollection(id: number, get: FetchTmdb) {
+  const collection = await get('/collection/' + id);
+  const seen = new Set<number>();
+  const parts = (Array.isArray(collection.parts) ? collection.parts : [])
+    .filter((part: any) => Number.isInteger(part.id) && part.id > 0 && part.adult !== true && !seen.has(part.id) && seen.add(part.id))
+    .slice(0, 200).map((part: any) => ({ id: part.id, title: String(part.title || part.original_title || ''),
+      originalTitle: String(part.original_title || ''), releaseDate: String(part.release_date || ''),
+      poster: part.poster_path ? 'https://image.tmdb.org/t/p/w342' + part.poster_path : null }))
+    .sort((a: any, b: any) => (a.releaseDate || '9999').localeCompare(b.releaseDate || '9999') || a.id - b.id);
+  return { id: collection.id, name: String(collection.name || 'Film Serisi'), parts };
 }
 
 export function createTmdbDetailsHandler(fetcher: typeof fetch = fetch) {
@@ -70,7 +85,8 @@ export function createTmdbDetailsHandler(fetcher: typeof fetch = fetch) {
       year: Number(req.query.year) >= 1900 && Number(req.query.year) <= 2100 ? Number(req.query.year) : undefined,
       tmdbId: /^\d{1,10}$/.test(String(req.query.tmdbId || '')) && Number(req.query.tmdbId) > 0 ? Number(req.query.tmdbId) : undefined,
       imdbId: /^tt\d{5,12}$/.test(String(req.query.imdbId || '')) ? String(req.query.imdbId) : undefined,
-      searchOnly: req.query.searchOnly === '1' };
+      searchOnly: req.query.searchOnly === '1',
+      collectionId: /^\d{1,10}$/.test(String(req.query.collectionId || '')) && Number(req.query.collectionId) > 0 ? Number(req.query.collectionId) : undefined };
     const key = JSON.stringify(input);
     const hit = cache.get(key);
     if (hit && hit.until > Date.now()) { res.setHeader('X-TMDB-Cache', 'HIT'); return res.status(hit.status).json(hit.body); }
@@ -92,7 +108,7 @@ export function createTmdbDetailsHandler(fetcher: typeof fetch = fetch) {
             if (!response.ok) throw new TmdbLookupError(502, 'TMDB_UPSTREAM_ERROR', 'Film bilgi servisi şu anda yanıt veremiyor.');
             return response.json();
           };
-          const body = await resolveTmdbDetails(input, get);
+          const body = input.collectionId ? await resolveTmdbCollection(input.collectionId, get) : await resolveTmdbDetails(input, get);
           return { status: 200, body };
         } catch (error) {
           if (error instanceof TmdbLookupError) return { status: error.status, body: { code: error.code, error: error.message, ...(error.candidates ? { candidates: error.candidates } : {}) } };
