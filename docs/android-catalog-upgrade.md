@@ -49,3 +49,13 @@ Gerçek telefonda son kontrol: mevcut APK üzerine güncelle, kataloğu yenile, 
 - Bilgi ekranında adla arama, eşleşmeyi düzeltme ve yeniden deneme eklendi. Seçilen TMDB kaydı oynatma adresini değiştirmez.
 - Başarılı bilgiler cihazda 7 gün (en çok 120 kayıt), sunucuda 24 saat (en çok 1500 kayıt) saklanır. Aynı anda gelen aynı istekler birleştirilir. Geçici bağlantı/anahtar hataları bulunamadı diye önbelleğe alınmaz.
 - Kontroller: 16 birim testi; tarayıcıda belirsiz eşleşme seçimi, elle düzeltme, kapat/aç ve sayfa yenilemesinden sonra önbellek; mevcut katalog kontrolleri. Gerçek sağlayıcı eşleşmesi ayrıca canlı API üzerinde kontrol edilir.
+
+## 1.2.0 — Film serileri ve afiş rozeti
+
+- TMDB koleksiyonuna ait filmlerin katalog, keşif, izleme devamı ve favori afişlerinde küçük turkuaz katman / SERİ rozeti bulunur. Sırf adında 2/3 geçtiği için rozet verilmez.
+- İlk karşılaşmada yalnızca görünür afişler arka planda en fazla iki eşzamanlı bilgi isteğiyle doğrulanır. Sonuçlar cihazda saklanır; doğrulama tamamlanana kadar rozet gösterilmez. Bağlantı hatası film seri değilmiş gibi kaydedilmez.
+- Film bilgi ekranında **Bu Serinin Filmleri** bölümü, çıkış sırasına göre afişler ve **Sıradaki film** kısayolu eklendi.
+- Devam filmleri yalnızca yerel katalogdaki gerçek yayın kayıtlarıyla eşleştirilerek oynatılır. TMDB kimliği / elle düzeltilmiş eşleşme önceliklidir; Türkçe ve orijinal ad + yıl eşleşmesi ikinci yoldur. Katalogda yoksa oynatma düğmesi verilmez.
+- Çocuk profilinde yalnızca izinli katalog kayıtları eşleşir. İzin verilmeyen devam filmlerinin afişi, adı ve oynatma kısayolu gösterilmez.
+- Koleksiyon isteği ana film bilgisi açıldıktan sonra bağımsız yüklenir. Önceki TMDB v2 önbelleği yeni koleksiyon alanını almak için temizlenir; eşleşme düzeltmeleri korunur.
+- Kontroller: 23 birim testi; telefon / geniş ekran; filme girmeden rozet, hatalı sayısal rozetin engellenmesi, devam filmi bilgisine geçiş, eksik film, yeniden açılışta ağ isteği olmadan rozet, çocuk izinleri, iki istek eşzamanlılık sınırı. Canlı TMDB kontrolü Demir Adam film / koleksiyonu üzerinden yapılır.

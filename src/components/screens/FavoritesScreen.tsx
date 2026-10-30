@@ -1,4 +1,5 @@
 import React from 'react';
+import { MovieCollectionBadge } from '../MovieCollectionBadge';
 import { MediaItem } from '../../types';
 import { Heart, Play } from 'lucide-react';
 
@@ -61,7 +62,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e10] via-transparent to-transparent"></div>
-                <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-[#0e0e10]/90 text-[#00f0ff] font-headline text-[9px] font-bold">
+                {item.type === 'movie' && <MovieCollectionBadge media={item}/>}
+                <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-[#0e0e10]/90 text-[#00f0ff] font-headline text-[9px] font-bold">
                   {item.resolution}
                 </div>
                 <button
@@ -92,3 +94,4 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
     </div>
   );
 };
+

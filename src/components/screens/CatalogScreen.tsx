@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { MediaItem, Playlist } from '../../types';
 import { StorageService } from '../../services/storage';
 import type { WatchHistoryEntry } from '../../services/watchHistory';
+import { MovieCollectionBadge } from '../MovieCollectionBadge';
 import { CatalogMediaCard } from './CatalogMediaCard';
 import { buildDiscoveryShelves, readCatalogPreferences, saveCatalogPreferences, sortCatalog, SORT_OPTIONS, VIEW_OPTIONS, type CatalogSort, type CatalogView, type CatalogPreferences } from '../../services/catalogDiscovery';
 import {
@@ -281,7 +282,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
           <div className="flex gap-3 overflow-x-auto pb-1">
             {continueWatching.slice(0, 12).map(entry => (
               <button key={entry.id} className="w-32 shrink-0 text-left" onClick={() => onPlayMedia(entry.media as MediaItem)}>
-                <img src={entry.media.poster} alt="" className="w-full h-20 rounded-lg object-cover bg-[#29292c]"/>
+                <div className="relative"><img src={entry.media.poster} alt="" className="w-full h-20 rounded-lg object-cover bg-[#29292c]"/>{entry.media.type === 'movie' && <MovieCollectionBadge media={entry.media as MediaItem}/>}</div>
                 <span className="text-xs font-bold line-clamp-2 mt-1">{entry.media.title}</span>
                 <div className="h-1.5 mt-2 rounded-full bg-white/10 overflow-hidden">
                   <div className="h-full bg-[#00f0ff]" style={{width: Math.min(100, Math.max(0, 100 * entry.positionSeconds / entry.durationSeconds))+'%'}} />
@@ -350,6 +351,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
               className="relative shrink-0 w-[32vw] sm:w-36 lg:w-44 snap-start text-left group" aria-label={`${item.title} keşfet`}>
               <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-[#29292c]">
                 <img src={item.poster || '/brand/xiptvplay-icon.svg'} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = '/brand/xiptvplay-icon.svg'; }}/>
+                {item.type === 'movie' && <MovieCollectionBadge media={item}/>}
                 {shelf.badge && <span className="absolute bottom-0 inset-x-0 px-2 py-1 bg-[#00f0ff] text-[#00363a] font-bold text-[10px] text-center">{shelf.badge}</span>}
               </div>
               <span className="block text-xs font-bold mt-1.5 line-clamp-2">{item.title}</span>

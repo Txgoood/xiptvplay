@@ -2,20 +2,25 @@ import type { MediaItem } from '../types';
 import { buildApiUrl } from '../config/api';
 import { tmdbTitleQueries } from './tmdbTitle';
 
+export interface MovieCollectionPart { id: number; title: string; originalTitle: string; releaseDate: string; poster: string | null }
+export interface MovieCollection { id: number; name: string; parts: MovieCollectionPart[] }
 export interface TmdbDetails {
   id: number; title: string; overview: string; poster: string | null; backdrop: string | null;
   rating: number; releaseDate?: string; genres: string[];
+  collection?: { id: number; name: string } | null;
   cast: Array<{ name: string; character?: string; photo: string | null }>; trailerKey: string | null;
 }
 export interface TmdbChoice { id: number; title: string; originalTitle?: string; releaseDate?: string; poster: string | null }
 export class TmdbClientError extends Error {
   constructor(message: string, public code = 'TMDB_CONNECTION_ERROR', public candidates: TmdbChoice[] = []) { super(message); }
 }
-const CACHE_KEY = 'xiptvplay_tmdb_details_v2', CHOICE_KEY = 'xiptvplay_tmdb_choices_v1';
+const CACHE_KEY = 'xiptvplay_tmdb_details_v3', CHOICE_KEY = 'xiptvplay_tmdb_choices_v1';
+// Önceki şemadaki koleksiyon alanı olmayan kayıtlar yer kaplamasın.
+try { localStorage.removeItem('xiptvplay_tmdb_details_v2'); } catch {}
 type CacheEntry = { until: number; data: TmdbDetails };
 const memory = new Map<string, CacheEntry>();
 const pending = new Map<string, Promise<TmdbDetails>>();
-function savedChoices(): Record<string, number> {
+export function savedChoices(): Record<string, number> {
   try { return JSON.parse(localStorage.getItem(CHOICE_KEY) || '{}') || {}; } catch { return {}; }
 }
 export function rememberTmdbChoice(media: MediaItem, id: number) {
@@ -82,4 +87,33 @@ export function getTmdbDetails(media: MediaItem, id?: number): Promise<TmdbDetai
 export async function searchTmdbChoices(media: MediaItem, query: string): Promise<TmdbChoice[]> {
   const data = await request(media, { query, searchOnly: true });
   return Array.isArray(data.candidates) ? data.candidates : [];
+}
+
+const collectionCache = new Map<number, { until: number; data: MovieCollection }>();
+const collectionRequests = new Map<number, Promise<MovieCollection>>();
+export function getTmdbCollection(id: number): Promise<MovieCollection> {
+  const key = 'xiptvplay_tmdb_collection_v1_' + id;
+  let cached = collectionCache.get(id);
+  if (!cached) { try { cached = JSON.parse(localStorage.getItem(key) || 'null'); } catch {} }
+  if (cached && cached.until > Date.now() && cached.data?.id === id) return Promise.resolve(cached.data);
+  const running = collectionRequests.get(id); if (running) return running;
+  const work = (async () => {
+    const response = await fetch(buildApiUrl('/api/tmdb/details?collectionId=' + id), { signal: AbortSignal.timeout(16000) });
+    if (!(response.headers.get('content-type') || '').includes('application/json')) throw new Error('Seri bilgisi şu anda alınamıyor.');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Seri bilgisi alınamadı.');
+    if (data.id !== id || !Array.isArray(data.parts)) throw new Error('Seri bilgisi geçersiz.');
+    const entry = { until: Date.now() + 7 * 86400000, data: data as MovieCollection };
+    collectionCache.set(id, entry);
+    if (collectionCache.size > 80) collectionCache.delete(collectionCache.keys().next().value!);
+    try {
+      // Diskteki seri önbelleği de sınırlı tutulur.
+      const prefix = 'xiptvplay_tmdb_collection_v1_';
+      const keys = Object.keys(localStorage).filter(item => item.startsWith(prefix) && item !== key);
+      for (const old of keys.slice(0, Math.max(0, keys.length - 79))) localStorage.removeItem(old);
+      localStorage.setItem(key, JSON.stringify(entry));
+    } catch { /* Depo doluyken bellek önbelleği kullanılır. */ }
+    return data as MovieCollection;
+  })().finally(() => collectionRequests.delete(id));
+  collectionRequests.set(id, work); return work;
 }

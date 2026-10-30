@@ -1,18 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { X, Play, Download, Star, Film, Loader2, ExternalLink } from 'lucide-react';
+import { X, Play, Download, Star, Film, Loader2, ExternalLink, Layers3 } from 'lucide-react';
 import { MediaItem } from '../../types';
 import { getTmdbDetails, rememberTmdbChoice, searchTmdbChoices, TmdbClientError, type TmdbChoice, type TmdbDetails } from '../../services/tmdbClient';
 import { tmdbTitleQueries } from '../../services/tmdbTitle';
+import { rememberMovieCollection } from '../../services/movieCollections';
+import { MovieCollectionSection } from './MovieCollectionSection';
 
 interface Props {
   media: MediaItem | null;
+  catalog?: MediaItem[];
+  isChildMode?: boolean;
+  onSelectRelated?: (item: MediaItem) => void;
   onClose: () => void;
   onPlay: (item: MediaItem) => void;
   onDownload: (item: MediaItem) => void;
   onOpenSeries: (item: MediaItem) => void;
 }
 
-export const TmdbInfoModal: React.FC<Props> = ({ media, onClose, onPlay, onDownload, onOpenSeries }) => {
+export const TmdbInfoModal: React.FC<Props> = ({ media, catalog = [], isChildMode = false, onSelectRelated, onClose, onPlay, onDownload, onOpenSeries }) => {
   const [details, setDetails] = useState<TmdbDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,7 +40,7 @@ export const TmdbInfoModal: React.FC<Props> = ({ media, onClose, onPlay, onDownl
     let active = true;
     setDetails(null); setError(null); setLoading(true);
     getTmdbDetails(media, selectedId)
-      .then(data => { if (active) setDetails(data); })
+      .then(data => { rememberMovieCollection(media, data); if (active) setDetails(data); })
       .catch(err => { if (active) {
         setError(err.message || 'Bağlantı hatası');
         if (err instanceof TmdbClientError && err.candidates.length) { setChoices(err.candidates); setSearchOpen(true); }
@@ -86,12 +91,15 @@ export const TmdbInfoModal: React.FC<Props> = ({ media, onClose, onPlay, onDownl
             </button>)}</div>
             <p className="text-[10px] text-[#849495]">Seçtiğin eşleşme bu içerik için hatırlanır. İzlenecek yayın değişmez.</p>
           </div>}
+          {details?.collection && <p className="flex w-fit items-center gap-1.5 px-2 py-1 rounded-lg bg-[#00f0ff]/10 text-[#00f0ff] text-xs font-bold"><Layers3 size={14}/> Bu film bir seriye ait</p>}
           {details?.overview && <p className="text-sm leading-relaxed text-[#d5d5d5]">{details.overview}</p>}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => { onClose(); media.type === 'series' ? onOpenSeries(media) : onPlay(media); }} className="flex items-center gap-2 rounded-full px-5 py-2.5 bg-[#00f0ff] text-[#00363a] text-sm font-bold"><Play size={17}/>{media.type === 'series' ? 'Bölümler / İzle' : 'İzle'}</button>
             <button onClick={() => { onClose(); media.type === 'series' ? onOpenSeries(media) : onDownload(media); }} className="flex items-center gap-2 rounded-full px-5 py-2.5 bg-[#28282b] text-sm font-semibold"><Download size={17}/>{media.type === 'series' ? 'Bölüm İndir' : 'İndir'}</button>
             {details?.trailerKey && <a className="flex items-center gap-2 rounded-full px-4 py-2.5 bg-[#28282b] text-sm" href={'https://www.youtube.com/watch?v=' + encodeURIComponent(details.trailerKey)} target="_blank" rel="noopener noreferrer"><Film size={17}/> Fragman <ExternalLink size={12}/></a>}
           </div>
+          {media.type === 'movie' && details?.collection && <MovieCollectionSection key={details.collection.id} collection={details.collection} media={media} tmdbId={details.id} catalog={catalog} isChildMode={isChildMode}
+            onInfo={item => onSelectRelated?.(item)} onPlay={item => { onClose(); onPlay(item); }}/>}
           {details?.cast && details.cast.length > 0 && <div>
             <h3 className="font-bold text-sm mb-2">Oyuncular</h3>
             <div className="flex gap-3 overflow-x-auto pb-3">

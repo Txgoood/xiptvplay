@@ -1289,6 +1289,9 @@ export default function App() {
 
       <TmdbInfoModal
         media={tmdbInfoItem}
+        catalog={childVisibleCatalog}
+        isChildMode={Boolean(isChildProfile)}
+        onSelectRelated={item => { if (canAccessMedia(item)) setTmdbInfoItem(item); }}
         onClose={() => setTmdbInfoItem(null)}
         onPlay={safePlay}
         onDownload={handleDownloadMedia}
