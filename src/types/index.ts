@@ -37,6 +37,8 @@ export interface MediaItem {
   duration?: string;
   year?: number;
   rating?: string;
+  tmdbId?: number;
+  imdbId?: string;
   addedAt?: number;
   updatedAt?: number;
   releaseDate?: string;

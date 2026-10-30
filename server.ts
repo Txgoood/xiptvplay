@@ -2,6 +2,7 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 import express, { Request, Response } from 'express';
+import { createTmdbDetailsHandler } from './server/tmdb';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -648,6 +649,8 @@ async function startServer() {
         category_id: s.category_id,
         container_extension: s.container_extension || 'mp4',
         rating_5based: s.rating_5based,
+        tmdb_id: s.tmdb_id || s.tmdb,
+        imdb_id: s.imdb_id,
         rating: s.rating,
         added: s.added,
         releaseDate: s.releaseDate || s.release_date || s.releasedate,
@@ -663,6 +666,8 @@ async function startServer() {
         category_id: s.category_id,
         rating: s.rating,
         rating_5based: s.rating_5based,
+        tmdb_id: s.tmdb_id || s.tmdb,
+        imdb_id: s.imdb_id,
         added: s.added,
         last_modified: s.last_modified,
         releaseDate: s.releaseDate || s.release_date || s.releasedate,
@@ -821,62 +826,8 @@ async function startServer() {
     });
   });
 
-  // TMDB credentials live only on Render; never embed them into the APK.
-  app.get('/api/tmdb/details', async (req: Request, res: Response) => {
-    const token = process.env.TMDB_API_READ_ACCESS_TOKEN || process.env.TMDB_API_KEY;
-    if (!token) return res.status(503).json({ error: 'TMDB anahtarı sunucuda henüz tanımlanmadı.' });
-    const mediaType = req.query.type === 'series' ? 'tv' : 'movie';
-    const rawTitle = typeof req.query.title === 'string' ? req.query.title : '';
-    const title = rawTitle.replace(/\b(19|20)\d{2}\b/g, '').replace(/\b(4k|uhd|1080p|720p|fhd|hdr|hevc|x265|x264|multi|dual|tr dublaj|altyazılı)\b/gi, '').replace(/[\[\]{}()|._-]+/g, ' ').replace(/\bTR\b/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 130);
-    if (!title || title.length < 2) return res.status(400).json({ error: 'Geçerli bir film veya dizi adı bulunamadı.' });
-    const authHeaders: Record<string, string> = token.startsWith('eyJ') ? { Authorization: 'Bearer ' + token } : {};
-    const keyParam = token.startsWith('eyJ') ? '' : '&api_key=' + encodeURIComponent(token);
-    const fetchTmdb = async (endpoint: string) => {
-      const response = await fetch('https://api.themoviedb.org/3' + endpoint + (endpoint.includes('?') ? '&' : '?') + 'language=tr-TR' + keyParam, {
-        headers: { Accept: 'application/json', ...authHeaders },
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!response.ok) throw new Error('TMDB yanıtı: ' + response.status);
-      return response.json() as Promise<any>;
-    };
-    try {
-      const search = await fetchTmdb('/search/' + mediaType + '?query=' + encodeURIComponent(title) + '&include_adult=false');
-      const matches = (search.results || []).filter((item: any) => {
-        const name = String(item.title || item.name || '').toLocaleLowerCase('tr');
-        return name.length > 0;
-      });
-      const requestedYear = Number(req.query.year) || 0;
-      const result = matches.find((item: any) => requestedYear && String(item.release_date || item.first_air_date || '').startsWith(String(requestedYear))) || matches[0];
-      if (!result) return res.status(404).json({ error: 'TMDB üzerinde eşleşen içerik bulunamadı.' });
-      let details = await fetchTmdb('/' + mediaType + '/' + result.id + '?append_to_response=credits,videos');
-      if (!details.overview || !(details.videos?.results || []).length) {
-        const english = await fetchTmdb('/' + mediaType + '/' + result.id + '?append_to_response=videos&language=en-US');
-        if (!details.overview) details.overview = english.overview;
-        if (!(details.videos?.results || []).length) details.videos = english.videos;
-      }
-      const video = (details.videos?.results || []).find((v: any) => v.site === 'YouTube' && v.type === 'Trailer')
-        || (details.videos?.results || []).find((v: any) => v.site === 'YouTube');
-      res.json({
-        id: details.id,
-        title: details.title || details.name,
-        overview: details.overview || '',
-        poster: details.poster_path ? 'https://image.tmdb.org/t/p/w500' + details.poster_path : null,
-        backdrop: details.backdrop_path ? 'https://image.tmdb.org/t/p/w780' + details.backdrop_path : null,
-        rating: details.vote_average,
-        releaseDate: details.release_date || details.first_air_date,
-        genres: (details.genres || []).map((g: any) => g.name),
-        cast: (details.credits?.cast || []).slice(0, 12).map((person: any) => ({
-          name: person.name, character: person.character,
-          photo: person.profile_path ? 'https://image.tmdb.org/t/p/w185' + person.profile_path : null,
-        })),
-        trailerKey: video?.key || null,
-      });
-    } catch (err) {
-      console.error('[TMDB] Lookup failed:', err);
-      return res.status(502).json({ error: 'TMDB bilgileri alınamadı. Daha sonra tekrar deneyin.' });
-    }
-  });
-
+  // TMDB anahtarı yalnızca sunucuda kalır.
+  app.get('/api/tmdb/details', createTmdbDetailsHandler());
 
   // Family safety: bounded TMDB certification checks. Missing or ambiguous data is never approved.
   const childAgeCache = new Map<string, { expires: number; minimumAge: number | null; confident: boolean }>();

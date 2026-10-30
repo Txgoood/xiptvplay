@@ -39,3 +39,13 @@ Keşif rafları Tümü / Film / Dizi içinde, tür sekmeleri ile kategori şerid
 - GitHub Actions: sabit sertifikayla APK derlemesi ve mevcut Android emülatör açılış testi.
 
 Gerçek telefonda son kontrol: mevcut APK üzerine güncelle, kataloğu yenile, sıralama seç, uygulamayı kapatıp aç; Film/Dizi ve alt kategorilerde seçimin korunduğunu doğrula. Dört sütun / liste görünümünü ve yeni launcher simgesini kontrol et. Önerilerde tarih ve puan bulunması IPTV sağlayıcısının verilerine bağlıdır.
+
+## 1.1.1 — TMDB ve üst menü düzeltmesi
+
+- Uygulama / PM Analiz düğmeleri üst menüden kaldırıldı.
+- Canlı hata kaydında başarısız çağrının İngilizce bilgi isteği olduğu görüldü (`server.ts:844`, TMDB HTTP 400). Dil parametresi iki kez ekleniyordu; yeni sunucu istemcisi URLSearchParams ile tek dil gönderir. İsteğe bağlı ek bilginin hatası başarılı ana film bilgisini bozmaz.
+- TR/kalite etiketleri ve sezon-bölüm son ekleri temizlenir; Türkçe ve orijinal adlar ayrı, paralel aranır. Yanlış sağlayıcı yılı birebir ad eşleşmesini engellemez.
+- Sağlayıcı TMDB / IMDb kimliği bildirirse ada dayalı aramadan önce kullanılır. Belirsiz sonuçta kullanıcı seçim yapar; ilk rastgele sonuç seçilmez.
+- Bilgi ekranında adla arama, eşleşmeyi düzeltme ve yeniden deneme eklendi. Seçilen TMDB kaydı oynatma adresini değiştirmez.
+- Başarılı bilgiler cihazda 7 gün (en çok 120 kayıt), sunucuda 24 saat (en çok 1500 kayıt) saklanır. Aynı anda gelen aynı istekler birleştirilir. Geçici bağlantı/anahtar hataları bulunamadı diye önbelleğe alınmaz.
+- Kontroller: 16 birim testi; tarayıcıda belirsiz eşleşme seçimi, elle düzeltme, kapat/aç ve sayfa yenilemesinden sonra önbellek; mevcut katalog kontrolleri. Gerçek sağlayıcı eşleşmesi ayrıca canlı API üzerinde kontrol edilir.

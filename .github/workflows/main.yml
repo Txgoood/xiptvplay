@@ -13,6 +13,8 @@ on:
       - 'src/**'
       - 'public/**'
       - 'tests/**'
+      - 'server/**'
+      - 'server.ts'
       - 'package.json'
       - 'package-lock.json'
 
@@ -42,7 +44,7 @@ jobs:
       - name: Type check and catalog regression tests
         run: |
           npm run lint
-          node --import tsx --test tests/catalog-discovery.test.ts
+          node --import tsx --test tests/*.test.ts
 
       - name: Build web app
         run: npm run build

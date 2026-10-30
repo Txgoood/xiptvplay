@@ -1,14 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { X, Play, Download, Star, Film, Loader2, ExternalLink } from 'lucide-react';
 import { MediaItem } from '../../types';
-import { buildApiUrl } from '../../config/api';
-
-type TmdbDetails = {
-  id: number; title: string; overview: string; poster: string | null;
-  backdrop: string | null; rating: number; releaseDate?: string; genres: string[];
-  cast: Array<{ name: string; character?: string; photo: string | null }>;
-  trailerKey: string | null;
-};
+import { getTmdbDetails, rememberTmdbChoice, searchTmdbChoices, TmdbClientError, type TmdbChoice, type TmdbDetails } from '../../services/tmdbClient';
+import { tmdbTitleQueries } from '../../services/tmdbTitle';
 
 interface Props {
   media: MediaItem | null;
@@ -22,25 +16,44 @@ export const TmdbInfoModal: React.FC<Props> = ({ media, onClose, onPlay, onDownl
   const [details, setDetails] = useState<TmdbDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const [selection, setSelection] = useState<{ mediaId: string; id: number } | undefined>();
+  const selectedId = selection?.mediaId === media?.id ? selection?.id : undefined;
+  const [query, setQuery] = useState('');
+  const [choices, setChoices] = useState<TmdbChoice[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const searchGeneration = React.useRef(0);
+  useEffect(() => {
+    setSelection(undefined); setChoices([]); setSearchOpen(false); setSearchError(''); setSearching(false);
+    setQuery(media ? tmdbTitleQueries(media.title).queries[0] || media.title : '');
+    searchGeneration.current++;
+  }, [media?.id]);
   useEffect(() => {
     if (!media) return;
-    const controller = new AbortController();
+    let active = true;
     setDetails(null); setError(null); setLoading(true);
-    const params = new URLSearchParams({ type: media.type, title: media.title });
-    if (media.year) params.set('year', String(media.year));
-    fetch(buildApiUrl('/api/tmdb/details?' + params.toString()), { signal: controller.signal })
-      .then(async response => {
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) throw new Error('TMDB servisi Render sunucusunda henüz etkin değil. Sunucunun güncellenmesi gerekiyor.');
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'Film bilgisi bulunamadı.');
-        return payload as TmdbDetails;
-      })
-      .then(data => setDetails(data))
-      .catch(err => { if (!controller.signal.aborted) setError(err.message || 'Bağlantı hatası'); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
-  }, [media?.id, media?.title]);
+    getTmdbDetails(media, selectedId)
+      .then(data => { if (active) setDetails(data); })
+      .catch(err => { if (active) {
+        setError(err.message || 'Bağlantı hatası');
+        if (err instanceof TmdbClientError && err.candidates.length) { setChoices(err.candidates); setSearchOpen(true); }
+      } })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [media?.id, media?.title, selectedId, retry]);
+  const search = async () => {
+    if (!media || query.trim().length < 2) return;
+    const generation = ++searchGeneration.current;
+    setSearching(true); setSearchError(''); setChoices([]);
+    try {
+      const results = await searchTmdbChoices(media, query.trim());
+      if (generation !== searchGeneration.current) return;
+      setChoices(results); if (!results.length) setSearchError('Bu adla sonuç bulunamadı. Orijinal adını da deneyebilirsin.');
+    } catch (error) { if (generation === searchGeneration.current) setSearchError(error instanceof Error ? error.message : 'Arama yapılamadı.'); }
+    finally { if (generation === searchGeneration.current) setSearching(false); }
+  };
 
   if (!media) return null;
   return (
@@ -59,7 +72,20 @@ export const TmdbInfoModal: React.FC<Props> = ({ media, onClose, onPlay, onDownl
             <span>{details?.genres?.join(' • ')}</span>
           </div>
           {loading && <div className="flex items-center gap-2 text-[#00f0ff] text-sm"><Loader2 size={18} className="animate-spin"/> TMDB bilgileri yükleniyor...</div>}
-          {error && <p className="text-sm text-amber-200 bg-amber-500/10 rounded-xl p-3">{error}</p>}
+          {error && <div role="alert" className="text-sm text-amber-200 bg-amber-500/10 rounded-xl p-3 space-y-2"><p>{error}</p><button type="button" onClick={() => setRetry(value => value + 1)} className="min-h-10 px-3 rounded-xl bg-white/10 font-semibold">Yeniden dene</button></div>}
+          {!loading && <button type="button" onClick={() => setSearchOpen(value => !value)} className="text-xs text-[#00f0ff] underline min-h-10">{details ? 'Eşleşme yanlış mı? Düzelt' : 'Adıyla ara / Eşleşme seç'}</button>}
+          {searchOpen && <div className="rounded-xl border border-white/10 p-3 space-y-3">
+            <form onSubmit={event => { event.preventDefault(); void search(); }} className="flex gap-2">
+              <input aria-label="TMDB film veya dizi adı" value={query} maxLength={160} onChange={event => setQuery(event.target.value)} placeholder="Türkçe veya orijinal adı" className="min-w-0 flex-1 bg-[#28282b] rounded-xl px-3 py-2 text-sm"/>
+              <button type="submit" disabled={searching || query.trim().length < 2} className="rounded-xl bg-[#00f0ff] text-[#00363a] font-bold px-3 min-h-11 disabled:opacity-50">{searching ? 'Aranıyor…' : 'Ara'}</button>
+            </form>
+            {searchError && <p role="status" className="text-xs text-amber-200">{searchError}</p>}
+            <div className="max-h-64 overflow-y-auto space-y-2">{choices.map(choice => <button type="button" key={choice.id} onClick={() => { rememberTmdbChoice(media, choice.id); setSelection({ mediaId: media.id, id: choice.id }); setRetry(value => value + 1); setChoices([]); setSearchOpen(false); }} className="w-full text-left flex items-center gap-3 rounded-xl bg-white/5 p-2 hover:bg-white/10">
+              {choice.poster && <img src={choice.poster} alt="" loading="lazy" className="w-10 h-14 rounded object-cover"/>}
+              <span className="min-w-0"><span className="block text-sm font-semibold">{choice.title} {choice.releaseDate?.slice(0, 4)}</span><span className="block text-xs text-[#b9cacb] truncate">{choice.originalTitle}</span></span>
+            </button>)}</div>
+            <p className="text-[10px] text-[#849495]">Seçtiğin eşleşme bu içerik için hatırlanır. İzlenecek yayın değişmez.</p>
+          </div>}
           {details?.overview && <p className="text-sm leading-relaxed text-[#d5d5d5]">{details.overview}</p>}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => { onClose(); media.type === 'series' ? onOpenSeries(media) : onPlay(media); }} className="flex items-center gap-2 rounded-full px-5 py-2.5 bg-[#00f0ff] text-[#00363a] text-sm font-bold"><Play size={17}/>{media.type === 'series' ? 'Bölümler / İzle' : 'İzle'}</button>
@@ -82,3 +108,4 @@ export const TmdbInfoModal: React.FC<Props> = ({ media, onClose, onPlay, onDownl
     </div>
   );
 };
+

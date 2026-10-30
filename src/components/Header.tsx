@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScreenType, AppMode } from '../types';
-import { Cast, Search, User, Smartphone, FileText } from 'lucide-react';
+import { Cast, Search, User } from 'lucide-react';
 
 interface HeaderProps {
   currentScreen: ScreenType;
@@ -66,35 +66,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Mode Switcher & Global Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* PRD Spec / App View toggle pill */}
-          <div className="flex items-center bg-[#201f21] p-0.5 sm:p-1 rounded-full border border-white/10 shadow-inner">
-            <button
-              onClick={() => setAppMode('app')}
-              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                appMode === 'app'
-                  ? 'bg-[#00f0ff] text-[#00363a] shadow-[0_0_10px_rgba(0,240,255,0.35)]'
-                  : 'text-[#b9cacb] hover:text-[#e5e1e4]'
-              }`}
-              title="Uygulama Modu"
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Uygulama</span>
-            </button>
-            <button
-              onClick={() => setAppMode('prd')}
-              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                appMode === 'prd'
-                  ? 'bg-[#0566d9] text-white shadow-[0_0_10px_rgba(5,102,217,0.45)]'
-                  : 'text-[#b9cacb] hover:text-[#e5e1e4]'
-              }`}
-              title="PM Gereksinim ve Araştırma Raporu (11 Aşama)"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">PM Analiz</span>
-              <span className="sm:hidden text-[10px]">PM</span>
-            </button>
-          </div>
-
           {/* Cast button */}
           <button
             onClick={onOpenCast}
@@ -130,3 +101,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+
