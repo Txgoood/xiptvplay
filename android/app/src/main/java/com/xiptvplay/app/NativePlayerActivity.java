@@ -718,7 +718,7 @@ public class NativePlayerActivity extends Activity {
         if(lastDurationSecond!=duration/1000){durationText.setText(duration>0?formatTime(duration):"--:--");lastDurationSecond=duration/1000;}
     }
 
-    private void showControlDialog(AlertDialog dialog) {
+    private void showControlDialog(android.app.Dialog dialog) {
         controlDialogCount++;controlDialogOpen=true;controlsHandler.removeCallbacks(hideControlsRunnable);
         dialog.setOnDismissListener(ignored->{controlDialogCount=Math.max(0,controlDialogCount-1);controlDialogOpen=controlDialogCount>0;showControlsTemporarily();});
         dialog.show();
