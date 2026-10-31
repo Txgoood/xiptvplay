@@ -324,6 +324,7 @@ public class NativePlayerActivity extends Activity {
             public void onPlaybackStateChanged(int playbackState) {
                 if (player == null) return;
                 updatePlayPauseButton();
+                if(controlsVisible && !scrubbing)updateProgressLabels();
                 if (playbackState == Player.STATE_ENDED && nextUrl != null && !nextUrl.isEmpty()) {
                     playNextEpisode();
                 }
@@ -509,7 +510,7 @@ public class NativePlayerActivity extends Activity {
         Button button=styleButton(new PlayerIconButton(this),"");button.setContentDescription(description);
         button.setMinWidth(dp(48));button.setMinimumWidth(dp(48));
         PlayerControlIcon drawable=new PlayerControlIcon(icon,primary?0xFF002E34:Color.WHITE);
-        drawable.setBounds(0,0,dp(24),dp(24));button.setCompoundDrawables(drawable,null,null,null);
+        drawable.setBounds(0,0,dp(24),dp(24));((PlayerIconButton)button).setControlIcon(drawable);
         button.setGravity(Gravity.CENTER);button.setPadding(dp(12),0,dp(12),0);
         if(primary){GradientDrawable shape=new GradientDrawable();shape.setColor(0xFF00DCEA);shape.setCornerRadius(dp(24));button.setBackground(new RippleDrawable(ColorStateList.valueOf(0x55000000),shape,null));}
         return button;
@@ -518,8 +519,8 @@ public class NativePlayerActivity extends Activity {
     private void updatePlayPauseButton() {
         if(playPauseButton==null||player==null)return;
         boolean pause=player.getPlayWhenReady()&&player.getPlaybackState()!=Player.STATE_ENDED;
-        if(pause!=displayedPause || playPauseButton.getCompoundDrawables()[0] != (pause?pauseIcon:playIcon)) {
-            displayedPause=pause;playPauseButton.setCompoundDrawables(pause?pauseIcon:playIcon,null,null,null);
+        if(pause!=displayedPause || ((PlayerIconButton)playPauseButton).getControlIcon() != (pause?pauseIcon:playIcon)) {
+            displayedPause=pause;((PlayerIconButton)playPauseButton).setControlIcon(pause?pauseIcon:playIcon);
             playPauseButton.setContentDescription(pause?"Duraklat":"Oynat");
         }
     }
@@ -527,7 +528,7 @@ public class NativePlayerActivity extends Activity {
     private void togglePlayback() {
         if(player==null)return;
         if(player.getPlayWhenReady())player.pause();else{if(player.getPlaybackState()==Player.STATE_ENDED)player.seekTo(0);player.play();}
-        updatePlayPauseButton();updatePipActions();showControlsTemporarily();
+        updatePlayPauseButton();updateProgressLabels();updatePipActions();showControlsTemporarily();
     }
 
     private void restartProgressUpdates() {

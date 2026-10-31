@@ -3,6 +3,8 @@ package com.xiptvplay.app;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -35,6 +37,15 @@ public class NativePlayerControlsTest {
     }
     private static PlayerView video(View root){if(root instanceof PlayerView)return (PlayerView)root;if(root instanceof ViewGroup){ViewGroup group=(ViewGroup)root;for(int i=0;i<group.getChildCount();i++){PlayerView found=video(group.getChildAt(i));if(found!=null)return found;}}return null;}
     private static Button button(NativePlayerActivity a,String label){View result=find(a.getWindow().getDecorView(),label);assertNotNull(label,result);return (Button)result;}
+    private static void assertIconPainted(Button button,boolean dark) {
+        Bitmap image=Bitmap.createBitmap(button.getWidth(),button.getHeight(),Bitmap.Config.ARGB_8888);
+        button.draw(new Canvas(image));int pixels=0,half=Math.round(12*button.getResources().getDisplayMetrics().density);
+        for(int y=image.getHeight()/2-half;y<image.getHeight()/2+half;y++)for(int x=image.getWidth()/2-half;x<image.getWidth()/2+half;x++){
+            int color=image.getPixel(x,y);
+            if(Color.alpha(color)>220 && (dark ? Color.red(color)<80&&Color.green(color)<130&&Color.blue(color)<140 : Color.red(color)>200&&Color.green(color)>200&&Color.blue(color)>200))pixels++;
+        }
+        image.recycle();assertTrue("Düğmenin simgesi gerçekten çizilmeli: "+button.getContentDescription(),pixels>20);
+    }
     private static void ready(ActivityScenario<NativePlayerActivity> scenario) throws Exception {
         long end=System.currentTimeMillis()+12000;AtomicBoolean ready=new AtomicBoolean();
         while(System.currentTimeMillis()<end){scenario.onActivity(a->{ExoPlayer p=player(a);ready.set(p!=null&&p.getDuration()>0&&p.getPlaybackState()==androidx.media3.common.Player.STATE_READY);});if(ready.get())return;Thread.sleep(100);}
@@ -55,6 +66,7 @@ public class NativePlayerControlsTest {
                 first.set(player(a));Button pause=button(a,"Duraklat"),brightness=button(a,"Parlaklık"),speed=button(a,"Oynatma hızı");
                 ViewGroup row=(ViewGroup)pause.getParent();assertEquals(row.indexOfChild(brightness)+1,row.indexOfChild(pause));assertEquals(row.indexOfChild(pause)+1,row.indexOfChild(speed));
                 assertTrue(pause.getWidth()>=48*a.getResources().getDisplayMetrics().density-1);
+                assertIconPainted(pause,true);assertIconPainted(button(a,"Videoyu kapat"),false);assertIconPainted(brightness,false);
                 if(!pause.isShown())video(a.getWindow().getDecorView()).performClick();
                 assertTrue(pause.isShown());pause.performClick();assertFalse(player(a).getPlayWhenReady());assertEquals("Oynat",pause.getContentDescription());pausedPosition.set(player(a).getCurrentPosition());
             });
