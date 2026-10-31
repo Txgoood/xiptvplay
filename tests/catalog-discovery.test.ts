@@ -76,3 +76,21 @@ test('Xtream ham verisinde tarih ve gerçek puan kaybolmaz; dizi güncellemesi e
   assert.equal(result.items[1].addedAt, undefined);
   assert.equal(result.items[1].updatedAt, 1793404800000);
 });
+
+test('dizide eklenme tarihi yoksa yeni/eski seçimi doğrulanmış güncellenme tarihine döner', async () => {
+  const {resolveCatalogSort} = await import('../src/services/catalogDiscovery');
+  const series=[media('old',{type:'series',updatedAt:100}),media('new',{type:'series',updatedAt:300}),media('middle',{type:'series',updatedAt:200}),media('unknown',{type:'series'})];
+  const newest=resolveCatalogSort(series,'added-desc','series'),oldest=resolveCatalogSort(series,'added-asc','series');
+  assert.equal(newest.usesUpdatedAt,true);assert.equal(newest.sort,'updated-desc');
+  assert.deepEqual(sortCatalog(series,newest.sort).map(item=>item.id),['new','middle','old','unknown']);
+  assert.deepEqual(sortCatalog(series,oldest.sort).map(item=>item.id),['old','middle','new','unknown']);
+  assert.equal(series[0].addedAt,undefined);
+});
+test('dizide gerçek eklenme tarihi varsa korunur; filmde dizi güncelleme sırası uygulanmaz', async()=>{
+  const {resolveCatalogSort} = await import('../src/services/catalogDiscovery');
+  const items=[media('old',{type:'series',addedAt:100,updatedAt:300}),media('new',{type:'series',addedAt:200,updatedAt:100})];
+  assert.equal(resolveCatalogSort(items,'added-desc','series').usesUpdatedAt,false);
+  assert.equal(resolveCatalogSort(items,'updated-desc','movie').sort,'added-desc');
+  assert.deepEqual(sortCatalog(items,'added-desc').map(item=>item.id),['new','old']);
+  assert.deepEqual(sortCatalog(items,'updated-desc').map(item=>item.id),['old','new']);
+});

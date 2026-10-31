@@ -3,6 +3,7 @@ import type { WatchHistoryEntry } from './watchHistory';
 
 export const SORT_OPTIONS = [
   ['added-desc', 'Yeni eklenenler önce'], ['added-asc', 'Eski eklenenler önce'],
+  ['updated-desc', 'Son güncellenenler önce'], ['updated-asc', 'Eski güncellenenler önce'],
   ['year-desc', 'Yapım yılı: yeni → eski'], ['year-asc', 'Yapım yılı: eski → yeni'],
   ['rating-desc', 'Puan: yüksek → düşük'], ['rating-asc', 'Puan: düşük → yüksek'],
   ['title-asc', 'İsim: A → Z'], ['title-desc', 'İsim: Z → A'],
@@ -56,12 +57,22 @@ function compareKnown(a: number | undefined, b: number | undefined, ascending: b
   if (b == null) return -1;
   return ascending ? a - b : b - a;
 }
+// Dizi sağlayıcısı yalnızca last_modified veriyorsa bunu eklenme tarihi diye sunmayız.
+export function resolveCatalogSort(items: MediaItem[], requested: CatalogSort, type: MediaItem['type'] | 'all') {
+  const effectiveRequested = requested.startsWith('updated-') && type !== 'series'
+    ? requested.replace('updated-', 'added-') as CatalogSort : requested;
+  const fallback = type === 'series' && effectiveRequested.startsWith('added-') &&
+    !items.some(item => Number.isFinite(item.addedAt) && item.addedAt! > 0) &&
+    items.some(item => Number.isFinite(item.updatedAt) && item.updatedAt! > 0);
+  const sort = fallback ? effectiveRequested.replace('added-', 'updated-') as CatalogSort : effectiveRequested;
+  return {sort, usesUpdatedAt: fallback, label: SORT_OPTIONS.find(([key]) => key === sort)?.[1] || ''};
+}
 const titleCollator = new Intl.Collator('tr', { sensitivity: 'base', numeric: true });
 export function sortCatalog(items: MediaItem[], sort: CatalogSort): MediaItem[] {
   if (sort === 'title-asc' || sort === 'title-desc') return [...items].sort((a,b)=>titleCollator.compare(a.title,b.title)*(sort==='title-desc'?-1:1));
   const ascending=sort.endsWith('-asc');
   // Yıl / puan ayıklaması karşılaştırma başına değil, içerik başına bir kez yapılır.
-  return items.map(item=>({item,value:sort.startsWith('added-')?item.addedAt:sort.startsWith('year-')?year(item):Number(catalogRating(item.rating))||undefined}))
+  return items.map(item=>({item,value:sort.startsWith('added-')?item.addedAt:sort.startsWith('updated-')?item.updatedAt:sort.startsWith('year-')?year(item):Number(catalogRating(item.rating))||undefined}))
     .sort((a,b)=>compareKnown(a.value,b.value,ascending)).map(row=>row.item);
 }
 

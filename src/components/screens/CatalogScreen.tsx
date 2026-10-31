@@ -8,7 +8,7 @@ import { DecisionModal } from './DecisionModal';
 import { FollowingShelf } from './FollowingShelf';
 import { normalizeSearch } from '../../services/discoveryTools';
 import { CatalogMediaCard } from './CatalogMediaCard';
-import { buildDiscoveryShelves, readCatalogPreferences, saveCatalogPreferences, sortCatalog, SORT_OPTIONS, VIEW_OPTIONS, type CatalogSort, type CatalogView, type CatalogPreferences } from '../../services/catalogDiscovery';
+import { buildDiscoveryShelves, readCatalogPreferences, saveCatalogPreferences, sortCatalog, resolveCatalogSort, SORT_OPTIONS, VIEW_OPTIONS, type CatalogSort, type CatalogView, type CatalogPreferences } from '../../services/catalogDiscovery';
 import {
   Dices,
   ArrowLeft,
@@ -64,6 +64,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   isChildMode = false,
   continueWatching = [],
 }) => {
+  const gridStart = React.useRef<HTMLDivElement>(null);
   const [decisionOpen, setDecisionOpen] = useState(false);
   const sessionKey = 'xiptv_catalog_session_' + profileId + '_' + (activePlaylist?.id || 'all');
   const [session] = useState(() => { try { return JSON.parse(sessionStorage.getItem(sessionKey) || '{}'); } catch { return {}; } });
@@ -91,6 +92,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   const updatePreferences = (patch: Partial<CatalogPreferences>) => {
     const next = { ...preferences, ...patch };
     setPreferences(next); saveCatalogPreferences(profileId, next); setOpenTools(null);
+    if (patch.sort && patch.sort !== preferences.sort) requestAnimationFrame(() => gridStart.current?.scrollIntoView({block:'start'}));
   };
   const sortable = activeTab === 'movie' || activeTab === 'series';
   const appSettings = StorageService.getSettings();
@@ -215,8 +217,14 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
     });
   }, [visibleCatalog, activeTab, selectedCategory, deferredQuery, searchIndex]);
 
-  const orderedItems = useMemo(() => sortable ? sortCatalog(filteredItems, preferences.sort) : filteredItems,
-    [filteredItems, sortable, preferences.sort]);
+  const sortPresentation = useMemo(() => resolveCatalogSort(filteredItems, preferences.sort, activeTab), [filteredItems, preferences.sort, activeTab]);
+  const seriesDateFallback = useMemo(() => resolveCatalogSort(filteredItems, 'added-desc', activeTab).usesUpdatedAt, [filteredItems,activeTab]);
+  const sortOptions = useMemo(() => SORT_OPTIONS.filter(([key]) => activeTab === 'series' || !key.startsWith('updated-')).map(([key,label]) => {
+    if (seriesDateFallback && key.startsWith('added-')) return [key, key==='added-desc'?'Yeni / güncellenen diziler önce':'Eski / güncellenen diziler önce'] as const;
+    return [key,label] as const;
+  }), [activeTab,seriesDateFallback]);
+  const orderedItems = useMemo(() => sortable ? sortCatalog(filteredItems, sortPresentation.sort) : filteredItems,
+    [filteredItems, sortable, sortPresentation.sort]);
   const shelves = useMemo(() => buildDiscoveryShelves(itemsForActiveTab, watchHistory), [itemsForActiveTab, watchHistory]);
   const hasAddedDates = filteredItems.some(item => Boolean(item.addedAt));
 
@@ -388,17 +396,19 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         </div>
       )}
       {sortable && <p className="text-[11px] text-[#849495] -mt-1" aria-live="polite">
-        {SORT_OPTIONS.find(([key]) => key === preferences.sort)?.[1]} · {VIEW_OPTIONS.find(([key]) => key === preferences.view)?.[1]}
-        {preferences.sort.startsWith('added-') && !hasAddedDates && ' · Eklenme tarihi yok; sağlayıcı sırası korunuyor. Kataloğu yenileyerek tarihleri alabilirsin.'}
+        {sortPresentation.label} · {VIEW_OPTIONS.find(([key]) => key === preferences.view)?.[1]}
+        {sortPresentation.usesUpdatedAt && ' · Sağlayıcı eklenme tarihi vermiyor; dizilerin son güncellenme tarihi kullanılıyor.'}
+        {sortPresentation.sort.startsWith('updated-') && !sortPresentation.usesUpdatedAt && ' · Dizinin son güncellenme tarihi; yeni bölüm eklenmesi de bu tarihi değiştirebilir.'}
+        {sortPresentation.sort.startsWith('added-') && !hasAddedDates && ' · Eklenme tarihi yok; sağlayıcı sırası korunuyor. Kataloğu yenileyerek tarihleri alabilirsin.'}
       </p>}
       {openTools && <div className="fixed inset-0 z-[110] bg-black/70 flex items-end sm:items-center justify-center sm:p-4" onClick={() => setOpenTools(null)}>
         <section role="dialog" aria-modal="true" aria-label={openTools === 'sort' ? 'İçerik sıralaması' : 'Katalog görünümü'} onClick={event => event.stopPropagation()} className="w-full sm:max-w-md max-h-[88dvh] overflow-auto rounded-t-3xl sm:rounded-3xl bg-[#171719] border border-white/10 p-4 pb-8">
           <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-base">{openTools === 'sort' ? 'İçerikleri sırala' : 'Katalog görünümü'}</h2><button autoFocus type="button" onClick={() => setOpenTools(null)} aria-label="Seçenekleri kapat" className="min-h-10 min-w-10 flex items-center justify-center"><X size={20}/></button></div>
           <p className="text-xs text-[#b9cacb] mb-3">Seçimin bu profil için hatırlanır.{openTools === 'sort' ? ' Film ve Dizi sekmelerinde, tüm alt kategorilerde uygulanır. Tarihi veya puanı olmayanlar sonda gösterilir.' : ''}</p>
-          {(openTools === 'sort' ? SORT_OPTIONS : VIEW_OPTIONS).map(([key, label]) => <button type="button" key={key} aria-pressed={key === (openTools === 'sort' ? preferences.sort : preferences.view)}
+          {(openTools === 'sort' ? sortOptions : VIEW_OPTIONS).map(([key, label]) => <button type="button" key={key} aria-pressed={key === (openTools === 'sort' ? (sortPresentation.usesUpdatedAt ? preferences.sort : sortPresentation.sort) : preferences.view)}
             onClick={() => openTools === 'sort' ? updatePreferences({ sort: key as CatalogSort }) : updatePreferences({ view: key as CatalogView })}
             className="w-full min-h-12 flex items-center justify-between gap-3 px-3 py-3 mb-1 rounded-xl bg-white/5 text-left text-sm">
-            {label}{key === (openTools === 'sort' ? preferences.sort : preferences.view) && <Check size={18} className="text-[#00f0ff]"/>}
+            {label}{key === (openTools === 'sort' ? (sortPresentation.usesUpdatedAt ? preferences.sort : sortPresentation.sort) : preferences.view) && <Check size={18} className="text-[#00f0ff]"/>}
           </button>)}
           {openTools === 'sort' && <p className="text-[11px] text-[#849495] mt-3">Puanlar sağlayıcının bildirdiği 10 üzerinden puanlardır; IMDb kaynağı doğrulanmış değildir. Eklenme tarihi ile yapım yılı farklıdır.</p>}
         </section>
@@ -478,9 +488,11 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         </div>
       ) : (
         <>
+          <div ref={gridStart} className="scroll-mt-20"><h2 className="text-sm font-bold mb-2">{sortable ? `Katalog · ${sortPresentation.label}` : 'İçerikler'}</h2>
           <VirtualCatalogGrid items={orderedItems} view={preferences.view} getKey={item => item.id} render={item => <CatalogMediaCard item={item} view={preferences.view} isChildMode={isChildMode}
               onPlay={onPlayMedia} onSeries={onOpenSeriesDetail} onInfo={onOpenTmdbInfo} onEpg={onOpenEpgGuide}
               onDownload={onDownloadMedia} onSchedule={onScheduleMedia} onFavorite={onToggleFavorite}/>}/>
+          </div>
           <p className="text-center text-xs text-[#849495] py-3">{orderedItems.length.toLocaleString('tr-TR')} içerik · Kaydırarak keşfet</p>
         </>
       )}
