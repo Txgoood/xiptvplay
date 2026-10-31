@@ -51,6 +51,7 @@ export async function resolveTmdbDetails(input: { type: string; title: string; y
     id: details.id, title: details.title || details.name || '', overview: details.overview || '',
     poster: details.poster_path ? 'https://image.tmdb.org/t/p/w500' + details.poster_path : null,
     backdrop: details.backdrop_path ? 'https://image.tmdb.org/t/p/w780' + details.backdrop_path : null,
+    runtimeMinutes: Number(type === 'movie' ? details.runtime : details.episode_run_time?.[0]) > 0 ? Number(type === 'movie' ? details.runtime : details.episode_run_time?.[0]) : undefined,
     rating: Number(details.vote_average) || 0, releaseDate: details.release_date || details.first_air_date,
     genres: (details.genres || []).map((item: any) => item.name),
     cast: (details.credits?.cast || []).slice(0, 12).map((person: any) => ({ name: person.name, character: person.character,
