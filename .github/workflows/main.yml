@@ -90,7 +90,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest
+          ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 
       - name: Verify APK integrity and package metadata
         run: |
