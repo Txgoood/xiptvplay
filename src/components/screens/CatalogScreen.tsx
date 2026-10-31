@@ -1,11 +1,16 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useDeferredValue } from 'react';
 import { MediaItem, Playlist } from '../../types';
 import { StorageService } from '../../services/storage';
 import type { WatchHistoryEntry } from '../../services/watchHistory';
 import { MovieCollectionBadge } from '../MovieCollectionBadge';
+import { VirtualCatalogGrid } from '../VirtualCatalogGrid';
+import { DecisionModal } from './DecisionModal';
+import { FollowingShelf } from './FollowingShelf';
+import { normalizeSearch } from '../../services/discoveryTools';
 import { CatalogMediaCard } from './CatalogMediaCard';
 import { buildDiscoveryShelves, readCatalogPreferences, saveCatalogPreferences, sortCatalog, SORT_OPTIONS, VIEW_OPTIONS, type CatalogSort, type CatalogView, type CatalogPreferences } from '../../services/catalogDiscovery';
 import {
+  Dices,
   ArrowLeft,
   Search,
   X,
@@ -32,6 +37,7 @@ interface CatalogScreenProps {
   onOpenSeriesDetail: (item: MediaItem) => void;
   onOpenTmdbInfo: (item: MediaItem) => void;
   onOpenEpgGuide: (item: MediaItem) => void;
+  onOpenFollowed?: (item: MediaItem, season?: number, episode?: number) => void;
   isCatalogLoading?: boolean;
   isChildMode?: boolean;
   continueWatching?: WatchHistoryEntry[];
@@ -54,12 +60,20 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   onOpenTmdbInfo,
   onOpenEpgGuide,
   isCatalogLoading,
+  onOpenFollowed,
   isChildMode = false,
   continueWatching = [],
 }) => {
-  const [activeTab, setActiveTab] = useState<'all' | 'live' | 'movie' | 'series'>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [decisionOpen, setDecisionOpen] = useState(false);
+  const sessionKey = 'xiptv_catalog_session_' + profileId + '_' + (activePlaylist?.id || 'all');
+  const [session] = useState(() => { try { return JSON.parse(sessionStorage.getItem(sessionKey) || '{}'); } catch { return {}; } });
+  const [activeTab, setActiveTab] = useState<'all' | 'live' | 'movie' | 'series'>(session.tab || 'all');
+  const [selectedCategory, setSelectedCategory] = useState<string>(session.category || 'Tümü');
+  const [searchQuery, setSearchQuery] = useState(session.search || '');
+  const deferredQuery = useDeferredValue(searchQuery);
+  const searchIndex = useMemo(() => new Map(catalog.map(item => [item.id, normalizeSearch(item.title + ' ' + item.category)])), [catalog]);
+  useEffect(() => { try { sessionStorage.setItem(sessionKey,JSON.stringify({tab:activeTab,category:selectedCategory,search:searchQuery})); } catch {} },[sessionKey,activeTab,selectedCategory,searchQuery]);
+  React.useLayoutEffect(() => { const y=Number(sessionStorage.getItem(sessionKey+'_scroll')||0); const frame=requestAnimationFrame(()=>window.scrollTo(0,y)); const save=()=>{try{sessionStorage.setItem(sessionKey+'_scroll',String(window.scrollY));}catch{}};window.addEventListener('scroll',save,{passive:true});return()=>{cancelAnimationFrame(frame);window.removeEventListener('scroll',save);}; },[sessionKey]);
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_CHUNK);
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
@@ -185,7 +199,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
 
   // Arama veya kategori filtresi
   const filteredItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = normalizeSearch(deferredQuery.trim());
     return visibleCatalog.filter((item) => {
       if (activeTab !== 'all' && item.type !== activeTab) return false;
       if (
@@ -195,27 +209,17 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         return false;
       }
       if (q) {
-        const titleMatch = item.title.toLowerCase().includes(q);
-        const catMatch = item.category && item.category.toLowerCase().includes(q);
-        return titleMatch || catMatch;
+        return searchIndex.get(item.id)?.includes(q);
       }
       return true;
     });
-  }, [visibleCatalog, activeTab, selectedCategory, searchQuery]);
+  }, [visibleCatalog, activeTab, selectedCategory, deferredQuery, searchIndex]);
 
   const orderedItems = useMemo(() => sortable ? sortCatalog(filteredItems, preferences.sort) : filteredItems,
     [filteredItems, sortable, preferences.sort]);
   const shelves = useMemo(() => buildDiscoveryShelves(itemsForActiveTab, watchHistory), [itemsForActiveTab, watchHistory]);
   const hasAddedDates = filteredItems.some(item => Boolean(item.addedAt));
 
-  // Performanslı DOM gösterimi için sayfalanmış içerik
-  const visibleItems = useMemo(() => {
-    return orderedItems.slice(0, visibleCount);
-  }, [orderedItems, visibleCount]);
-
-  const handleLoadMore = () => {
-    setVisibleCount((prev) => Math.min(filteredItems.length, prev + PAGE_CHUNK));
-  };
 
 
   return (
@@ -293,7 +297,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         </section>
       )}
       {/* Media Type Tabs with Real Server Totals */}
-      <div className="flex items-center gap-1.5 p-1 rounded-full bg-[#1c1b1d] border border-white/5">
+      <div className="catalog-type-tabs flex items-center gap-1.5 p-1 rounded-full bg-[#1c1b1d] border border-white/5">
         <button
           onClick={() => handleTabChange('all')}
           className={`flex-1 py-1.5 px-2 rounded-full font-headline text-xs font-bold transition-all cursor-pointer truncate ${
@@ -336,12 +340,13 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         </button>
       </div>
 
-      {!isCatalogLoading && catalog.length > 0 && activeTab !== 'live' && !searchQuery.trim() && selectedCategory === 'Tümü' && !shelves.some(shelf => shelf.title === 'Bu hafta çıkanlar') && (
-        <section className="rounded-2xl bg-[#1c1b1d] border border-white/5 p-3" aria-label="Bu hafta çıkanlar">
-          <h2 className="font-bold text-sm text-[#00f0ff]">Bu hafta çıkanlar</h2>
-          <p className="text-xs text-[#b9cacb] mt-1">Bu hafta için doğrulanmış ilk yayın tarihi bulunmuyor. Yeni eklenenler ve sana uygun seçimler aşağıda gösterilir.</p>
-        </section>
-      )}
+      {!isCatalogLoading && activeTab !== 'live' && !searchQuery.trim() && selectedCategory === 'Tümü' && <>
+        <button onClick={() => setDecisionOpen(true)} className="rounded-2xl border border-[#00f0ff]/35 p-4 bg-[#00f0ff]/5 text-left flex items-center gap-3 min-h-20" aria-label="Karar veremiyorum">
+          <Dices size={28} className="text-[#00f0ff] shrink-0"/><span><span className="block font-bold text-[#00f0ff]">Bu akşam ne izlesek?</span><span className="block text-xs text-[#b9cacb] mt-1">Karar veremiyorum · Kataloğundan 3 seçenek</span></span>
+        </button>
+        <FollowingShelf profile={profileId} catalog={visibleCatalog} playlist={activePlaylist} onOpen={(item,season,episode) => onOpenFollowed ? onOpenFollowed(item,season,episode) : onOpenSeriesDetail(item)}/>
+      </>}
+      {decisionOpen && <DecisionModal catalog={visibleCatalog} history={watchHistory} onClose={() => setDecisionOpen(false)} onInfo={item => {setDecisionOpen(false);onOpenTmdbInfo(item);}} onPlay={item => {setDecisionOpen(false);item.type==='series'?onOpenSeriesDetail(item):onPlayMedia(item);}}/>}
       {!isCatalogLoading && activeTab !== 'live' && !searchQuery.trim() && selectedCategory === 'Tümü' && shelves.map(shelf => (
         <section key={shelf.title} className="catalog-shelf min-w-0" aria-label={shelf.title}>
           <div className="flex items-center gap-2 mb-1"><Sparkles size={17} className="text-[#00f0ff]"/><h2 className="font-bold text-base">{shelf.title}</h2></div>
@@ -473,30 +478,10 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         </div>
       ) : (
         <>
-          <div className={`catalog-grid catalog-grid--${preferences.view}`} data-testid="catalog-grid">
-            {visibleItems.map(item => <CatalogMediaCard key={item.id} item={item} view={preferences.view} isChildMode={isChildMode}
+          <VirtualCatalogGrid items={orderedItems} view={preferences.view} getKey={item => item.id} render={item => <CatalogMediaCard item={item} view={preferences.view} isChildMode={isChildMode}
               onPlay={onPlayMedia} onSeries={onOpenSeriesDetail} onInfo={onOpenTmdbInfo} onEpg={onOpenEpgGuide}
-              onDownload={onDownloadMedia} onSchedule={onScheduleMedia} onFavorite={onToggleFavorite}/>) }
-          </div>
-
-          {/* Pagination & Load More Footer */}
-          {filteredItems.length > visibleCount && (
-            <div className="flex flex-col items-center justify-center pt-4 pb-2 gap-2.5">
-              <span className="text-xs text-[#b9cacb] font-mono">
-                Gösterilen: {visibleItems.length.toLocaleString('tr-TR')} / {filteredItems.length.toLocaleString('tr-TR')} içerik
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleLoadMore}
-                  className="px-5 py-2.5 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold shadow-[0_0_10px_rgba(0,240,255,0.4)] hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                  <span>Daha Fazla Göster (+{PAGE_CHUNK})</span>
-                </button>
-
-              </div>
-            </div>
-          )}
+              onDownload={onDownloadMedia} onSchedule={onScheduleMedia} onFavorite={onToggleFavorite}/>}/>
+          <p className="text-center text-xs text-[#849495] py-3">{orderedItems.length.toLocaleString('tr-TR')} içerik · Kaydırarak keşfet</p>
         </>
       )}
     </div>

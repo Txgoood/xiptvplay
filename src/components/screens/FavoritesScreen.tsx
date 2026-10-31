@@ -1,10 +1,13 @@
-import React from 'react';
+import React, {useState} from 'react';
+import {readCatalogPreferences,saveCatalogPreferences,VIEW_OPTIONS,type CatalogView} from '../../services/catalogDiscovery';
 import { MovieCollectionBadge } from '../MovieCollectionBadge';
 import { MediaItem } from '../../types';
 import { Heart, Play } from 'lucide-react';
 
 interface FavoritesScreenProps {
   favorites: MediaItem[];
+  profileId?: string;
+  onOpenInfo?: (item:MediaItem)=>void;
   onPlayMedia: (item: MediaItem) => void;
   onRemoveFavorite: (id: string) => void;
   onOpenCatalog: () => void;
@@ -12,12 +15,15 @@ interface FavoritesScreenProps {
 
 export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
   favorites,
+  profileId = 'parent',
+  onOpenInfo,
   onPlayMedia,
   onRemoveFavorite,
   onOpenCatalog,
 }) => {
+  const [view,setView]=useState<CatalogView>(()=>readCatalogPreferences(profileId+'_favorites').view);
   return (
-    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-2 pb-28 gap-4 select-none">
+    <div className="flex flex-col w-full max-w-none mx-auto px-4 pt-2 pb-28 gap-4 select-none">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Heart className="w-5 h-5 fill-[#ffb4ab] text-[#ffb4ab]" />
@@ -28,6 +34,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
         </span>
       </div>
 
+      <label className="self-end text-xs text-[#b9cacb]">Görünüm <select aria-label="Favori görünümü" value={view} onChange={e=>{const value=e.target.value as CatalogView;setView(value);saveCatalogPreferences(profileId+'_favorites',{sort:'added-desc',view:value});}} className="min-h-11 rounded-xl bg-[#28282b] p-2">{VIEW_OPTIONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
       {favorites.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-8 bg-[#1c1b1d] rounded-2xl border border-white/5 text-center my-6">
           <div className="w-14 h-14 rounded-full bg-[#2a2a2c] flex items-center justify-center text-[#849495] mb-3">
@@ -45,20 +52,20 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div className={`catalog-grid catalog-grid--${view}`}>
           {favorites.map((item) => (
             <div
               key={item.id}
-              className="relative flex flex-col rounded-2xl bg-[#1c1b1d] border border-white/5 p-3 shadow-md gap-2"
+              className={`catalog-card catalog-card--${view} relative rounded-2xl bg-[#1c1b1d] border border-white/5 p-2 gap-2`}
             >
-              <div className="relative aspect-video rounded-xl bg-[#2a2a2c] overflow-hidden">
+              <div className="catalog-card-poster relative rounded-xl bg-[#2a2a2c] overflow-hidden">
                 <img
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full ${item.type==='live'?'object-contain p-3':'object-cover'}`}
+                  loading="lazy" decoding="async"
                   alt={item.title}
                   src={item.poster}
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80';
+                    e.currentTarget.onerror=null;e.currentTarget.src='/brand/xiptvplay-icon.svg';
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e10] via-transparent to-transparent"></div>
@@ -74,12 +81,12 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
                   <Heart className="w-4 h-4 fill-[#ffb4ab] text-[#ffb4ab]" />
                 </button>
               </div>
-              <div className="flex flex-col min-w-0">
+              <div className="catalog-card-body flex flex-col min-w-0 flex-1 gap-2">
                 <h4 className="font-headline text-sm font-bold text-[#e5e1e4] truncate">
                   {item.title}
                 </h4>
                 <span className="text-[11px] text-[#b9cacb] truncate">{item.category}</span>
-              </div>
+              <button type="button" onClick={()=>onOpenInfo?.(item)} className="text-left min-h-10 text-xs text-[#00f0ff]">Bilgileri aç</button>
               <button
                 onClick={() => onPlayMedia(item)}
                 className="w-full h-9 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.35)] active:scale-95 cursor-pointer mt-1"
@@ -87,6 +94,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
                 <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Şimdi İzle</span>
               </button>
+              </div>
             </div>
           ))}
         </div>

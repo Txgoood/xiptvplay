@@ -6,6 +6,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(NativeCastPlugin.class);
         registerPlugin(NativeMediaPlayerPlugin.class);
         registerPlugin(NativeDownloadPlugin.class);
         registerPlugin(NativeNotificationsPlugin.class);
@@ -15,3 +16,4 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
     }
 }
+

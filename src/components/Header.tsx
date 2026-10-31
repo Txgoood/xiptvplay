@@ -33,6 +33,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Katalog & Canlı TV';
       case 'favorites':
         return 'Favorilerim';
+      case 'history':
+        return 'İzleme Geçmişi';
       case 'settings':
         return 'Ayarlar';
       default:

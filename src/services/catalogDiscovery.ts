@@ -56,16 +56,15 @@ function compareKnown(a: number | undefined, b: number | undefined, ascending: b
   if (b == null) return -1;
   return ascending ? a - b : b - a;
 }
+const titleCollator = new Intl.Collator('tr', { sensitivity: 'base', numeric: true });
 export function sortCatalog(items: MediaItem[], sort: CatalogSort): MediaItem[] {
-  const collator = new Intl.Collator('tr', { sensitivity: 'base', numeric: true });
-  return [...items].sort((a, b) => {
-    if (sort === 'title-asc') return collator.compare(a.title, b.title);
-    if (sort === 'title-desc') return collator.compare(b.title, a.title);
-    if (sort.startsWith('added-')) return compareKnown(a.addedAt, b.addedAt, sort === 'added-asc');
-    if (sort.startsWith('year-')) return compareKnown(year(a), year(b), sort === 'year-asc');
-    return compareKnown(Number(catalogRating(a.rating)) || undefined, Number(catalogRating(b.rating)) || undefined, sort === 'rating-asc');
-  });
+  if (sort === 'title-asc' || sort === 'title-desc') return [...items].sort((a,b)=>titleCollator.compare(a.title,b.title)*(sort==='title-desc'?-1:1));
+  const ascending=sort.endsWith('-asc');
+  // Yıl / puan ayıklaması karşılaştırma başına değil, içerik başına bir kez yapılır.
+  return items.map(item=>({item,value:sort.startsWith('added-')?item.addedAt:sort.startsWith('year-')?year(item):Number(catalogRating(item.rating))||undefined}))
+    .sort((a,b)=>compareKnown(a.value,b.value,ascending)).map(row=>row.item);
 }
+
 export interface DiscoveryShelf { title: string; subtitle: string; items: MediaItem[]; badge?: string }
 export function buildDiscoveryShelves(items: MediaItem[], history: WatchHistoryEntry[], now = new Date()): DiscoveryShelf[] {
   const media = items.filter(item => item.type !== 'live');
@@ -89,7 +88,7 @@ export function buildDiscoveryShelves(items: MediaItem[], history: WatchHistoryE
   const score = (item: MediaItem) => (affinity.get(item.type + ':' + item.category) || 0) * 4 + Number(catalogRating(item.rating) || 0);
   const recommended = media.filter(item => !watched.has(item.id) && !item.isFavorite &&
     (affinity.has(item.type + ':' + item.category) || Boolean(catalogRating(item.rating))))
-    .sort((a, b) => score(b) - score(a) || (b.addedAt || 0) - (a.addedAt || 0)).slice(0, 16);
+    .map(item=>({item,score:score(item)})).sort((a,b)=>b.score-a.score||(b.item.addedAt||0)-(a.item.addedAt||0)).slice(0,16).map(row=>row.item);
   const shelves: DiscoveryShelf[] = [];
   if (released.length) shelves.push({ title: 'Bu hafta çıkanlar', subtitle: 'Sağlayıcının bildirdiği vizyon / ilk yayın tarihine göre', items: released, badge: 'Bu hafta' });
   if (added.length) shelves.push({ title: 'Bu hafta eklenenler', subtitle: 'Son 7 günde kataloğa eklenen film ve diziler', items: added, badge: 'Yeni eklendi' });

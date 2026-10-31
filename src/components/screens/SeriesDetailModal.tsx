@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MediaItem, Playlist, SeriesDetail, SeriesEpisode } from '../../types';
+import { FollowButton } from './FollowingShelf';
+import { updateFollowing } from '../../services/seriesFollowing';
 import { XtreamClientService } from '../../services/xtreamClient';
 import { IptvService } from '../../services/iptvService';
 import {
@@ -26,6 +28,8 @@ interface SeriesDetailModalProps {
   onDownloadEpisode: (episode: SeriesEpisode, seriesItem: MediaItem) => void;
   onScheduleEpisodes: (episodes: SeriesEpisode[], seriesItem: MediaItem) => void;
   initialSeason?: number;
+  initialEpisode?: number;
+  profileId?: string;
 }
 
 export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
@@ -37,7 +41,10 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   onDownloadEpisode,
   onScheduleEpisodes,
   initialSeason,
+  initialEpisode,
+  profileId = 'parent',
 }) => {
+  const [verifiedDetail,setVerifiedDetail]=useState<SeriesDetail | undefined>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seriesDetail, setSeriesDetail] = useState<SeriesDetail | null>(null);
@@ -51,6 +58,8 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
       return;
     }
 
+    let cancelled = false;
+    setVerifiedDetail(undefined);
     const loadSeriesInfo = async () => {
       setLoading(true);
       setError(null);
@@ -58,7 +67,9 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
       // Use IptvService to intelligently bridge Xtream and M3U series info & bypass port blocks
       const res = await IptvService.fetchSeriesDetail(seriesItem, activePlaylist);
 
+      if (cancelled) return;
       if (res.success && res.seriesDetail) {
+        if (!res.isFallback) { setVerifiedDetail(res.seriesDetail); updateFollowing(profileId,seriesItem.id,res.seriesDetail); }
         setSeriesDetail(res.seriesDetail);
         if (res.seriesDetail.seasons.length > 0) {
           const requestedSeason = res.seriesDetail.seasons.find((season) => season.seasonNumber === initialSeason);
@@ -73,7 +84,9 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
     };
 
     loadSeriesInfo();
-  }, [isOpen, seriesItem, activePlaylist, initialSeason]);
+    return () => {cancelled=true;};
+  }, [isOpen, seriesItem, activePlaylist, initialSeason, profileId]);
+  useEffect(()=>{if(!loading && initialEpisode){const timer=setTimeout(()=>document.getElementById(`follow-episode-${selectedSeason}-${initialEpisode}`)?.scrollIntoView({block:"center"}),100);return()=>clearTimeout(timer);}},[loading,selectedSeason,initialEpisode]);
 
   if (!isOpen || !seriesItem) return null;
 
@@ -178,6 +191,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
 
         {/* Modal Body / Episodes Section */}
         <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain p-3 sm:p-5 landscape:p-3 flex flex-col gap-3 sm:gap-4 no-scrollbar">
+          <FollowButton key={seriesItem.id} profile={profileId} item={seriesItem} detail={verifiedDetail}/>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
               <Loader2 className="w-8 h-8 text-[#00f0ff] animate-spin" />
@@ -276,6 +290,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                     return (
                       <div
                         key={episode.id}
+                        id={`follow-episode-${episode.seasonNum}-${episode.episodeNum}`}
                         className="group flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-2xl bg-[#1c1b1d] hover:bg-[#201f21] border border-white/5 hover:border-[#00f0ff]/30 transition-all gap-3"
                       >
                         {/* Episode Info */}
@@ -385,3 +400,4 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
     </div>
   );
 };
+

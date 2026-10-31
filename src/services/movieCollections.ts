@@ -48,6 +48,8 @@ function pump() {
 export function ensureMovieCollection(media: MediaItem): Promise<void> {
   if (media.type !== 'movie' || movieCollectionStatus(media) || (failedUntil.get(media.id) || 0) > Date.now()) return Promise.resolve();
   const existing = jobs.get(media.id); if (existing) return existing;
+  // Hızlı kaydırmada görünmeyen afişler sınırsız arka plan kuyruğu oluşturmaz.
+  if (queue.length >= 32) return Promise.resolve();
   // Büyük katalogda yalnızca ekranda görünen afişler kontrol edilir.
   const work = new Promise<void>(resolve => {
     queue.push(async () => {

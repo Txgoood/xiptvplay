@@ -24,7 +24,7 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
   return <article className={`catalog-card catalog-card--${view} group min-w-0 rounded-2xl bg-[#1c1b1d] border border-white/5 overflow-hidden hover:border-[#00f0ff]/30`}>
     <div className="catalog-card-poster relative bg-[#2a2a2c] overflow-hidden">
       <button type="button" onClick={open} className="block w-full h-full" aria-label={`${item.title} ${live ? 'izle' : 'bilgileri'}`}>
-        <img className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" src={item.poster || '/brand/xiptvplay-icon.svg'} alt="" loading="lazy" decoding="async"
+        <img className={`w-full h-full ${live ? 'object-contain p-3' : 'object-cover'}`} src={item.poster || '/brand/xiptvplay-icon.svg'} alt="" loading="lazy" decoding="async"
           onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = '/brand/xiptvplay-icon.svg'; }} />
       </button>
       {item.type === 'movie' && <MovieCollectionBadge media={item}/>}

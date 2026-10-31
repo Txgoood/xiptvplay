@@ -6,7 +6,7 @@ export interface MovieCollectionPart { id: number; title: string; originalTitle:
 export interface MovieCollection { id: number; name: string; parts: MovieCollectionPart[] }
 export interface TmdbDetails {
   id: number; title: string; overview: string; poster: string | null; backdrop: string | null;
-  rating: number; releaseDate?: string; genres: string[];
+  rating: number; releaseDate?: string; genres: string[]; runtimeMinutes?: number;
   collection?: { id: number; name: string } | null;
   cast: Array<{ name: string; character?: string; photo: string | null }>; trailerKey: string | null;
 }
@@ -20,37 +20,51 @@ try { localStorage.removeItem('xiptvplay_tmdb_details_v2'); } catch {}
 type CacheEntry = { until: number; data: TmdbDetails };
 const memory = new Map<string, CacheEntry>();
 const pending = new Map<string, Promise<TmdbDetails>>();
+let choicesMemory: Record<string, number> | undefined;
+let hydrated = false;
+let persistTimer: ReturnType<typeof setTimeout> | undefined;
 export function savedChoices(): Record<string, number> {
-  try { return JSON.parse(localStorage.getItem(CHOICE_KEY) || '{}') || {}; } catch { return {}; }
+  if (!choicesMemory) { try { choicesMemory = JSON.parse(localStorage.getItem(CHOICE_KEY) || '{}') || {}; } catch { choicesMemory = {}; } }
+  return choicesMemory!;
 }
 export function rememberTmdbChoice(media: MediaItem, id: number) {
-  try {
-    const choices = savedChoices(); delete choices[media.id]; choices[media.id] = id;
-    localStorage.setItem(CHOICE_KEY, JSON.stringify(Object.fromEntries(Object.entries(choices).slice(-400))));
-  } catch { /* Depo doluyken de seçilen bilgi açılabilir. */ }
+  const choices = {...savedChoices()}; delete choices[media.id]; choices[media.id] = id;
+  choicesMemory = Object.fromEntries(Object.entries(choices).slice(-400));
+  try { localStorage.setItem(CHOICE_KEY, JSON.stringify(choicesMemory)); } catch {}
 }
 function cacheKey(media: MediaItem, id?: number) {
   const actualId = id || savedChoices()[media.id] || media.tmdbId;
   return JSON.stringify(actualId ? [media.type, actualId] : [media.type, media.imdbId || null, tmdbTitleQueries(media.title).queries, media.year || null]);
 }
+function hydrateCache() {
+  if (hydrated) return;
+  hydrated = true;
+  try {
+    for (const [key,value] of Object.entries(JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') as Record<string,CacheEntry>).slice(-120)) {
+      if (value?.until > Date.now() && Number.isInteger(value.data?.id)) memory.set(key,value);
+    }
+  } catch {}
+}
 function readCache(key: string): TmdbDetails | undefined {
-  let entry = memory.get(key);
-  if (!entry) {
-    try { entry = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')[key]; } catch {}
-  }
-  if (entry?.until && entry.until > Date.now() && Number.isInteger(entry.data?.id)) { memory.set(key, entry); return entry.data; }
-  return undefined;
+  hydrateCache();
+  const entry = memory.get(key);
+  return entry && entry.until > Date.now() ? entry.data : undefined;
+}
+export function peekTmdbDetails(media: MediaItem): TmdbDetails | undefined { return readCache(cacheKey(media)); }
+function flushCache() {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = undefined;
+  try { localStorage.setItem(CACHE_KEY,JSON.stringify(Object.fromEntries(memory))); } catch {}
 }
 function writeCache(key: string, data: TmdbDetails) {
-  const entry = { until: Date.now() + 7 * 86400000, data };
-  memory.delete(key); memory.set(key, entry);
-  if (memory.size > 120) memory.delete(memory.keys().next().value!);
-  try {
-    const saved: Record<string, CacheEntry> = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-    delete saved[key]; saved[key] = entry;
-    const entries = Object.entries(saved).filter(([, value]) => value?.until > Date.now()).slice(-120);
-    localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
-  } catch { /* Bellek önbelleği kullanılmaya devam eder. */ }
+  hydrateCache();
+  memory.delete(key); memory.set(key,{until:Date.now()+7*86400000,data});
+  if(memory.size>120) memory.delete(memory.keys().next().value!);
+  if(!persistTimer) persistTimer=setTimeout(flushCache,600);
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide',flushCache);
+  window.addEventListener('storage',event=>{ if(event.key===CHOICE_KEY) choicesMemory=undefined; if(event.key===CACHE_KEY) {hydrated=false;memory.clear();} });
 }
 async function request(media: MediaItem, options: { tmdbId?: number; query?: string; searchOnly?: boolean } = {}) {
   const params = new URLSearchParams({ type: media.type, title: options.query || media.title });

@@ -59,3 +59,18 @@ Gerçek telefonda son kontrol: mevcut APK üzerine güncelle, kataloğu yenile, 
 - Çocuk profilinde yalnızca izinli katalog kayıtları eşleşir. İzin verilmeyen devam filmlerinin afişi, adı ve oynatma kısayolu gösterilmez.
 - Koleksiyon isteği ana film bilgisi açıldıktan sonra bağımsız yüklenir. Önceki TMDB v2 önbelleği yeni koleksiyon alanını almak için temizlenir; eşleşme düzeltmeleri korunur.
 - Kontroller: 23 birim testi; telefon / geniş ekran; filme girmeden rozet, hatalı sayısal rozetin engellenmesi, devam filmi bilgisine geçiş, eksik film, yeniden açılışta ağ isteği olmadan rozet, çocuk izinleri, iki istek eşzamanlılık sınırı. Canlı TMDB kontrolü Demir Adam film / koleksiyonu üzerinden yapılır.
+
+## 1.3.0 — Keşif, takip, akıcılık ve gerçek TV bağlantısı
+
+- Katalogda `Karar veremiyorum`: film/dizi, kategori/tür, süre, minimum puan ve izlenenleri eleme; katalogdaki üç seçenek, başka üç öner. Eksik süre/puan filtreyi geçmez.
+- Film/dizi bilgileri altında `Benzerlerini keşfet`: ortak mevcut tür/tema veya aynı sağlayıcı kategorisi gerekçesi; yalnızca verilen izinli katalogdan seçim.
+- Profil başına en fazla 50 dizi takibi. İlk doğrulanmış bölüm listesi başlangıçtır. Sonraki katalog/açılış kontrollerinde (15 dakika bekleme, en fazla iki eşzamanlı sağlayıcı isteği) yeni sezon/bölüm farkı gösterilir. Elle `Kontrol et` beklemeyi atlar. Fallback M3U bölüm listesi doğrulanmış kabul edilmez. Uyarılar uygulama içindedir; kapalı uygulamada zamanlanmış bildirim değildir.
+- İzleme geçmişi, favoriler, manuel TMDB seçimleri ve yayın adresleri korunur. Çocuk önerileri/takip rafı yalnızca izinli içeriklerle çalışır. Çocuk profiline geçerken yetişkinin TV oturumu kapatılır.
+- Katalog görünür satırlara göre sanallaştırılır; kaydırma ve filtreler profil/playlist oturumunda korunur. Arama metni önceden normalleştirilir ve ertelenerek işlenir. Favori işaretleri Set ile bir kez hazırlanır; indirme ilerlemesi her seferinde dev kataloğu yeniden oluşturmaz.
+- TMDB disk önbelleği bir kez belleğe alınır; yazılar toplulaştırılır. Afiş taraması iki eşzamanlı istek ve en fazla 32 bekleyen iş ile sınırlanır. Sıralamada tarih/puan ayıklaması kayıt başına yapılır.
+- Oynatıcı ihtiyaç anında yüklenir. Ana JS üretim paketi yaklaşık 1185 kB → 576 kB (minify edilmiş ham boyut); telefon açılış süresi/FPS iddiası değildir.
+- Boş haftalık kutu kaldırıldı, canlı logoları kırpılmadan gösterilir, Favoriler'e görünüm seçimi eklendi, Geçmiş başlığı düzeltildi.
+- Örnek TV listesi kaldırıldı. NativeCast: gerçek SSDP MediaRenderer keşfi, yerel AVTransport doğrulaması, SetAVTransportURI/Play/Pause/Stop, durum okuma; Google Cast SDK'nın gerçek cihaz seçicisi ve Default Media Receiver. DLNA XML dış varlıkları kapalı, cihaz denetim adresleri yalnızca LAN, yanıt boyutları ve zaman aşımları sınırlı. Yayın URL'leri loglanmaz.
+- TV bağlantısı doğrulanınca katalogdan film/canlı yayın veya dizi bölümü TV'ye yüklenir. Yerel oynatıcı önce durdurulur. İndirilen yerel dosyaları HTTP sunucusu olmadan TV'ye göndermek desteklenmez; açık hata gösterilir. Aynı ağ / TV codec ve sağlayıcı bağlantı sınırları geçerlidir. Bu ortamda fiziksel TV / Chromecast uçtan uca testi yapılamaz.
+
+Doğrulama: TypeScript, 32 Node birim/regresyon testi, üretim derlemesi; Playwright ile 430px/1440px, 65001 kayıt, başlangıçta 16 / geniş ekranda 12 çizilen katalog kartı, 500000px kaydırıp geri dönüş, son kayda arama, üçlü önerileri değiştirme, süre/puan filtreleri, benzer içerik, dizi takibi/yeni bölüm/yeni sezon/hedef bölüm navigasyonu ve örnek cihazların kaldırılması kontrol edildi. Android CI ayrıca dört saf Java DLNA testini ve APK kurulum/açılış emülatör kontrolünü çalıştırır. Fiziksel yayın hızı veya gerçek TV oynatımı test edilmiş sayılmaz.

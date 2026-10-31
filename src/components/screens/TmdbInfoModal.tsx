@@ -4,10 +4,13 @@ import { MediaItem } from '../../types';
 import { getTmdbDetails, rememberTmdbChoice, searchTmdbChoices, TmdbClientError, type TmdbChoice, type TmdbDetails } from '../../services/tmdbClient';
 import { tmdbTitleQueries } from '../../services/tmdbTitle';
 import { rememberMovieCollection } from '../../services/movieCollections';
+import { FollowButton } from './FollowingShelf';
+import { SimilarMediaSection } from './SimilarMediaSection';
 import { MovieCollectionSection } from './MovieCollectionSection';
 
 interface Props {
   media: MediaItem | null;
+  profileId?: string;
   catalog?: MediaItem[];
   isChildMode?: boolean;
   onSelectRelated?: (item: MediaItem) => void;
@@ -17,7 +20,7 @@ interface Props {
   onOpenSeries: (item: MediaItem) => void;
 }
 
-export const TmdbInfoModal: React.FC<Props> = ({ media, catalog = [], isChildMode = false, onSelectRelated, onClose, onPlay, onDownload, onOpenSeries }) => {
+export const TmdbInfoModal: React.FC<Props> = ({ profileId = 'parent', media, catalog = [], isChildMode = false, onSelectRelated, onClose, onPlay, onDownload, onOpenSeries }) => {
   const [details, setDetails] = useState<TmdbDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -92,6 +95,7 @@ export const TmdbInfoModal: React.FC<Props> = ({ media, catalog = [], isChildMod
             <p className="text-[10px] text-[#849495]">Seçtiğin eşleşme bu içerik için hatırlanır. İzlenecek yayın değişmez.</p>
           </div>}
           {details?.collection && <p className="flex w-fit items-center gap-1.5 px-2 py-1 rounded-lg bg-[#00f0ff]/10 text-[#00f0ff] text-xs font-bold"><Layers3 size={14}/> Bu film bir seriye ait</p>}
+          {media.type === 'series' && <FollowButton profile={profileId} item={media}/>}
           {details?.overview && <p className="text-sm leading-relaxed text-[#d5d5d5]">{details.overview}</p>}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => { onClose(); media.type === 'series' ? onOpenSeries(media) : onPlay(media); }} className="flex items-center gap-2 rounded-full px-5 py-2.5 bg-[#00f0ff] text-[#00363a] text-sm font-bold"><Play size={17}/>{media.type === 'series' ? 'Bölümler / İzle' : 'İzle'}</button>
@@ -100,6 +104,7 @@ export const TmdbInfoModal: React.FC<Props> = ({ media, catalog = [], isChildMod
           </div>
           {media.type === 'movie' && details?.collection && <MovieCollectionSection key={details.collection.id} collection={details.collection} media={media} tmdbId={details.id} catalog={catalog} isChildMode={isChildMode}
             onInfo={item => onSelectRelated?.(item)} onPlay={item => { onClose(); onPlay(item); }}/>}
+          <SimilarMediaSection media={media} catalog={catalog} genres={details?.genres} onInfo={item => onSelectRelated?.(item)}/>
           {details?.cast && details.cast.length > 0 && <div>
             <h3 className="font-bold text-sm mb-2">Oyuncular</h3>
             <div className="flex gap-3 overflow-x-auto pb-3">

@@ -1,6 +1,8 @@
+import { CastModal } from './components/screens/CastModal';
+import { NativeCast, EMPTY_CAST, supportsNativeCast, castMediaRequest, stopLocalPlayback, type CastState } from './services/nativeCast';
 import { CloudSyncController } from './services/cloudSync';
 import { DeviceProfileAccess } from './services/deviceProfileAccess';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { ScreenType, AppMode, Playlist, DownloadItem, MediaItem, SeriesEpisode } from './types';
 import { INITIAL_STATS } from './data/mockData';
 import { StorageService } from './services/storage';
@@ -25,9 +27,9 @@ import { WatchHistoryEntry, WatchHistoryService } from './services/watchHistory'
 import { FamilyProfilesModal } from './components/screens/FamilyProfilesModal';
 import { CloudBackupModal } from './components/screens/CloudBackupModal';
 import { FamilyConfiguration, FamilyProfile, FamilyProfilesService } from './services/familyProfiles';
-import { VideoPlayerModal } from './components/player/VideoPlayerModal';
+const VideoPlayerModal = lazy(()=>import('./components/player/VideoPlayerModal').then(module=>({default:module.VideoPlayerModal})));
 import { PrdHub } from './components/prd/PrdHub';
-import { Info, Cast as CastIcon, Tv as TvIcon, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
+import { Info, Search as SearchIcon, PlayCircle, X as CloseIcon } from 'lucide-react';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { DownloadNotifications } from './services/downloadNotifications';
@@ -146,7 +148,26 @@ export default function App() {
 
   // Cast, Search & Profile Modals
   const [isCastOpen, setIsCastOpen] = useState(false);
-  const [isCastConnected, setIsCastConnected] = useState(false);
+  const [castState, setCastState] = useState<CastState>(EMPTY_CAST);
+  const isCastConnected = castState.connected;
+  const [castCandidate,setCastCandidate] = useState<MediaItem|null>(null);
+  const updateCast = (state:CastState) => setCastState(old=>JSON.stringify(old)===JSON.stringify(state)?old:state);
+  useEffect(()=>{
+    if(!supportsNativeCast())return;
+    let alive=true;let listener: {remove:()=>Promise<void>}|undefined;let polling=false;
+    NativeCast.addListener('castState',state=>{if(alive)updateCast(state);}).then(handle=>{if(alive)listener=handle;else void handle.remove();});
+    const poll=async()=>{if(polling||document.visibilityState!=='visible')return;polling=true;try{const state=await NativeCast.status();if(alive)updateCast(state);}catch{}finally{polling=false;}};
+    void poll();const timer=setInterval(()=>void poll(),5000);
+    return()=>{alive=false;clearInterval(timer);void listener?.remove();};
+  },[]);
+  const sendToTv = async(item:MediaItem) => {
+    const request=castMediaRequest(item);
+    if(activePlayerMedia&&supportsNativeCast())await stopLocalPlayback();
+    setActivePlayerMedia(null);
+    // Yerel oynatıcı kapanmadan TV'yi başlatmak tek bağlantılı sağlayıcıyı kilitleyebilir.
+    await new Promise(resolve=>setTimeout(resolve,350));
+    updateCast(await NativeCast.loadMedia(request));setCastCandidate(item);
+  };
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [globalSearchTerm, setGlobalSearchTerm] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -222,6 +243,7 @@ export default function App() {
     setAppMode('app');
     setCurrentScreen(profile.kind === 'child' ? 'catalog' : 'playlists');
     if(familyConfiguration)DeviceProfileAccess.remember(profile,familyConfiguration);
+    if(profile.kind==='child'&&supportsNativeCast()){void NativeCast.disconnect().catch(()=>{});setCastCandidate(null);}
     setCurrentProfileId(profile.id);
     setFamilyDialogMode(null);
   };
@@ -231,7 +253,7 @@ export default function App() {
     setFamilyDialogMode(familyConfiguration ? 'manage' : 'setup');
   };
   const safePlay = (item: MediaItem) => {
-    if (canAccessMedia(item)) { setWatchHistory(WatchHistoryService.record(historyProfileId, item)); setActivePlayerMedia(item); }
+    if (canAccessMedia(item)) { setWatchHistory(WatchHistoryService.record(historyProfileId, item)); setCastCandidate(item); if(isCastConnected&&!isChildProfile){void sendToTv(item).then(()=>showToast('Yayın TV’ye gönderildi.')).catch(error=>showToast(error.message));}else setActivePlayerMedia(item); }
     else showToast('Bu içerik çocuk profili için izinli değil.');
   };
 
@@ -820,8 +842,7 @@ export default function App() {
         episodeMedia.nextNextEpisodeTitle = `${seriesItem.title} - S${nextNextSeasonStr}E${nextNextEpStr}: ${nextNextEpisode.title}`;
       }
     }
-    setWatchHistory(WatchHistoryService.record(historyProfileId, episodeMedia));
-    setActivePlayerMedia(episodeMedia);
+    safePlay(episodeMedia);
   };
 
   // Series Episode Download Handler
@@ -1087,6 +1108,12 @@ export default function App() {
   };
 
   // 1- Rozet Sayısı Hesaplaması: Sadece mevcut katalogda gerçekten eşleşen favorileri say
+  const decoratedCatalog = useMemo(() => {
+    const favorites = new Set(activeFavoriteItems.map(item=>item.id));
+    return childVisibleCatalog.map(item=>({...item,isFavorite:favorites.has(item.id)}));
+  },[childVisibleCatalog,activeFavoriteItems]);
+  const continueWatching = useMemo(()=>watchHistory.filter(e=>e.media.type!=='live'&&e.durationSeconds>0&&e.positionSeconds>0&&!e.completed&&(!isChildProfile||FamilyProfilesService.allows(activeFamilyProfile,e.media as MediaItem))),[watchHistory,isChildProfile,activeFamilyProfile]);
+  const [followEpisode,setFollowEpisode]=useState<number|undefined>();
   const allFavoritesList = useMemo(() => {
     return isChildProfile
       ? activeFavoriteItems.filter(item => FamilyProfilesService.allows(activeFamilyProfile, item))
@@ -1129,7 +1156,7 @@ export default function App() {
         appMode={appMode}
         setAppMode={setAppMode}
         onOpenSearch={() => setIsSearchOpen(true)}
-        onOpenCast={() => setIsCastOpen(true)}
+        onOpenCast={() => {if(activePlayerMedia)setCastCandidate('audioTracks' in activePlayerMedia?activePlayerMedia:null);setIsCastOpen(true);}}
         isCastConnected={isCastConnected}
         userEmail={userEmail}
         onOpenProfile={() => setIsProfileOpen(true)}
@@ -1169,15 +1196,13 @@ export default function App() {
 
             {currentScreen === 'catalog' && (
               <CatalogScreen
-                key={historyProfileId}
+                key={historyProfileId+'_'+(activePlaylist?.id||'all')}
                 profileId={historyProfileId}
                 watchHistory={watchHistory}
-                catalog={childVisibleCatalog.map((c) => ({
-                  ...c,
-                  isFavorite: activeFavoriteItems.some(f => f.id === c.id),
-                }))}
+                catalog={decoratedCatalog}
                 isChildMode={Boolean(isChildProfile)}
-                continueWatching={watchHistory.filter(e => e.media.type !== 'live' && e.durationSeconds > 0 && e.positionSeconds > 0 && !e.completed && (!isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, e.media as MediaItem)))}
+                continueWatching={continueWatching}
+                onOpenFollowed={(item,season,episode)=>{if(canAccessMedia(item)){setCatalogTargetSeason(season);setFollowEpisode(episode);setSelectedSeriesItem(item);}}}
                 activePlaylist={activePlaylist}
                 onBackToPlaylists={() => { if (!isChildProfile) setCurrentScreen('playlists'); }}
                 onRetryCatalog={() => { if(activePlaylist)void handleRefreshPlaylist(activePlaylist.id); }}
@@ -1185,7 +1210,7 @@ export default function App() {
                 onDownloadMedia={handleDownloadMedia}
                 onScheduleMedia={(item) => { if (!isChildProfile) setScheduleSelection([item]); }}
                 onToggleFavorite={handleToggleFavorite}
-                onOpenSeriesDetail={(item) => { if (canAccessMedia(item)) { setCatalogTargetSeason(undefined); setSelectedSeriesItem(item); } }}
+                onOpenSeriesDetail={(item) => { if (canAccessMedia(item)) { setCatalogTargetSeason(undefined); setFollowEpisode(undefined); setSelectedSeriesItem(item); } }}
                 onOpenTmdbInfo={(item) => { if (canAccessMedia(item)) setTmdbInfoItem(item); }}
                 onOpenEpgGuide={(item) => { if (canAccessMedia(item)) setEpgGuideItem(item); }}
                 isCatalogLoading={isCatalogLoading}
@@ -1214,13 +1239,16 @@ export default function App() {
 
             {!isChildProfile && currentScreen === 'favorites' && (
               <FavoritesScreen
+                key={historyProfileId}
+                profileId={historyProfileId}
+                onOpenInfo={item=>item.type==='live'?setEpgGuideItem(item):setTmdbInfoItem(item)}
                 favorites={allFavoritesList}
                 onPlayMedia={(item) => {
                   setWatchHistory(WatchHistoryService.record(historyProfileId, item));
                   if (item.type === 'series') {
                     setSelectedSeriesItem(item);
                   } else {
-                    setActivePlayerMedia(item);
+                    safePlay(item);
                   }
                 }}
                 onRemoveFavorite={handleToggleFavorite}
@@ -1235,7 +1263,7 @@ export default function App() {
                 onPlay={(item) => {
                   if (isChildProfile && !FamilyProfilesService.allows(activeFamilyProfile, item as MediaItem)) { showToast('Bu içerik çocuk profili için izinli değil.'); return; }
                   setWatchHistory(WatchHistoryService.record(historyProfileId, item));
-                  setActivePlayerMedia(item);
+                  if ('audioTracks' in item) safePlay(item); else setActivePlayerMedia(item);
                 }}
                 onRemove={(id) => setWatchHistory(WatchHistoryService.remove(historyProfileId, id))}
                 onComplete={(id) => setWatchHistory(WatchHistoryService.complete(historyProfileId, id))}
@@ -1289,13 +1317,14 @@ export default function App() {
 
       <TmdbInfoModal
         media={tmdbInfoItem}
+        profileId={historyProfileId}
         catalog={childVisibleCatalog}
         isChildMode={Boolean(isChildProfile)}
         onSelectRelated={item => { if (canAccessMedia(item)) setTmdbInfoItem(item); }}
         onClose={() => setTmdbInfoItem(null)}
         onPlay={safePlay}
         onDownload={handleDownloadMedia}
-        onOpenSeries={(item) => { setCatalogTargetSeason(undefined); setSelectedSeriesItem(item); }}
+        onOpenSeries={(item) => { setCatalogTargetSeason(undefined); setFollowEpisode(undefined); setSelectedSeriesItem(item); }}
       />
 
       {/* Series Detail & Episodes Selection Modal */}
@@ -1303,11 +1332,13 @@ export default function App() {
         seriesItem={selectedSeriesItem}
         activePlaylist={activePlaylist}
         isOpen={!!selectedSeriesItem}
-        onClose={() => { setSelectedSeriesItem(null); setCatalogTargetSeason(undefined); }}
+        onClose={() => { setSelectedSeriesItem(null); setCatalogTargetSeason(undefined); setFollowEpisode(undefined); }}
         onPlayEpisode={(episode, seriesItem, nextEpisode, nextNextEpisode) => { if (canAccessMedia(seriesItem)) handlePlayEpisode(episode, seriesItem, nextEpisode, nextNextEpisode); }}
         onDownloadEpisode={handleDownloadEpisode}
         onScheduleEpisodes={handleScheduleEpisodes}
         initialSeason={catalogTargetSeason}
+        initialEpisode={followEpisode}
+        profileId={historyProfileId}
       />
 
       {scheduleSelection.length > 0 && !isChildProfile && <ScheduleDownloadModal
@@ -1322,14 +1353,14 @@ export default function App() {
       />}
 
       {/* Real Video Player Modal */}
-      <VideoPlayerModal
+      {activePlayerMedia && <Suspense fallback={<div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center text-[#00f0ff]">Oynatıcı hazırlanıyor…</div>}><VideoPlayerModal
         media={activePlayerMedia}
         isOpen={!!activePlayerMedia}
         onClose={() => setActivePlayerMedia(null)}
         onProgress={(media, positionSeconds, durationSeconds, completed) => {
           setWatchHistory(WatchHistoryService.record(profileRef.current, media, positionSeconds, durationSeconds, completed));
         }}
-      />
+      /></Suspense>}
 
       {familyDialogMode && isAdminProfile && <FamilyProfilesModal
         mode={familyDialogMode}
@@ -1350,45 +1381,8 @@ export default function App() {
         }}
       />}
 
-      {/* Chromecast Simulation Modal */}
-      {isCastOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-[#1c1b1d] rounded-3xl p-5 border border-white/10 shadow-2xl flex flex-col gap-3">
-            <div className="flex items-center justify-between border-b border-white/5 pb-2">
-              <div className="flex items-center gap-2">
-                <CastIcon className="w-5 h-5 text-[#00f0ff]" />
-                <span className="font-headline font-bold text-sm text-white">Yansıtılacak Cihaz</span>
-              </div>
-              <button onClick={() => setIsCastOpen(false)} className="text-[#849495] hover:text-white cursor-pointer">
-                ✕
-              </button>
-            </div>
-            <div className="flex flex-col gap-2 py-1">
-              {[
-                { name: 'Salon Android TV (4K)', type: 'Google Cast' },
-                { name: 'Oturma Odası Chromecast', type: 'Chromecast Ultra' },
-                { name: 'Yatak Odası Mi Box', type: 'DLNA / AirPlay' },
-              ].map((device) => (
-                <button
-                  key={device.name}
-                  onClick={() => {
-                    setIsCastConnected(true);
-                    setIsCastOpen(false);
-                    showToast(`"${device.name}" cihazına bağlandı!`);
-                  }}
-                  className="flex items-center justify-between p-3 rounded-2xl bg-[#201f21] hover:bg-[#2a2a2c] text-left transition-all border border-white/5 cursor-pointer"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-headline text-xs font-bold text-white">{device.name}</span>
-                    <span className="text-[10px] text-[#b9cacb]">{device.type}</span>
-                  </div>
-                  <TvIcon className="w-4 h-4 text-[#00f0ff]" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {!isChildProfile && isCastOpen && <CastModal state={castState} media={castCandidate} onClose={()=>setIsCastOpen(false)} onChange={updateCast} onSend={sendToTv}/>}
+      {!isChildProfile && isCastConnected && !isCastOpen && <button onClick={()=>setIsCastOpen(true)} className="fixed left-3 right-3 bottom-24 z-40 rounded-xl bg-[#12353a] border border-[#00f0ff]/40 p-2 text-xs text-[#00f0ff] truncate">TV · {castState.name} · {castState.title||'Yayın seç'} · Kontroller</button>}
 
       {/* Quick Search Dialog Modal */}
       {isSearchOpen && (
@@ -1432,7 +1426,7 @@ export default function App() {
                         if (item.type === 'series') {
                           setSelectedSeriesItem(item);
                         } else {
-                          setActivePlayerMedia(item);
+                          safePlay(item);
                         }
                       }}
                       className="flex items-center justify-between p-2 rounded-xl hover:bg-[#201f21] text-left transition-colors cursor-pointer"

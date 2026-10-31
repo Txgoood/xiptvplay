@@ -128,3 +128,16 @@ input[type="range"] {
 .catalog-card--large .catalog-primary,
 .catalog-card--medium .catalog-primary,
 .catalog-card--small .catalog-primary { flex-basis: 100%; }
+
+/* Uzun listelerde sabit kart ölçüsü sanallaştırmanın kaydırmasını kararlı tutar. */
+.virtual-catalog-cell { min-width: 0; }
+.virtual-catalog-cell > .catalog-card { height: 100%; }
+.virtual-catalog-cell .catalog-card-body { height: 172px; flex: none; }
+.virtual-catalog-cell .catalog-card--small .catalog-card-body { height: 172px; }
+.virtual-catalog-cell .catalog-card--list { height: 126px; }
+.virtual-catalog-cell .catalog-card--details { height: 220px; }
+.virtual-catalog-cell .catalog-card--list .catalog-card-body,
+.virtual-catalog-cell .catalog-card--details .catalog-card-body { height: auto; flex: 1; }
+.discovery-select { display: block; width: 100%; min-height: 44px; margin-top: 5px; padding: 8px; border-radius: 12px; background: #28282b; color: white; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+@media (max-width: 479px) { .catalog-type-tabs { gap: 2px; } .catalog-type-tabs button { font-size: 10px; padding-inline: 2px; min-height: 40px; } }

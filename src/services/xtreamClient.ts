@@ -405,6 +405,7 @@ export class XtreamClientService {
     // Web fallback via backend
     try {
       const resp = await fetch('/api/iptv/xtream/series_info', {
+        signal: AbortSignal.timeout(20000),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
