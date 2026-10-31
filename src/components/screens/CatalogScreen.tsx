@@ -11,7 +11,6 @@ import { CatalogMediaCard } from './CatalogMediaCard';
 import { buildDiscoveryShelves, readCatalogPreferences, saveCatalogPreferences, sortCatalog, resolveCatalogSort, SORT_OPTIONS, VIEW_OPTIONS, type CatalogSort, type CatalogView, type CatalogPreferences } from '../../services/catalogDiscovery';
 import {
   Dices,
-  ArrowLeft,
   Search,
   X,
   Tv,
@@ -232,34 +231,6 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
 
   return (
     <div className="flex flex-col w-full max-w-none mx-auto px-3 sm:px-4 lg:px-6 pt-2 pb-28 gap-3.5 select-none">
-      {/* Active Playlist Header Strip */}
-      <div className="flex items-center justify-between p-3 rounded-2xl bg-[#1c1b1d] border border-white/5 shadow-md">
-        <div className="flex items-center gap-2.5 min-w-0">
-          {!isChildMode && <button
-            onClick={onBackToPlaylists}
-            className="w-8 h-8 rounded-full bg-[#201f21] hover:bg-[#2a2a2c] flex items-center justify-center text-[#00f0ff] shrink-0 border border-white/5 cursor-pointer"
-            title="Playlistlere Dön"
-          >
-            <ArrowLeft className="w-4 h-4 text-[#00f0ff]" />
-          </button>}
-          <div className="flex flex-col min-w-0">
-            <span className="font-headline text-xs font-bold text-white truncate">
-              {activePlaylist ? activePlaylist.name : 'Tüm Kanallar'}
-            </span>
-            <span className="text-[10px] text-[#b9cacb] truncate font-mono">
-              {activePlaylist
-                ? `${serverGrandTotal.toLocaleString('tr-TR')} İçerik • ${filteredItems.length.toLocaleString('tr-TR')} Eşleşen`
-                : `${catalog.length.toLocaleString('tr-TR')} Kanal`}
-            </span>
-          </div>
-        </div>
-        {activePlaylist?.badge && (
-          <span className="px-2 py-0.5 rounded-full bg-[#00f0ff]/15 text-[#00f0ff] font-headline text-[10px] font-bold shrink-0">
-            {activePlaylist.badge}
-          </span>
-        )}
-      </div>
-
       {/* Search Input Bar */}
       <div className="relative flex items-center rounded-2xl bg-[#1c1b1d] border border-white/5 focus-within:border-[#00f0ff]/40 shadow-md">
         <div className="absolute left-3.5 flex items-center pointer-events-none text-[#b9cacb]">

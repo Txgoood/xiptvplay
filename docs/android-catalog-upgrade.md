@@ -80,3 +80,7 @@ Doğrulama: TypeScript, 32 Node birim/regresyon testi, üretim derlemesi; Playwr
 Sağlayıcı yalnızca `last_modified` verip `added` vermediğinde Yeni/Eski eklenenler aynı sırayı koruyordu. Dizi sekmesinde ve alt kategorilerde bu durumda doğrulanmış son güncellenme tarihine geçilir; seçenek ve etkin sıra açıklaması bunu açıkça belirtir. Güncellenme tarihi içerikte eklenme tarihi olarak kaydedilmez. Gerçek eklenme tarihi varsa önceki davranış korunur. Yıl/puan/ad sıralaması ve profil tercihi korunur. Sıra değişince sanallaştırılmış kataloğun başlangıcına dönülür; öneri raflarından ayrı bir Katalog sıra başlığı gösterilir.
 
 Ek regresyonlar: eksik eklenme tarihi + farklı güncellenme tarihleri, iki yön ve eksik değerlerin sonda kalması; gerçek eklenme tarihinin korunması ve dizi güncelleme sırasının filme taşınmaması. 34 Node testi / TypeScript / üretim derlemesi başarılı.
+
+## 1.3.2 — Katalog üst alanı
+
+Katalogdaki geri düğmesi, aktif playlist adı, içerik/eşleşen sayıları ve PRO rozetinin bulunduğu üst şerit kaldırıldı. Arama alanı doğrudan uygulama başlığının altına taşındı. Alt Playlists sekmesi kullanılır. TypeScript/üretim derlemesi ve 390/1440px arayüz kontrolünde kaldırılan şerit, arama konumu, alt sekmeden playlist geçişi ve sıralama kontrol edildi.
