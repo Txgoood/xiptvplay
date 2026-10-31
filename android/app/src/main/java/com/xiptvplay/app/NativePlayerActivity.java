@@ -30,6 +30,8 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
@@ -83,12 +85,11 @@ public class NativePlayerActivity extends Activity {
     private TextView currentEpisodeTitleView;
     private LinearLayout bottomBar;
     private LinearLayout actionButtons;
-    private Button fullscreenButton;
-    private Button closeButton;
+    private ImageButton fullscreenButton;
+    private ImageButton closeButton;
     private String currentUrl;
     private String progressPreferenceKey;
-    private Button playPauseButton;
-    private PlayerControlIcon playIcon, pauseIcon;
+    private ImageButton playPauseButton;
     private boolean displayedPause = false;
     private boolean scrubbing = false;
     private boolean controlDialogOpen = false;
@@ -101,8 +102,8 @@ public class NativePlayerActivity extends Activity {
     private long lastPositionSecond = -1L, lastDurationSecond = -1L;
     private Button speedButton;
     private Button subtitleButton;
-    private Button audioButton;
-    private Button nextButton;
+    private ImageButton audioButton;
+    private ImageButton nextButton;
     private TextView positionText;
     private TextView durationText;
     private DefaultTimeBar timeBar;
@@ -369,9 +370,7 @@ public class NativePlayerActivity extends Activity {
         topBar.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
 
         closeButton = makeIconButton("close", "Videoyu kapat", false);
-        closeButton.setTextSize(18);
         closeButton.setContentDescription("Videoyu kapat");
-        closeButton.setMinWidth(dp(44));
         closeButton.setMinimumWidth(dp(44));
         closeButton.setPadding(0, 0, 0, 0);
         closeButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48)));
@@ -390,9 +389,7 @@ public class NativePlayerActivity extends Activity {
         videoContainer.addView(bottomBar, bottomParams);
 
         fullscreenButton = makeIconButton("fullscreen", "Tam ekran / küçük ekran", false);
-        fullscreenButton.setTextSize(19);
         fullscreenButton.setContentDescription("Tam ekran / küçük ekran");
-        fullscreenButton.setMinWidth(0);
         fullscreenButton.setOnClickListener(v -> setFullscreen(!fullscreen));
 
         LinearLayout timelineRow = new LinearLayout(this);
@@ -453,19 +450,16 @@ public class NativePlayerActivity extends Activity {
         subtitleButton.setOnClickListener(v -> showSubtitleTracks());
         addCompactButton(actionButtons, subtitleButton);
 
-        Button volumeButton = makeIconButton("volume", "Ses seviyesi", false);
+        ImageButton volumeButton = makeIconButton("volume", "Ses seviyesi", false);
         volumeButton.setContentDescription("Ses seviyesi");
         volumeButton.setOnClickListener(v -> showVolumeDialog());
         addCompactButton(actionButtons, volumeButton);
 
-        Button brightnessButton = makeIconButton("brightness", "Parlaklık", false);
+        ImageButton brightnessButton = makeIconButton("brightness", "Parlaklık", false);
         brightnessButton.setContentDescription("Parlaklık");
         brightnessButton.setOnClickListener(v -> showBrightnessDialog());
         addCompactButton(actionButtons, brightnessButton);
 
-        playIcon = new PlayerControlIcon("play",0xFF002E34);
-        pauseIcon = new PlayerControlIcon("pause",0xFF002E34);
-        playIcon.setBounds(0,0,dp(24),dp(24));pauseIcon.setBounds(0,0,dp(24),dp(24));
         playPauseButton = makeIconButton("play", "Oynat", true);
         playPauseButton.setOnClickListener(v -> togglePlayback());
         addCompactButton(actionButtons, playPauseButton);
@@ -506,21 +500,34 @@ public class NativePlayerActivity extends Activity {
         return button;
     }
 
-    private Button makeIconButton(String icon,String description,boolean primary) {
-        Button button=styleButton(new PlayerIconButton(this),"");button.setContentDescription(description);
-        button.setMinWidth(dp(48));button.setMinimumWidth(dp(48));
-        PlayerControlIcon drawable=new PlayerControlIcon(icon,primary?0xFF002E34:Color.WHITE);
-        drawable.setBounds(0,0,dp(24),dp(24));((PlayerIconButton)button).setControlIcon(drawable);
-        button.setGravity(Gravity.CENTER);button.setPadding(dp(12),0,dp(12),0);
-        if(primary){GradientDrawable shape=new GradientDrawable();shape.setColor(0xFF00DCEA);shape.setCornerRadius(dp(24));button.setBackground(new RippleDrawable(ColorStateList.valueOf(0x55000000),shape,null));}
+    private ImageButton makeIconButton(String icon,String description,boolean primary) {
+        ImageButton button=new ImageButton(this);button.setContentDescription(description);
+        button.setMinimumWidth(dp(48));button.setMinimumHeight(dp(48));
+        button.setPadding(dp(12),dp(12),dp(12),dp(12));button.setScaleType(ImageView.ScaleType.CENTER);
+        button.setBackgroundTintList(null);button.setStateListAnimator(null);
+        int resource;
+        switch(icon){
+            case "close":resource=R.drawable.player_close;break;
+            case "audio":resource=R.drawable.player_audio;break;
+            case "volume":resource=R.drawable.player_volume;break;
+            case "brightness":resource=R.drawable.player_brightness;break;
+            case "next":resource=R.drawable.player_next;break;
+            case "fullscreen":resource=R.drawable.player_fullscreen;break;
+            default:resource=R.drawable.player_play;
+        }
+        button.setImageResource(resource);
+        button.setImageTintList(ColorStateList.valueOf(primary?0xFF002E34:Color.WHITE));
+        GradientDrawable shape=new GradientDrawable();shape.setColor(primary?0xFF00DCEA:0xCC202024);shape.setCornerRadius(dp(24));
+        if(!primary)shape.setStroke(dp(1),0x26FFFFFF);
+        button.setBackground(new RippleDrawable(ColorStateList.valueOf(primary?0x55000000:0x33FFFFFF),shape,null));
         return button;
     }
 
     private void updatePlayPauseButton() {
         if(playPauseButton==null||player==null)return;
         boolean pause=player.getPlayWhenReady()&&player.getPlaybackState()!=Player.STATE_ENDED;
-        if(pause!=displayedPause || ((PlayerIconButton)playPauseButton).getControlIcon() != (pause?pauseIcon:playIcon)) {
-            displayedPause=pause;((PlayerIconButton)playPauseButton).setControlIcon(pause?pauseIcon:playIcon);
+        if(pause!=displayedPause || !playPauseButton.getContentDescription().equals(pause?"Duraklat":"Oynat")) {
+            displayedPause=pause;playPauseButton.setImageResource(pause?R.drawable.player_pause:R.drawable.player_play);
             playPauseButton.setContentDescription(pause?"Duraklat":"Oynat");
         }
     }
@@ -536,7 +543,7 @@ public class NativePlayerActivity extends Activity {
         if(player!=null)controlsHandler.post(progressUpdater);
     }
 
-    private void addCompactButton(LinearLayout row, Button button) {
+    private void addCompactButton(LinearLayout row, View button) {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1f);
         params.setMargins(dp(2), 0, dp(2), 0);
         row.addView(button, params);

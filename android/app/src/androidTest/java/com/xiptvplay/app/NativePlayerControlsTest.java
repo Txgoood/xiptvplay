@@ -36,8 +36,8 @@ public class NativePlayerControlsTest {
         return null;
     }
     private static PlayerView video(View root){if(root instanceof PlayerView)return (PlayerView)root;if(root instanceof ViewGroup){ViewGroup group=(ViewGroup)root;for(int i=0;i<group.getChildCount();i++){PlayerView found=video(group.getChildAt(i));if(found!=null)return found;}}return null;}
-    private static Button button(NativePlayerActivity a,String label){View result=find(a.getWindow().getDecorView(),label);assertNotNull(label,result);return (Button)result;}
-    private static void assertIconPainted(Button button,boolean dark) {
+    private static View button(NativePlayerActivity a,String label){View result=find(a.getWindow().getDecorView(),label);assertNotNull(label,result);return result;}
+    private static void assertIconPainted(View button,boolean dark) {
         Bitmap image=Bitmap.createBitmap(button.getWidth(),button.getHeight(),Bitmap.Config.ARGB_8888);
         button.draw(new Canvas(image));int pixels=0,half=Math.round(12*button.getResources().getDisplayMetrics().density);
         for(int y=image.getHeight()/2-half;y<image.getHeight()/2+half;y++)for(int x=image.getWidth()/2-half;x<image.getWidth()/2+half;x++){
@@ -63,7 +63,7 @@ public class NativePlayerControlsTest {
         try(ActivityScenario<NativePlayerActivity> scenario=ActivityScenario.launch(intent)){
             ready(scenario);Thread.sleep(500);AtomicLong pausedPosition=new AtomicLong();AtomicReference<ExoPlayer> first=new AtomicReference<>();
             scenario.onActivity(a->{
-                first.set(player(a));Button pause=button(a,"Duraklat"),brightness=button(a,"Parlaklık"),speed=button(a,"Oynatma hızı");
+                first.set(player(a));View pause=button(a,"Duraklat"),brightness=button(a,"Parlaklık"),speed=button(a,"Oynatma hızı");
                 ViewGroup row=(ViewGroup)pause.getParent();assertEquals(row.indexOfChild(brightness)+1,row.indexOfChild(pause));assertEquals(row.indexOfChild(pause)+1,row.indexOfChild(speed));
                 assertTrue(pause.getWidth()>=48*a.getResources().getDisplayMetrics().density-1);
                 assertIconPainted(pause,true);assertIconPainted(button(a,"Videoyu kapat"),false);assertIconPainted(brightness,false);
