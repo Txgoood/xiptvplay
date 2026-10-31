@@ -488,8 +488,8 @@ public class NativePlayerActivity extends Activity {
         button.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         button.setAllCaps(false);
         button.setSingleLine(true);
-        button.setMinWidth(0);
-        button.setMinimumWidth(0);
+        button.setMinWidth(dp(48));
+        button.setMinimumWidth(dp(48));
         button.setPadding(dp(4), 0, dp(4), 0);
         button.setTextColor(Color.WHITE);
         button.setBackgroundTintList(null);
