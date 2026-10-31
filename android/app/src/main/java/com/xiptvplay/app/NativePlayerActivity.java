@@ -15,6 +15,10 @@ import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.content.res.ColorStateList;
+import android.os.SystemClock;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -78,10 +82,23 @@ public class NativePlayerActivity extends Activity {
     private LinearLayout topBar;
     private TextView currentEpisodeTitleView;
     private LinearLayout bottomBar;
+    private LinearLayout actionButtons;
     private Button fullscreenButton;
     private Button closeButton;
     private String currentUrl;
     private String progressPreferenceKey;
+    private Button playPauseButton;
+    private PlayerControlIcon playIcon, pauseIcon;
+    private boolean displayedPause = false;
+    private boolean scrubbing = false;
+    private boolean controlDialogOpen = false;
+    private int controlDialogCount = 0;
+    private boolean resumePlayWhenReady = true;
+    private long resumePositionMs = 0L;
+    private androidx.media3.common.TrackSelectionParameters resumeTracks;
+    private float resumeSpeed = 1f, resumeVolume = 1f;
+    private long lastCheckpointMs = 0L;
+    private long lastPositionSecond = -1L, lastDurationSecond = -1L;
     private Button speedButton;
     private Button subtitleButton;
     private Button audioButton;
@@ -91,9 +108,10 @@ public class NativePlayerActivity extends Activity {
     private DefaultTimeBar timeBar;
     private final Runnable progressUpdater = new Runnable() {
         @Override public void run() {
-            updateProgressLabels();
-            savePlaybackPosition();
-            if (player != null) controlsHandler.postDelayed(this, 1000);
+            if (player == null) return;
+            if (controlsVisible && !isInPictureInPictureMode() && !scrubbing) updateProgressLabels();
+            savePlaybackPosition(false);
+            controlsHandler.postDelayed(this, PlayerUiPolicy.tickDelay(controlsVisible, player.getPlayWhenReady(), isInPictureInPictureMode()));
         }
     };
     private OrientationEventListener orientationListener;
@@ -113,7 +131,8 @@ public class NativePlayerActivity extends Activity {
     private int offlineEpisodeIndex = 0;
     private final Handler controlsHandler = new Handler(Looper.getMainLooper());
     private boolean controlsVisible = true;
-    private final Runnable hideControlsRunnable = () -> setControlsVisible(false);
+    private final Runnable hideControlsRunnable = () -> { if (!scrubbing && !controlDialogOpen) setControlsVisible(false); };
+    private final Runnable orientationResetRunnable = () -> changingOrientation = false;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -128,8 +147,7 @@ public class NativePlayerActivity extends Activity {
                 }
                 if (player == null) return;
                 if (PIP_PAUSE_ACTION.equals(intent.getAction())) {
-                    if (player.isPlaying()) player.pause(); else player.play();
-                    updatePipActions();
+                    togglePlayback();
                 } else if (PIP_NEXT_ACTION.equals(intent.getAction())) {
                     playNextEpisode();
                     updatePipActions();
@@ -154,6 +172,7 @@ public class NativePlayerActivity extends Activity {
 
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
+        root.setOnClickListener(v -> showControlsTemporarily());
         videoContainer = new FrameLayout(this);
         FrameLayout.LayoutParams videoParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.CENTER
@@ -183,7 +202,7 @@ public class NativePlayerActivity extends Activity {
                 ));
             }
         });
-        controlsHandler.post(progressUpdater);
+        restartProgressUpdates();
         playerView.setOnClickListener(v -> {
             if (controlsVisible) setControlsVisible(false);
             else showControlsTemporarily();
@@ -195,6 +214,9 @@ public class NativePlayerActivity extends Activity {
                 controlsHandler.removeCallbacks(hideControlsRunnable);
                 controlsHandler.postDelayed(hideControlsRunnable, 3500);
             }
+        });
+        videoContainer.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom) -> {
+            if (right-left != oldRight-oldLeft) applyVideoBounds();
         });
         showControlsTemporarily();
 
@@ -234,8 +256,27 @@ public class NativePlayerActivity extends Activity {
                 setOfflineNextFromQueue();
             } catch (Exception ignored) { offlineEpisodeQueue = null; }
         }
-        nextButton.setVisibility(nextUrl == null || nextUrl.trim().isEmpty() ? View.GONE : View.VISIBLE);
+        updateNextButtonVisibility();
 
+        resumePositionMs = getSharedPreferences("playback_progress", MODE_PRIVATE).getLong(progressPreferenceKey, 0L);
+        initializePlayer();
+
+        orientationListener = new OrientationEventListener(this) {
+            @Override
+            public void onOrientationChanged(int orientation) {
+                if (orientation == ORIENTATION_UNKNOWN || changingOrientation) return;
+                if ((orientation >= 60 && orientation <= 120) || (orientation >= 240 && orientation <= 300)) {
+                    if (!fullscreen) setFullscreen(true);
+                } else if ((orientation <= 25 || orientation >= 335) && fullscreen) {
+                    setFullscreen(false);
+                }
+            }
+        };
+        if (orientationListener.canDetectOrientation()) orientationListener.enable();
+    }
+
+    private void initializePlayer() {
+        if (player != null || currentUrl == null || isFinishing()) return;
         int bufferSeconds = Math.max(3, Math.min(45, getIntent().getIntExtra("bufferSeconds", 15)));
         int minBufferMs = bufferSeconds * 1000;
         int maxBufferMs = Math.min(90000, Math.max(minBufferMs * 2, 15000));
@@ -251,6 +292,8 @@ public class NativePlayerActivity extends Activity {
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                 .build()
         );
+        if(resumeTracks!=null)player.setTrackSelectionParameters(resumeTracks);
+        player.setPlaybackSpeed(resumeSpeed);player.setVolume(resumeVolume);
         playerView.setPlayer(player);
         player.addListener(new Player.Listener() {
             @Override
@@ -268,51 +311,46 @@ public class NativePlayerActivity extends Activity {
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
                 updatePipActions();
+                updatePlayPauseButton();
+            }
+
+            @Override public void onPlayWhenReadyChanged(boolean ready, int reason) {
+                updatePlayPauseButton();
+                if (!ready) savePlaybackPosition();
+                restartProgressUpdates();
             }
 
             @Override
             public void onPlaybackStateChanged(int playbackState) {
+                if (player == null) return;
+                updatePlayPauseButton();
                 if (playbackState == Player.STATE_ENDED && nextUrl != null && !nextUrl.isEmpty()) {
                     playNextEpisode();
                 }
             }
         });
 
-        String title = getIntent().getStringExtra("title");
+        String title = currentEpisodeTitleView == null ? getIntent().getStringExtra("title") : currentEpisodeTitleView.getText().toString();
         MediaItem item = new MediaItem.Builder()
-            .setUri(Uri.parse(url))
+            .setUri(Uri.parse(currentUrl))
             .setMediaId(title == null ? "XIPTV Play" : title)
             .build();
         player.setMediaItem(item);
-        long savedPosition = getSharedPreferences("playback_progress", MODE_PRIVATE)
-            .getLong(progressPreferenceKey, 0L);
-        if (savedPosition > 0L) player.seekTo(savedPosition);
+        if (resumePositionMs > 0L) player.seekTo(resumePositionMs);
         player.prepare();
-        player.play();
+        player.setPlayWhenReady(resumePlayWhenReady);
+        lastPositionSecond = -1; lastDurationSecond = -1;
+        updatePlayPauseButton();
+        restartProgressUpdates();
 
-        orientationListener = new OrientationEventListener(this) {
-            @Override
-            public void onOrientationChanged(int orientation) {
-                if (orientation == ORIENTATION_UNKNOWN || changingOrientation) return;
-                if ((orientation >= 60 && orientation <= 120) || (orientation >= 240 && orientation <= 300)) {
-                    if (!fullscreen) setFullscreen(true);
-                } else if ((orientation <= 25 || orientation >= 335) && fullscreen) {
-                    setFullscreen(false);
-                }
-            }
-        };
-        if (orientationListener.canDetectOrientation()) orientationListener.enable();
     }
 
     private void buildCustomControls() {
         topBar = new LinearLayout(this);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
-        int statusBarHeight = 0;
-        int statusBarResource = getResources().getIdentifier("status_bar_height", "dimen", "android");
-        if (statusBarResource > 0) statusBarHeight = getResources().getDimensionPixelSize(statusBarResource);
-        topBar.setPadding(dp(10), dp(8) + statusBarHeight, dp(10), dp(8));
-        topBar.setBackgroundColor(0x99000000);
+        topBar.setPadding(dp(12), dp(6), dp(12), dp(6));
+        topBar.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xD9000000,0x00000000}));
         FrameLayout.LayoutParams topParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP
         );
@@ -322,39 +360,38 @@ public class NativePlayerActivity extends Activity {
         TextView title = currentEpisodeTitleView;
         title.setText(getIntent().getStringExtra("title") == null ? "XIPTV Play" : getIntent().getStringExtra("title"));
         title.setTextColor(Color.WHITE);
-        title.setTextSize(15);
-        title.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
-        title.setMaxLines(1);
+        title.setTextSize(13);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        title.setMaxLines(2);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         title.setPadding(0, 0, dp(8), 0);
-        topBar.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1));
+        topBar.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
 
-        closeButton = makeButton("✕");
+        closeButton = makeIconButton("close", "Videoyu kapat", false);
         closeButton.setTextSize(18);
         closeButton.setContentDescription("Videoyu kapat");
         closeButton.setMinWidth(dp(44));
         closeButton.setMinimumWidth(dp(44));
         closeButton.setPadding(0, 0, 0, 0);
-        closeButton.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(42)));
-        closeButton.setElevation(dp(6));
+        closeButton.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48)));
+        closeButton.setElevation(0);
         closeButton.setOnClickListener(v -> closePlayerAndFinish());
         topBar.addView(closeButton);
 
         bottomBar = new LinearLayout(this);
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
         bottomBar.setOrientation(LinearLayout.VERTICAL);
-        bottomBar.setPadding(dp(8), dp(6), dp(8), dp(6));
-        bottomBar.setBackgroundColor(0xCC000000);
+        bottomBar.setPadding(dp(8), dp(6), dp(8), dp(8));
+        bottomBar.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,new int[]{0xEC000000,0x00000000}));
         FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM
         );
         videoContainer.addView(bottomBar, bottomParams);
 
-        fullscreenButton = makeButton("⛶");
+        fullscreenButton = makeIconButton("fullscreen", "Tam ekran / küçük ekran", false);
         fullscreenButton.setTextSize(19);
         fullscreenButton.setContentDescription("Tam ekran / küçük ekran");
         fullscreenButton.setMinWidth(0);
-        fullscreenButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xCC111827));
         fullscreenButton.setOnClickListener(v -> setFullscreen(!fullscreen));
 
         LinearLayout timelineRow = new LinearLayout(this);
@@ -371,6 +408,9 @@ public class NativePlayerActivity extends Activity {
 
         timeBar = new DefaultTimeBar(this, null);
         timeBar.setFocusable(true);
+        timeBar.setContentDescription("Oynatma konumu");
+        timeBar.setPlayedColor(0xFF00DCEA);timeBar.setScrubberColor(Color.WHITE);
+        timeBar.setBufferedColor(0x99FFFFFF);timeBar.setUnplayedColor(0x55FFFFFF);
         timelineRow.addView(timeBar, new LinearLayout.LayoutParams(0, dp(28), 1));
 
         durationText = new TextView(this);
@@ -381,25 +421,28 @@ public class NativePlayerActivity extends Activity {
         timelineRow.addView(durationText, new LinearLayout.LayoutParams(dp(48), -2));
 
         timeBar.addListener(new androidx.media3.ui.TimeBar.OnScrubListener() {
-            @Override public void onScrubStart(androidx.media3.ui.TimeBar bar, long position) {}
+            @Override public void onScrubStart(androidx.media3.ui.TimeBar bar, long position) { scrubbing=true; controlsHandler.removeCallbacks(hideControlsRunnable); }
             @Override public void onScrubMove(androidx.media3.ui.TimeBar bar, long position) {
                 positionText.setText(formatTime(position));
             }
             @Override public void onScrubStop(androidx.media3.ui.TimeBar bar, long position, boolean canceled) {
-                if (player != null && !canceled) player.seekTo(position);
+                scrubbing=false;lastPositionSecond=-1;
+                if (player != null && !canceled) { player.seekTo(position); savePlaybackPosition(); }
                 updateProgressLabels();
                 showControlsTemporarily();
             }
         });
 
-        LinearLayout actionButtons = new LinearLayout(this);
+        actionButtons = new LinearLayout(this);
         actionButtons.setGravity(Gravity.CENTER);
         actionButtons.setOrientation(LinearLayout.HORIZONTAL);
-        bottomBar.addView(actionButtons, new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
+        HorizontalScrollView actionsScroll = new HorizontalScrollView(this);
+        actionsScroll.setHorizontalScrollBarEnabled(false);actionsScroll.setFillViewport(true);
+        actionButtons.setMinimumWidth(dp(8 * 52));
+        actionsScroll.addView(actionButtons,new FrameLayout.LayoutParams(-1,dp(48)));
+        bottomBar.addView(actionsScroll,new LinearLayout.LayoutParams(-1,dp(48)));
 
-        audioButton = makeButton("♫");
+        audioButton = makeIconButton("audio", "Ses parçası", false);
         audioButton.setContentDescription("Ses parçası");
         audioButton.setOnClickListener(v -> showAudioTracks());
         addCompactButton(actionButtons, audioButton);
@@ -409,50 +452,91 @@ public class NativePlayerActivity extends Activity {
         subtitleButton.setOnClickListener(v -> showSubtitleTracks());
         addCompactButton(actionButtons, subtitleButton);
 
-        Button volumeButton = makeButton("🔊");
+        Button volumeButton = makeIconButton("volume", "Ses seviyesi", false);
         volumeButton.setContentDescription("Ses seviyesi");
         volumeButton.setOnClickListener(v -> showVolumeDialog());
         addCompactButton(actionButtons, volumeButton);
 
-        Button brightnessButton = makeButton("☼");
+        Button brightnessButton = makeIconButton("brightness", "Parlaklık", false);
         brightnessButton.setContentDescription("Parlaklık");
         brightnessButton.setOnClickListener(v -> showBrightnessDialog());
         addCompactButton(actionButtons, brightnessButton);
+
+        playIcon = new PlayerControlIcon("play",0xFF002E34);
+        pauseIcon = new PlayerControlIcon("pause",0xFF002E34);
+        playIcon.setBounds(0,0,dp(24),dp(24));pauseIcon.setBounds(0,0,dp(24),dp(24));
+        playPauseButton = makeIconButton("play", "Oynat", true);
+        playPauseButton.setOnClickListener(v -> togglePlayback());
+        addCompactButton(actionButtons, playPauseButton);
 
         speedButton = makeButton("1×");
         speedButton.setContentDescription("Oynatma hızı");
         speedButton.setOnClickListener(v -> showSpeedDialog());
         addCompactButton(actionButtons, speedButton);
 
-        nextButton = makeButton("▶|");
+        nextButton = makeIconButton("next", "Sonraki bölüm", false);
         nextButton.setContentDescription("Sonraki bölüm");
         nextButton.setOnClickListener(v -> playNextEpisode());
         addCompactButton(actionButtons, nextButton);
         addCompactButton(actionButtons, fullscreenButton);
     }
 
-    private Button makeButton(String label) {
-        Button button = new Button(this);
+    private Button makeButton(String label) {return styleButton(new Button(this), label);}
+    private Button styleButton(Button button,String label) {
         button.setText(label);
         button.setTextSize(14);
-        button.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+        button.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         button.setAllCaps(false);
         button.setSingleLine(true);
         button.setMinWidth(0);
         button.setMinimumWidth(0);
         button.setPadding(dp(4), 0, dp(4), 0);
         button.setTextColor(Color.WHITE);
-        button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF202938));
+        button.setBackgroundTintList(null);
+        button.setStateListAnimator(null);
+        GradientDrawable background=new GradientDrawable();background.setColor(0xCC202024);background.setCornerRadius(dp(24));
+        background.setStroke(dp(1),0x26FFFFFF);
+        button.setBackground(new RippleDrawable(ColorStateList.valueOf(0x33FFFFFF),background,null));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)
+            LinearLayout.LayoutParams.WRAP_CONTENT, dp(48)
         );
         params.setMargins(dp(2), 0, dp(2), 0);
         button.setLayoutParams(params);
         return button;
     }
 
+    private Button makeIconButton(String icon,String description,boolean primary) {
+        Button button=styleButton(new PlayerIconButton(this),"");button.setContentDescription(description);
+        button.setMinWidth(dp(48));button.setMinimumWidth(dp(48));
+        PlayerControlIcon drawable=new PlayerControlIcon(icon,primary?0xFF002E34:Color.WHITE);
+        drawable.setBounds(0,0,dp(24),dp(24));button.setCompoundDrawables(drawable,null,null,null);
+        button.setGravity(Gravity.CENTER);button.setPadding(dp(12),0,dp(12),0);
+        if(primary){GradientDrawable shape=new GradientDrawable();shape.setColor(0xFF00DCEA);shape.setCornerRadius(dp(24));button.setBackground(new RippleDrawable(ColorStateList.valueOf(0x55000000),shape,null));}
+        return button;
+    }
+
+    private void updatePlayPauseButton() {
+        if(playPauseButton==null||player==null)return;
+        boolean pause=player.getPlayWhenReady()&&player.getPlaybackState()!=Player.STATE_ENDED;
+        if(pause!=displayedPause || playPauseButton.getCompoundDrawables()[0] != (pause?pauseIcon:playIcon)) {
+            displayedPause=pause;playPauseButton.setCompoundDrawables(pause?pauseIcon:playIcon,null,null,null);
+            playPauseButton.setContentDescription(pause?"Duraklat":"Oynat");
+        }
+    }
+
+    private void togglePlayback() {
+        if(player==null)return;
+        if(player.getPlayWhenReady())player.pause();else{if(player.getPlaybackState()==Player.STATE_ENDED)player.seekTo(0);player.play();}
+        updatePlayPauseButton();updatePipActions();showControlsTemporarily();
+    }
+
+    private void restartProgressUpdates() {
+        controlsHandler.removeCallbacks(progressUpdater);
+        if(player!=null)controlsHandler.post(progressUpdater);
+    }
+
     private void addCompactButton(LinearLayout row, Button button) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(38), 1f);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1f);
         params.setMargins(dp(2), 0, dp(2), 0);
         row.addView(button, params);
     }
@@ -461,8 +545,12 @@ public class NativePlayerActivity extends Activity {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private void savePlaybackPosition() {
+    private void savePlaybackPosition() {savePlaybackPosition(true);}
+    private void savePlaybackPosition(boolean force) {
         if (player == null || progressPreferenceKey == null) return;
+        long now=SystemClock.elapsedRealtime();
+        if(!PlayerUiPolicy.shouldCheckpoint(now,lastCheckpointMs,force))return;
+        lastCheckpointMs=now;
         long position = Math.max(0L, player.getCurrentPosition());
         long duration = Math.max(0L, player.getDuration());
         getSharedPreferences("playback_progress", MODE_PRIVATE).edit()
@@ -498,7 +586,7 @@ public class NativePlayerActivity extends Activity {
 
     private java.util.List<RemoteAction> buildPipActions() {
         if (android.os.Build.VERSION.SDK_INT < 26 || player == null) return java.util.Collections.emptyList();
-        boolean playing = player.isPlaying();
+        boolean playing = player.getPlayWhenReady();
         Intent toggle = new Intent(PIP_PAUSE_ACTION).setPackage(getPackageName());
         PendingIntent togglePending = PendingIntent.getBroadcast(this, 451, toggle,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -543,8 +631,7 @@ public class NativePlayerActivity extends Activity {
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
         if (isInPictureInPictureMode) {
-            if (topBar != null) topBar.setVisibility(View.GONE);
-            if (bottomBar != null) bottomBar.setVisibility(View.GONE);
+            setControlsVisible(false);
         } else {
             showControlsTemporarily();
         }
@@ -566,7 +653,6 @@ public class NativePlayerActivity extends Activity {
             ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
-        fullscreenButton.setText(enabled ? "⛶" : "⛶");
         fullscreenButton.setContentDescription(enabled ? "Küçük ekrana dön" : "Tam ekran");
         // Tam ekranda video tüm ekranı kaplar; çıkışta aynı ExoPlayer dikey ekranda 16:9 kart olur.
         int flags = enabled
@@ -575,49 +661,37 @@ public class NativePlayerActivity extends Activity {
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             : View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
         getWindow().getDecorView().setSystemUiVisibility(flags);
-        FrameLayout.LayoutParams videoParams;
-        if (enabled) {
-            videoParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.CENTER
-            );
-        } else {
-            int width = root.getWidth();
-            if (width <= 0) width = getResources().getDisplayMetrics().widthPixels;
-            int height = Math.round(width * 9f / 16f);
-            videoParams = new FrameLayout.LayoutParams(width, height, Gravity.CENTER);
-        }
-        videoContainer.animate().cancel();
-        videoContainer.setAlpha(0.92f);
-        videoContainer.setScaleX(enabled ? 0.985f : 0.97f);
-        videoContainer.setScaleY(enabled ? 0.985f : 0.97f);
-        videoContainer.setLayoutParams(videoParams);
-        videoContainer.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(180).start();
-        // Ekran yönü değişince root genişliği yeni ölçüsüne oturduktan sonra kart boyutunu tekrar hesapla.
-        root.postDelayed(() -> {
-            if (!fullscreen && root != null && videoContainer != null) {
-                int portraitWidth = root.getWidth();
-                if (portraitWidth <= 0) portraitWidth = getResources().getDisplayMetrics().widthPixels;
-                videoContainer.setLayoutParams(new FrameLayout.LayoutParams(
-                    portraitWidth, Math.round(portraitWidth * 9f / 16f), Gravity.CENTER
-                ));
-            }
-            changingOrientation = false;
-        }, 700);
+        applyVideoBounds();
+        controlsHandler.removeCallbacks(orientationResetRunnable);
+        controlsHandler.postDelayed(orientationResetRunnable,700);
         showControlsTemporarily();
+    }
+
+    private void applyVideoBounds() {
+        if(root==null || videoContainer==null)return;
+        int width=fullscreen?-1:root.getWidth();if(width==0)width=getResources().getDisplayMetrics().widthPixels;
+        int height=fullscreen?-1:Math.round(width*9f/16f);
+        android.view.ViewGroup.LayoutParams old=videoContainer.getLayoutParams();
+        if(old.width!=width||old.height!=height)videoContainer.setLayoutParams(new FrameLayout.LayoutParams(width,height,Gravity.CENTER));
     }
 
     private void showControlsTemporarily() {
         setControlsVisible(true);
         controlsHandler.removeCallbacks(hideControlsRunnable);
-        controlsHandler.postDelayed(hideControlsRunnable, 3500);
+        if(!controlDialogOpen && !scrubbing)controlsHandler.postDelayed(hideControlsRunnable, 3500);
     }
 
     private void setControlsVisible(boolean visible) {
-        controlsVisible = visible;
-        if (topBar != null) topBar.setVisibility(visible ? View.VISIBLE : View.GONE);
-        if (bottomBar != null) bottomBar.setVisibility(visible ? View.VISIBLE : View.GONE);
-        // PlayerView'in yerlesik kontrol katmani kapali kalmali.
-        // Sadece custom topBar/bottomBar gorunurlugunu degistir.
+        if(isInPictureInPictureMode())visible=false;
+        controlsVisible=visible;
+        for(View bar:new View[]{topBar,bottomBar}) {
+            if(bar==null)continue;
+            bar.animate().cancel();bar.setAlpha(visible?1f:0f);
+            // INVISIBLE ölçüyü korur; gizlenirken video SurfaceView yeniden boyutlanmaz.
+            bar.setVisibility(visible?View.VISIBLE:View.INVISIBLE);
+        }
+        if(visible&&!scrubbing)updateProgressLabels();
+        restartProgressUpdates();
     }
 
     private String formatTime(long timeMs) {
@@ -640,8 +714,14 @@ public class NativePlayerActivity extends Activity {
         timeBar.setDuration(duration);
         timeBar.setPosition(position);
         timeBar.setBufferedPosition(Math.min(buffered, duration));
-        positionText.setText(formatTime(position));
-        durationText.setText(duration > 0 ? formatTime(duration) : "--:--");
+        if(lastPositionSecond!=position/1000){positionText.setText(formatTime(position));lastPositionSecond=position/1000;}
+        if(lastDurationSecond!=duration/1000){durationText.setText(duration>0?formatTime(duration):"--:--");lastDurationSecond=duration/1000;}
+    }
+
+    private void showControlDialog(AlertDialog dialog) {
+        controlDialogCount++;controlDialogOpen=true;controlsHandler.removeCallbacks(hideControlsRunnable);
+        dialog.setOnDismissListener(ignored->{controlDialogCount=Math.max(0,controlDialogCount-1);controlDialogOpen=controlDialogCount>0;showControlsTemporarily();});
+        dialog.show();
     }
 
     private void showSubtitleTracks() {
@@ -655,7 +735,7 @@ public class NativePlayerActivity extends Activity {
         }
         final boolean subtitleAvailable = hasTextTracks;
         final String[] choices = { "Kapalı", "Altyazı seç" };
-        new AlertDialog.Builder(this)
+        showControlDialog(new AlertDialog.Builder(this)
             .setTitle("Altyazı")
             .setSingleChoiceItems(choices,
                 player.getTrackSelectionParameters().disabledTrackTypes.contains(C.TRACK_TYPE_TEXT) ? 0 : 1,
@@ -672,17 +752,16 @@ public class NativePlayerActivity extends Activity {
                             player.getTrackSelectionParameters().buildUpon()
                                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                                 .build());
-                        new TrackSelectionDialogBuilder(this, "Altyazı seçimi", player, C.TRACK_TYPE_TEXT)
+                        showControlDialog(new TrackSelectionDialogBuilder(this, "Altyazı seçimi", player, C.TRACK_TYPE_TEXT)
                             .setAllowAdaptiveSelections(false)
                             .setShowDisableOption(true)
-                            .build()
-                            .show();
+                            .build());
                     } else {
                         Toast.makeText(this, "Bu yayında seçilebilir altyazı izi bulunamadı.", Toast.LENGTH_SHORT).show();
                     }
                 })
             .setNegativeButton("Vazgeç", null)
-            .show();
+            .create());
     }
 
     private void showAudioTracks() {
@@ -698,10 +777,9 @@ public class NativePlayerActivity extends Activity {
             Toast.makeText(this, "Bu yayında seçilebilir ses parçası bulunamadı.", Toast.LENGTH_SHORT).show();
             return;
         }
-        new TrackSelectionDialogBuilder(this, "Ses parçası seçimi", player, C.TRACK_TYPE_AUDIO)
+        showControlDialog(new TrackSelectionDialogBuilder(this, "Ses parçası seçimi", player, C.TRACK_TYPE_AUDIO)
             .setAllowAdaptiveSelections(false)
-            .build()
-            .show();
+            .build());
     }
 
     private void updateAudioButton(Tracks tracks) {
@@ -743,9 +821,9 @@ public class NativePlayerActivity extends Activity {
             public void onStartTrackingTouch(SeekBar bar) {}
             public void onStopTrackingTouch(SeekBar bar) {}
         });
-        new AlertDialog.Builder(this).setTitle("Ses seviyesi").setView(layout)
+        showControlDialog(new AlertDialog.Builder(this).setTitle("Ses seviyesi").setView(layout)
             .setPositiveButton("Sessiz", (d, w) -> player.setVolume(0f))
-            .setNegativeButton("Kapat", null).setNeutralButton("Sesi aç", (d, w) -> player.setVolume(lastVolume)).show();
+            .setNegativeButton("Kapat", null).setNeutralButton("Sesi aç", (d, w) -> player.setVolume(lastVolume)).create());
     }
 
     private void showBrightnessDialog() {
@@ -765,8 +843,8 @@ public class NativePlayerActivity extends Activity {
             public void onStartTrackingTouch(SeekBar bar) {}
             public void onStopTrackingTouch(SeekBar bar) {}
         });
-        new AlertDialog.Builder(this).setTitle("Ekran parlaklığı").setView(layout)
-            .setPositiveButton("Tamam", null).setNegativeButton("Kapat", null).show();
+        showControlDialog(new AlertDialog.Builder(this).setTitle("Ekran parlaklığı").setView(layout)
+            .setPositiveButton("Tamam", null).setNegativeButton("Kapat", null).create());
     }
 
     private LinearLayout dialogLayout(String label) {
@@ -785,12 +863,12 @@ public class NativePlayerActivity extends Activity {
         final float[] speeds = {0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f, 3f, 4f, 6f, 8f, 10f, 12f, 16f};
         String[] labels = new String[speeds.length];
         for (int i = 0; i < speeds.length; i++) labels[i] = String.format(Locale.getDefault(), "%.2gx", speeds[i]).replace(".00x", "x").replace(".50x", ".5x").replace(".25x", ".25x").replace(".75x", ".75x");
-        new AlertDialog.Builder(this).setTitle("Oynatma hızı")
+        showControlDialog(new AlertDialog.Builder(this).setTitle("Oynatma hızı")
             .setSingleChoiceItems(labels, -1, (dialog, which) -> {
                 player.setPlaybackSpeed(speeds[which]);
                 speedButton.setText(labels[which]);
                 dialog.dismiss();
-            }).setNegativeButton("Kapat", null).show();
+            }).setNegativeButton("Kapat", null).create());
     }
 
     private void setOfflineNextFromQueue() {
@@ -803,11 +881,18 @@ public class NativePlayerActivity extends Activity {
         nextNextTitle = second == null ? null : second.optString("title", null);
     }
 
+    private void updateNextButtonVisibility() {
+        boolean available=nextUrl!=null&&!nextUrl.trim().isEmpty();
+        if(nextButton!=null)nextButton.setVisibility(available?View.VISIBLE:View.GONE);
+        if(actionButtons!=null)actionButtons.setMinimumWidth(dp((available?8:7)*52));
+    }
+
     private void playNextEpisode() {
         if (player == null || nextUrl == null || nextUrl.trim().isEmpty()) {
             Toast.makeText(this, "Sonraki bölüm bilgisi bulunamadı.", Toast.LENGTH_SHORT).show();
             return;
         }
+        savePlaybackPosition();
         String urlToPlay = nextUrl;
         String titleToPlay = nextTitle;
         nextUrl = nextNextUrl;
@@ -818,7 +903,7 @@ public class NativePlayerActivity extends Activity {
             offlineEpisodeIndex++;
             setOfflineNextFromQueue();
         }
-        nextButton.setVisibility(nextUrl == null || nextUrl.trim().isEmpty() ? View.GONE : View.VISIBLE);
+        updateNextButtonVisibility();
         updatePipActions();
         MediaItem next = new MediaItem.Builder()
             .setUri(Uri.parse(urlToPlay))
@@ -841,7 +926,9 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (player != null) player.play();
+        if(player==null)initializePlayer();
+        if (orientationListener != null && orientationListener.canDetectOrientation()) orientationListener.enable();
+        showControlsTemporarily();
     }
 
     @Override
@@ -850,6 +937,7 @@ public class NativePlayerActivity extends Activity {
         // PiP'ye geciste Activity durabilir: pencere yasarken oynaticiyi
         // kapatmak mini pencerenin tamamen kaybolmasina yol aciyordu.
         if (!isInPictureInPictureMode()) {
+            if(player!=null){resumePositionMs=player.getCurrentPosition();resumePlayWhenReady=player.getPlayWhenReady();resumeTracks=player.getTrackSelectionParameters();resumeSpeed=player.getPlaybackParameters().speed;resumeVolume=player.getVolume();}
             releasePlayer();
             controlsHandler.removeCallbacks(hideControlsRunnable);
             controlsHandler.removeCallbacks(progressUpdater);
@@ -889,6 +977,8 @@ public class NativePlayerActivity extends Activity {
             pipActionReceiver = null;
         }
 
+        controlsHandler.removeCallbacksAndMessages(null);
+        if(orientationListener!=null)orientationListener.disable();
         releasePlayer();
         if (activeInstance == this) activeInstance = null;
         super.onDestroy();
