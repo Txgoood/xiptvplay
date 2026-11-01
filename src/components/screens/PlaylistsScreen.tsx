@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Playlist, SystemStats } from '../../types';
+import { Playlist, SystemStats, MediaItem } from '../../types';
 import { EditPlaylistModal } from './EditPlaylistModal';
 import {
   Wifi,
@@ -28,6 +28,8 @@ import {
 
 interface PlaylistsScreenProps {
   playlists: Playlist[];
+  resumeItems?: { item: MediaItem; position: number }[];
+  onResume?: (item: MediaItem) => void;
   stats: SystemStats;
   onOpenAddModal: (type?: 'xtream' | 'm3u') => void;
   onSelectPlaylist: (playlist: Playlist) => void;
@@ -38,6 +40,8 @@ interface PlaylistsScreenProps {
 
 export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
   playlists,
+  resumeItems = [],
+  onResume,
   stats,
   onOpenAddModal,
   onSelectPlaylist,
@@ -75,6 +79,17 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
 
   return (
     <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-2 pb-28 gap-4 select-none">
+      {resumeItems.length > 0 && <section className="rounded-2xl border border-white/10 bg-[#1c1b1d] p-4">
+        <h2 className="font-bold text-white mb-3">Kaldığın Yerden Devam Et</h2>
+        <div className="flex gap-3 overflow-x-auto">
+          {resumeItems.map(({item,position}) => <button key={item.id} onClick={() => onResume?.(item)}
+            className="min-w-[150px] max-w-[180px] text-left rounded-xl bg-[#28282a] p-2 focus:ring-2 focus:ring-cyan-400">
+            {item.poster && <img src={item.poster} alt="" className="w-full h-24 object-cover rounded-lg" />}
+            <div className="text-white text-xs truncate mt-2">{item.title}</div>
+            <div className="text-cyan-300 text-[11px]">{Math.floor(position / 60)}. dakikadan devam et</div>
+          </button>)}
+        </div>
+      </section>}
       {/* Summary Dashboard Glass Card */}
       <div className="relative overflow-hidden rounded-2xl bg-[#201f21]/80 backdrop-blur-xl p-4 border border-white/5 shadow-xl flex flex-col gap-3.5">
         <div className="absolute -right-12 -top-12 w-36 h-36 bg-[#00f0ff]/10 rounded-full blur-2xl pointer-events-none"></div>

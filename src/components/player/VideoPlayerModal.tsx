@@ -88,7 +88,36 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [brightness, setBrightness] = useState(1.0); // 0.2 to 1.5
   const [quality, setQuality] = useState('Otomatik');
-  const [audioTrack, setAudioTrack] = useState('Türkçe (5.1 Dolby)');
+  const [audioTrack, setAudioTrack] = useState('Yayın Varsayılanı');
+  const [availableAudio, setAvailableAudio] = useState<{ index: number; name: string }[]>([]);
+  const [availableSubtitles, setAvailableSubtitles] = useState<{ index: number; name: string }[]>([]);
+  const scanTracks = useCallback(() => {
+    const video = videoRef.current as any;
+    if (!video) return;
+    const audio = video.audioTracks;
+    if (audio && typeof audio.length === 'number') {
+      setAvailableAudio(Array.from({ length: audio.length }, (_, index) => ({
+        index, name: audio[index]?.label || audio[index]?.language || `Ses ${index + 1}`
+      })));
+    }
+    const tracks = video.textTracks;
+    if (tracks && typeof tracks.length === 'number') {
+      setAvailableSubtitles(Array.from({ length: tracks.length }, (_, index) => ({
+        index, name: tracks[index]?.label || tracks[index]?.language || `Altyazı ${index + 1}`
+      })));
+    }
+  }, []);
+  const chooseAudio = (index: number) => {
+    const tracks = (videoRef.current as any)?.audioTracks;
+    if (!tracks) return;
+    for (let i = 0; i < tracks.length; i++) tracks[i].enabled = i === index;
+    setAudioTrack(availableAudio.find(a => a.index === index)?.name || 'Yayın Varsayılanı');
+  };
+  const chooseSubtitle = (index: number) => {
+    const tracks = videoRef.current?.textTracks;
+    if (tracks) for (let i = 0; i < tracks.length; i++) tracks[i].mode = i === index ? 'showing' : 'disabled';
+    setSubtitleTrack(availableSubtitles.find(s => s.index === index)?.name || 'Kapalı');
+  };
 
   // Subtitle State (.srt / .vtt)
   const [subtitleTrack, setSubtitleTrack] = useState('Kapalı');
@@ -602,6 +631,45 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     };
   }, [isOpen, media?.id, fallbackStage, effectiveUrl, triggerNextFallback, resetControlsTimeout, nativePlayerUnavailable]);
 
+  // webOS: İzlemeye devam et bilgisi her oynatılan VOD için yerel olarak saklanır.
+  useEffect(() => {
+    if (!isOpen || !media || ('type' in media && media.type === 'live')) return;
+    const video = videoRef.current;
+    if (!video) return;
+    const key = 'xiptv-webos-resume:' + String(media.id);
+    const restore = () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(key) || 'null');
+        if (saved && Number.isFinite(saved.position) && Number.isFinite(video.duration)
+          && saved.position > 15 && saved.position < video.duration - 30) {
+          video.currentTime = saved.position;
+        }
+      } catch { /* storage may be unavailable */ }
+    };
+    let lastSavedAt = 0;
+    const save = () => {
+      if (Date.now() - lastSavedAt < 5000 && !video.paused) return;
+      lastSavedAt = Date.now();
+      if (!Number.isFinite(video.currentTime) || !Number.isFinite(video.duration) || video.duration <= 0) return;
+      try {
+        if (video.currentTime >= video.duration - 30) localStorage.removeItem(key);
+        else if (video.currentTime > 5) localStorage.setItem(key, JSON.stringify({
+          id: String(media.id), title: media.title, position: video.currentTime,
+          duration: video.duration, updatedAt: Date.now(), poster: media.poster
+        }));
+      } catch { /* storage may be full */ }
+    };
+    video.addEventListener('loadedmetadata', restore);
+    video.addEventListener('timeupdate', save);
+    video.addEventListener('pause', save);
+    return () => {
+      save();
+      video.removeEventListener('loadedmetadata', restore);
+      video.removeEventListener('timeupdate', save);
+      video.removeEventListener('pause', save);
+    };
+  }, [isOpen, media?.id]);
+
   // Clean up subtitle blob url on unmount
   useEffect(() => {
     return () => {
@@ -843,6 +911,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           key={`${media.id}-${fallbackStage}`}
           poster={media.poster}
           onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={scanTracks}
           onEnded={() => setIsPlaying(false)}
           onError={(e) => {
             if (hlsRef.current || !e.currentTarget.currentSrc) return;
@@ -1279,37 +1348,18 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               </div>
 
               <div className="flex flex-col gap-1">
-                {['Kapalı', 'Türkçe', 'English', ...(customSubtitleName ? [customSubtitleName] : [])].map(
-                  (s) => (
-                    <button
-                      key={s}
-                      onClick={() => setSubtitleTrack(s)}
-                      className={`px-2.5 py-1.5 rounded text-left text-[11px] flex items-center justify-between cursor-pointer transition-colors ${
-                        subtitleTrack === s ? 'bg-[#00f0ff] text-[#00363a] font-bold' : 'bg-[#201f21] hover:bg-[#2a2a2c]'
-                      }`}
-                    >
-                      <span className="truncate">{s}</span>
-                      {subtitleTrack === s && <Check className="w-3.5 h-3.5 shrink-0" />}
-                    </button>
-                  )
-                )}
+                <button onClick={() => chooseSubtitle(-1)} className="px-2.5 py-1.5 text-left text-xs bg-[#201f21]">Kapalı</button>
+                {availableSubtitles.map(s => <button key={s.index} onClick={() => chooseSubtitle(s.index)} className="px-2.5 py-1.5 text-left text-xs bg-[#201f21]">{s.name}</button>)}
+                {customSubtitleName && <button onClick={() => setSubtitleTrack(customSubtitleName)} className="px-2.5 py-1.5 text-left text-xs bg-[#201f21]">{customSubtitleName}</button>}
+                {availableSubtitles.length === 0 && !customSubtitleName && <span className="text-xs text-[#849495]">TV tarafından altyazı kanalı bildirilmedi</span>}
               </div>
             </div>
 
             {/* Audio Track */}            <div className="flex flex-col gap-1 pt-1 border-t border-white/5">
               <span className="text-[10px] text-[#b9cacb] uppercase font-bold">Ses İzi</span>
               <div className="flex flex-col gap-1">
-                {['Türkçe (5.1 Dolby)', 'English (Original Atmos)', 'Yayın Varsayılanı'].map((a) => (
-                  <button
-                    key={a}
-                    onClick={() => setAudioTrack(a)}
-                    className={`px-2.5 py-1.5 rounded text-left text-[11px] cursor-pointer transition-colors ${
-                      audioTrack === a ? 'bg-[#0566d9] text-white font-bold' : 'bg-[#201f21] hover:bg-[#2a2a2c]'
-                    }`}
-                  >
-                    {a}
-                  </button>
-                ))}
+                {availableAudio.map(a => <button key={a.index} onClick={() => chooseAudio(a.index)} className="px-2.5 py-1.5 text-left text-xs bg-[#201f21]">{a.name}</button>)}
+                {availableAudio.length === 0 && <span className="text-xs text-[#849495]">TV tarafından ek ses kanalı bildirilmedi</span>}
               </div>
             </div>
 
@@ -1486,6 +1536,15 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               <span className="hidden sm:inline-block text-[11px] text-[#00f0ff] font-mono bg-[#00f0ff]/10 px-2 py-0.5 rounded border border-[#00f0ff]/20">
                 {quality}
               </span>
+
+              <button
+                onClick={togglePlay}
+                aria-label={isPlaying ? 'Duraklat' : 'Oynat'}
+                title={isPlaying ? 'Duraklat' : 'Oynat'}
+                className="w-9 h-9 rounded-full bg-[#00f0ff] text-[#00363a] flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white cursor-pointer"
+              >
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+              </button>
 
               <button
                 onClick={toggleFullscreen}
