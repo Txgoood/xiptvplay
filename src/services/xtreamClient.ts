@@ -497,6 +497,12 @@ export class XtreamClientService {
         });
       }
 
+      // Some providers return stale season episode_count metadata.
+      // The actual get_series_info episode lists are authoritative.
+      seasonsList.forEach((season) => {
+        const episodes = episodesMap[String(season.seasonNumber)];
+        if (episodes) season.episodeCount = episodes.length;
+      });
       seasonsList.sort((a, b) => a.seasonNumber - b.seasonNumber);
 
       const seriesDetail: SeriesDetail = {
