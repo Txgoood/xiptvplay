@@ -617,7 +617,10 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         }
       } catch { /* storage may be unavailable */ }
     };
+    let lastSavedAt = 0;
     const save = () => {
+      if (Date.now() - lastSavedAt < 5000 && !video.paused) return;
+      lastSavedAt = Date.now();
       if (!Number.isFinite(video.currentTime) || !Number.isFinite(video.duration) || video.duration <= 0) return;
       try {
         if (video.currentTime >= video.duration - 30) localStorage.removeItem(key);
