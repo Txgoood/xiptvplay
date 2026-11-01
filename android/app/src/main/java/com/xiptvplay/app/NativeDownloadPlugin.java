@@ -61,53 +61,100 @@ public class NativeDownloadPlugin extends Plugin {
                 if (!base.exists() && !base.mkdirs()) throw new Exception("İndirme klasörü oluşturulamadı.");
                 String safeName = new File(relativePath).getName();
                 target = new File(base, safeName);
-                HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-                connections.put(id, connection);
-                connection.setConnectTimeout(30000);
-                // Veri akışı durduğunda 2 dakika boyunca ekranda donmuş gibi kalmasın.
-                // Uzun sessizlikleri daha erken yakalamak için okuma zaman aşımı 30 saniye.
-                connection.setReadTimeout(30000);
-                connection.setInstanceFollowRedirects(true);
-                connection.setRequestProperty("Accept-Encoding", "identity");
-
-                connection.connect();
-                int code = connection.getResponseCode();
-                if (code < 200 || code >= 300) throw new Exception("Sunucu HTTP " + code + " yanıtı verdi.");
-                long total = connection.getContentLengthLong();
-                input = new BufferedInputStream(connection.getInputStream(), 256 * 1024);
-                output = new BufferedOutputStream(new FileOutputStream(target, false), 256 * 1024);
-                byte[] buffer = new byte[256 * 1024];
-                long received = 0;
-                long lastEmit = 0;
-                int count;
-                while (true) {
-                    pauseGate.awaitResume(cancelled);
+                // Bağlantı kesilirse aynı dosyayı Range ile sürdür; hiçbir zaman kısmi dosyayı tamamlanmış sayma.
+                long received = 0L;
+                long total = -1L;
+                long lastEmit = 0L;
+                Exception lastError = null;
+                for (int attempt = 0; attempt < 5; attempt++) {
                     if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
-                    count = input.read(buffer);
-                    if (count == -1) break;
-                    if (cancelled.get()) throw new InterruptedException("İndirme kullanıcı tarafından iptal edildi.");
-                    output.write(buffer, 0, count);
-                    received += count;
-                    DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, received, total, false);
-                    long now = System.currentTimeMillis();
-                    if (now - lastEmit >= 150) {
-                        final long current = received;
-                        final long length = total;
-                        JSObject event = new JSObject();
-                        event.put("id", id);
-                        event.put("bytes", current);
-                        event.put("contentLength", length);
-                        mainHandler.post(() -> notifyListeners("downloadProgress", event));
-                        lastEmit = now;
+                    HttpURLConnection connection = null;
+                    try {
+                        connection = (HttpURLConnection) new URL(url).openConnection();
+                        connections.put(id, connection);
+                        connection.setConnectTimeout(30000);
+                        connection.setReadTimeout(30000);
+                        connection.setInstanceFollowRedirects(true);
+                        connection.setRequestProperty("Accept-Encoding", "identity");
+                        if (received > 0) connection.setRequestProperty("Range", "bytes=" + received + "-");
+                        connection.connect();
+                        int code = connection.getResponseCode();
+                        if (code != 200 && code != 206) throw new java.io.IOException("Sunucu HTTP " + code + " yanıtı verdi.");
+                        boolean append = received > 0 && code == 206;
+                        if (code == 206) {
+                            String range = connection.getHeaderField("Content-Range");
+                            if (range == null || !range.startsWith("bytes " + received + "-"))
+                                throw new java.io.IOException("Sunucu beklenen Range konumunu döndürmedi.");
+                            int slash = range.indexOf('/');
+                            if (slash > 0 && !range.substring(slash + 1).equals("*"))
+                                total = Long.parseLong(range.substring(slash + 1).trim());
+                        } else {
+                            // Sunucu Range desteklemiyorsa eskisini ekleme: dosyayı sıfırdan indir.
+                            received = 0L;
+                            total = connection.getContentLengthLong();
+                        }
+                        if (total <= 0 && connection.getContentLengthLong() > 0)
+                            total = received + connection.getContentLengthLong();
+                        input = new BufferedInputStream(connection.getInputStream(), 256 * 1024);
+                        output = new BufferedOutputStream(new FileOutputStream(target, append), 256 * 1024);
+                        byte[] buffer = new byte[256 * 1024];
+                        int count;
+                        while (true) {
+                            pauseGate.awaitResume(cancelled);
+                            if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
+                            count = input.read(buffer);
+                            if (count == -1) break;
+                            output.write(buffer, 0, count);
+                            received += count;
+                            DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, received, total, false);
+                            long now = android.os.SystemClock.elapsedRealtime();
+                            if (now - lastEmit >= 900) {
+                                JSObject event = new JSObject();
+                                event.put("id", id);
+                                event.put("bytes", received);
+                                event.put("contentLength", total);
+                                notifyListeners("downloadProgress", event);
+                                lastEmit = now;
+                            }
+                        }
+                        output.flush();
+                        output.close(); output = null;
+                        input.close(); input = null;
+                        if (total > 0 && received != total)
+                            throw new java.io.EOFException("Akış erken bitti: " + received + "/" + total);
+                        lastError = null;
+                        break;
+                    } catch (java.io.IOException networkError) {
+                        lastError = networkError;
+                        if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
+                        // 401/403/404 gibi kalıcı HTTP yanıtlarında gereksiz yeniden deneme yapma.
+                        if (networkError.getMessage() != null &&
+                            networkError.getMessage().matches(".*HTTP (400|401|403|404|410|416).*")) throw networkError;
+                        if (attempt == 4) throw networkError;
+                    } finally {
+                        try { if (output != null) { output.flush(); output.close(); } } catch (Exception ignored) {}
+                        try { if (input != null) input.close(); } catch (Exception ignored) {}
+                        output = null; input = null;
+                        if (connection != null) connection.disconnect();
+                        connections.remove(id, connection);
+                    }
+                    // Exponential backoff, iptal edilebilir.
+                    long delay = Math.min(12000L, 1000L << attempt);
+                    for (long waited = 0; waited < delay; waited += 250L) {
+                        if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
+                        Thread.sleep(Math.min(250L, delay - waited));
                     }
                 }
-                output.flush();
-                output.close(); output = null;
-                input.close(); input = null;
-                if (cancelled.get()) throw new InterruptedException("İndirme kullanıcı tarafından iptal edildi.");
+                if (lastError != null) throw lastError;
+                if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
                 if (target.length() <= 0) throw new Exception("İndirilen dosya boş.");
-                if (total > 0 && target.length() < total) throw new Exception("İndirme eksik kaldı; sunucu bağlantıyı erken kapattı.");
+                if (total > 0 && target.length() != total) throw new Exception("İndirilen dosyanın boyutu uyuşmuyor.");
                 DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, target.length(), total > 0 ? total : target.length(), true);
+                JSObject finalEvent = new JSObject();
+                finalEvent.put("id", id);
+                finalEvent.put("bytes", target.length());
+                finalEvent.put("contentLength", total > 0 ? total : target.length());
+                notifyListeners("downloadProgress", finalEvent);
                 JSObject result = new JSObject();
                 result.put("path", "downloads/" + safeName);
                 result.put("fileUri", "file://" + target.getAbsolutePath());
