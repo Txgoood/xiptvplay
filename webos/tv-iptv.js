@@ -211,15 +211,6 @@
           else if(mode==='movie'){window.XIPTVTV.setPlayingItem('movie',item);playStream('movie',item.stream_id,String(item.container_extension||'mp4').replace(/[^a-zA-Z0-9]/g,''),item.name);}
           else showSeries(item);
         });
-        if(mode==='live'){
-          var logoSources=window.XIPTVPoster.candidates(item);
-          if(logoSources.length){
-            var logo=document.createElement('img');logo.alt='';logo.style.cssText='width:44px;height:40px;object-fit:contain;vertical-align:middle;margin-right:10px;display:inline-block';
-            var logoIndex=0;logo.onerror=function(){logoIndex++;if(logoIndex<logoSources.length)this.src=logoSources[logoIndex];else this.style.display='none';};
-            logo.src=logoSources[0];
-            line.insertBefore(logo,line.firstChild);
-          }
-        }
         if(mode!=='live'){
           var title=String(item.name||item.title||'İsimsiz');
           var picture=String(item.stream_icon||item.cover||item.cover_big||'');
