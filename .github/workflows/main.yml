@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - fix-download-cancel-season-queue
+      - fix-android-series-episode-discovery-20261101
     paths:
       - '.github/workflows/main.yml'
       - 'scripts/android-emulator-smoke.sh'
