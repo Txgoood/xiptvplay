@@ -16,7 +16,7 @@
   if(busy||active)return;
   var src=video.currentSrc||video.src||'';
   if(!src){say('Önce bir yayın aç.');return;}
-  if(!/\\.(m3u8|mpd)(?:[?#]|$)/i.test(src)){say('Shaka testi yalnızca HLS/DASH akışlarında kullanılabilir. MKV için mevcut oynatıcı korunuyor.');return;}
+  if(!/\.(m3u8|mpd)(?:[?#]|$)/i.test(src)){say('Shaka testi yalnızca HLS/DASH akışlarında kullanılabilir. MKV için mevcut oynatıcı korunuyor.');return;}
   oldSource=src;oldTime=video.currentTime||0;busy=true;toggle.disabled=true;
   say('Alternatif motor uygunluğu kontrol ediliyor…');
   function launch(){
