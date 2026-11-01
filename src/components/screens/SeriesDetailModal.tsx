@@ -113,11 +113,13 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
         <div className="relative h-48 sm:h-60 landscape:h-auto landscape:w-[36%] landscape:min-w-[250px] landscape:max-w-[380px] w-full overflow-hidden shrink-0 bg-[#1c1b1d]">
           {/* Backdrop Image */}
           <img
-            src={seriesItem.backdrop || seriesItem.poster || seriesDetail?.backdrop || seriesDetail?.cover}
+            src={seriesDetail?.backdrop || seriesDetail?.cover || seriesItem.backdrop || seriesItem.poster || '/brand/xiptvplay-icon.svg'}
             alt={seriesItem.title}
             className="w-full h-full object-cover opacity-35 blur-xs scale-105"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = seriesItem.poster;
+              const image = e.currentTarget as HTMLImageElement;
+              image.onerror = null;
+              image.src = '/brand/xiptvplay-icon.svg';
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#131315] via-[#131315]/70 to-transparent"></div>
@@ -136,7 +138,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
             {/* Poster Card */}
             <div className="w-16 sm:w-24 landscape:w-20 aspect-[2/3] rounded-xl sm:rounded-2xl overflow-hidden shrink-0 shadow-2xl border border-white/15 bg-[#201f21]">
               <img
-                src={seriesItem.poster || seriesDetail?.cover}
+                src={seriesDetail?.cover || seriesItem.poster || '/brand/xiptvplay-icon.svg'}
                 alt={seriesItem.title}
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -300,11 +302,13 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                           {/* Episode thumbnail */}
                           <div className="relative w-20 h-14 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 border border-white/5">
                             <img
-                              src={episode.image || seriesItem.poster || seriesDetail?.cover}
+                              src={episode.image || seriesDetail?.cover || seriesItem.poster || '/brand/xiptvplay-icon.svg'}
                               alt={episode.title}
                               className="w-full h-full object-cover"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = seriesItem.poster;
+                                const image = e.currentTarget as HTMLImageElement;
+              image.onerror = null;
+              image.src = '/brand/xiptvplay-icon.svg';
                               }}
                             />
                             <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
