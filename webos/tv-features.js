@@ -73,7 +73,8 @@ function tracksMenu(){
 var manualTrackChoice=false,autoAppliedTracks=false;
 function applyTracks(){
  if(!manualTrackChoice&&!autoAppliedTracks&&(trackList('audioTracks').length||trackList('textTracks').length)){
-  applyLanguagePolicy();autoAppliedTracks=true;
+  // No automatic language selection: leave native tracks untouched.
+  autoAppliedTracks=true;
  }
  tracksMenu();
 }
