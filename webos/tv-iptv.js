@@ -219,10 +219,10 @@
             // Xtream providers often omit stream_icon for series; prefer the real series cover.
             var sources=[],fields=[item.cover,item.cover_big,item.stream_icon,item.movie_image,item.poster],seen={};
             for(var pi=0;pi<fields.length;pi++){
-              var src=String(fields[pi]||'').replace(/^\\s+|\\s+$/g,'');
+              var src=String(fields[pi]||'').replace(/^\s+|\s+$/g,'');
               if(src.indexOf('//')===0)src='https:'+src;
-              if(/^\\/[^\\/]/.test(src))src='https://image.tmdb.org/t/p/w500'+src;
-              if(!/^https?:\\/\\//i.test(src)||seen[src])continue;
+              if(/^\/[^\/]/.test(src))src='https://image.tmdb.org/t/p/w500'+src;
+              if(!/^https?:\/\//i.test(src)||seen[src])continue;
               seen[src]=true;sources.push(src);
             }
             var fallback=document.createElement('span');fallback.className='tv-poster-placeholder';fallback.textContent='DİZİ';line.appendChild(fallback);
