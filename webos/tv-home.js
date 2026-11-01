@@ -29,7 +29,7 @@ function shelf(node,items,type,limit){
  for(var n=0;n<items.length&&n<limit;n++){(function(item){
   var b=document.createElement('button');b.type='button';b.className='stitch-movie-tile';
   var cover=String(item.stream_icon||item.cover_big||item.cover||'');
-  window.XIPTVPoster.attach(b,item,type==='series'?'series':type==='live'?'live':'movie');
+undefined
   var title=document.createElement('span');title.textContent=String(item.name||item.title||'İçerik');b.appendChild(title);
   b.onclick=function(){open(type==='films'?'films':type==='series'?'series':'live');window.XIPTVTV.openItem(type==='films'?'movie':type==='series'?'series':'live',item);};
   node.appendChild(b);
@@ -50,7 +50,7 @@ window.XIPTVTVHome={catalog:null,refresh:function(){if(this.catalog)this.render(
  for(var z=0;z<continuing.length;z++){(function(record){
   var b=document.createElement('button');b.type='button';b.className='stitch-movie-tile';
   var im=String(record.item.stream_icon||record.item.cover||'');
-  window.XIPTVPoster.attach(b,record.item,record.type==='series'?'series':'movie');
+  if(/^https?:\/\//i.test(im)){var pic=document.createElement('img');pic.src=im;pic.alt='';pic.onerror=function(){this.style.display='none';};b.appendChild(pic);}
   var title=document.createElement('span');title.textContent=String(record.item.name||record.item.title||'İçerik');b.appendChild(title);
   b.onclick=function(){open(record.type);if(record.type==='series')window.XIPTVTV.resumeSeriesFromHome=true;window.XIPTVTV.openItem(record.type==='films'?'movie':'series',record.item);};
   node.appendChild(b);
