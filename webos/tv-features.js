@@ -169,6 +169,9 @@ function showPlayerBar(){
  if(hideTimer)clearTimeout(hideTimer);
  hideTimer=setTimeout(function(){if(document.getElementById('tv-controls').style.display==='none'&&document.getElementById('tv-media-info').style.display==='none'){playerbar.style.opacity='0';playerbar.style.pointerEvents='none';}},6000);
 }
+var pp=document.getElementById('tv-player-playpause');
+function updatePlayPause(){if(pp)pp.textContent=video.paused?'▶ Oynat':'⏸ Duraklat';}
+if(pp){pp.onclick=function(){if(video.paused){var request=video.play();if(request&&request.catch)request.catch(function(){});}else video.pause();updatePlayPause();showPlayerBar();};video.addEventListener('play',updatePlayPause,false);video.addEventListener('pause',updatePlayPause,false);updatePlayPause();}
 document.getElementById('tv-player-rewind').onclick=function(){try{video.currentTime=Math.max(0,video.currentTime-10);}catch(e){}showPlayerBar();};
 document.getElementById('tv-player-forward').onclick=function(){try{video.currentTime=video.currentTime+10;}catch(e){}showPlayerBar();};
 document.getElementById('tv-player-tracks').onclick=function(){document.getElementById('tv-controls-toggle').click();showPlayerBar();};
