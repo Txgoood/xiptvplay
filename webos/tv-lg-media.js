@@ -2,7 +2,7 @@
    Configured only after a separate media service has been approved/deployed. */
 (function(){
  var video=document.getElementById('video'),url=String(window.XIPTV_LG_MEDIA_URL||'').replace(/\/+$/,'');
- var ctx=null,session=null,busy=false,manual=false,started=false,offset=0;
+ var ctx=null,session=null,busy=false,manual=false,started=false,offset=0,scanSequence=0;
  var playerOverlay=document.getElementById('tv-lg-subtitle-overlay'),cues=[],lastCue=-1,sourceKey='';
  var scanButton=document.getElementById('tv-lg-media-scan'),summary=document.getElementById('tv-lg-media-status'),returnButton=document.getElementById('tv-lg-native-return');
  function say(s){summary.textContent=String(s||'');}
@@ -158,8 +158,9 @@
   if(busy||!ctx)return;
   if(!url){say('LG alternatif medya hizmeti henüz Render üzerinde yapılandırılmadı. Mevcut TV oynatıcı kullanılmaya devam ediyor.');return;}
   scanNativeTracks();scanHlsManifest();
-  busy=true;scanButton.disabled=true;say('Ses ve altyazı parçaları analiz ediliyor…');
+  busy=true;scanButton.disabled=true;var thisScan=++scanSequence;say('MKV/MP4 ses ve altyazı parçaları analiz ediliyor…');
   request('POST','/tracks',{serverUrl:ctx.serverUrl,username:ctx.username,password:ctx.password,kind:ctx.kind,id:ctx.id,extension:ctx.extension},function(err,data){
+   if(thisScan!==scanSequence)return;
    busy=false;scanButton.disabled=false;
    if(err){var fallback=scanNativeTracks();say('LG medya servisi: '+url+' — '+err.message+'. TV yerel taraması: '+fallback.audio+' ses, '+fallback.subtitle+' altyazı. MKV içi parçalar için servis bağlantısı gerekli.');return;}
    if(!data||!data.tracks){say('Parça listesi alınamadı.');return;}
@@ -184,7 +185,7 @@
   if(this.value.indexOf('native:a:')===0){var n=Number(this.value.split(':')[2]);try{for(var i=0;i<video.audioTracks.length;i++)video.audioTracks[i].enabled=i===n;say('TV ses kanalı seçildi.');}catch(e){say('TV ses kanalı geçişini desteklemiyor.');}}
  },false);
  window.XIPTVLGMedia={
-  setSource:function(data){ctx=data;session=null;manual=false;busy=false;started=false;offset=0;cues=[];lastCue=-1;playerOverlay.style.display='none';scanButton.disabled=false;returnButton.style.display='none';summary.textContent='';if(data){setTimeout(function(){if(ctx===data)scan();},1100);}},
+  setSource:function(data){scanSequence++;ctx=data;session=null;manual=false;busy=false;started=false;offset=0;cues=[];lastCue=-1;playerOverlay.style.display='none';scanButton.disabled=false;returnButton.style.display='none';summary.textContent='';if(data){setTimeout(function(){if(ctx===data)scan();},1100);}},
   extendMenus:extendMenus,
   scan:scan
  };
