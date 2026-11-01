@@ -85,7 +85,7 @@ public class DownloadForegroundService extends Service {
         if (intent != null && ACTION_CANCEL.equals(intent.getAction())) {
             String cancelId = intent.getStringExtra("id");
             if (cancelId != null) {
-                cancelDownload(cancelId);
+                cancel(cancelId);
             }
         }
         // Promote to foreground immediately to avoid Android 8+ ANR
