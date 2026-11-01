@@ -43,8 +43,18 @@ window.XIPTVTVHome={catalog:null,refresh:function(){if(this.catalog)this.render(
  for(var c=0;c<channels.length&&favorites.length<8;c++)if(window.XIPTVTV.isFavorite('live',channels[c]))favorites.push(channels[c]);
  shelf(document.getElementById('stitch-favorites'),favorites,'live',8);
  var resume=window.XIPTVTV.getResume(),continuing=[];
- for(var r=0;r<movies.length&&continuing.length<8;r++)if(Number(resume['movie:'+String(movies[r].stream_id)]||0)>20)continuing.push(movies[r]);
- shelf(document.getElementById('stitch-continue'),continuing,'films',8);
+ for(var r=0;r<movies.length&&continuing.length<8;r++)if(Number(resume['movie:'+String(movies[r].stream_id)]||0)>20)continuing.push({item:movies[r],type:'films'});
+ for(var k=0;k<series.length&&continuing.length<8;k++)if(Number(resume['series:'+String(series[k].series_id)]||0)>20)continuing.push({item:series[k],type:'series'});
+ var node=document.getElementById('stitch-continue');clear(node);
+ if(!continuing.length){var empty=document.createElement('div');empty.className='stitch-empty';empty.textContent='İzlemeye başladığın filmler ve diziler burada görünecek.';node.appendChild(empty);}
+ for(var z=0;z<continuing.length;z++){(function(record){
+  var b=document.createElement('button');b.type='button';b.className='stitch-movie-tile';
+  var im=String(record.item.stream_icon||record.item.cover||'');
+  if(/^https?:\/\//i.test(im)){var picture=document.createElement('img');picture.src=im;picture.alt='';b.appendChild(picture);}
+  var title=document.createElement('span');title.textContent=String(record.item.name||record.item.title||'İçerik');b.appendChild(title);
+  b.onclick=function(){open(record.type);window.XIPTVTV.openItem(record.type==='films'?'movie':'series',record.item);};
+  node.appendChild(b);
+ })(continuing[z]);}
  shelf(document.getElementById('stitch-series'),series,'series',8);
  shelf(document.getElementById('stitch-live'),channels,'live',8);
  window.XIPTVTVHome.data={movies:movies,series:series,channels:channels};
