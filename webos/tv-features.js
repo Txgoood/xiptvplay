@@ -199,7 +199,9 @@ window.XIPTVTV={
  getResume:function(){return read('positions',{});},
  decorateItem:decorateItem,
  beforePlay:function(kind,id,url,name){
-   currentKey=kind+':'+String(id);
+   // Bölüm kimliği yerine ana dizinin kimliğini kullan: ana sayfa doğru diziyi bulur.
+   currentKey=kind==='series'&&playingItem&&playingItem.series_id
+     ? 'series:'+String(playingItem.series_id) : kind+':'+String(id);
    scanGeneration++;
    manualTrackChoice=false;autoAppliedTracks=false;
    document.getElementById('tv-track-scan-results').textContent='';
