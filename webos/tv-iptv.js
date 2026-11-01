@@ -218,7 +218,7 @@
           if(/^https?:\/\//i.test(picture)){
             var img=document.createElement('img');img.src=picture;
             img.alt='';img.loading='lazy';
-            img.onerror=function(){this.style.display='none';};
+            img.onerror=function(){var alternate=String(item.cover_big||item.cover||'');if(!this.getAttribute('data-fallback')&&/^https?:\/\//i.test(alternate)&&alternate!==picture){this.setAttribute('data-fallback','1');this.src=alternate;}else{this.style.display='none';}};
             line.appendChild(img);
           }else{
             var placeholder=document.createElement('span');
