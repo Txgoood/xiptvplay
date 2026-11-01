@@ -60,6 +60,8 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
 
     let cancelled = false;
     setVerifiedDetail(undefined);
+    setSeriesDetail(null);
+    setSelectedSeason(1);
     const loadSeriesInfo = async () => {
       setLoading(true);
       setError(null);
@@ -90,7 +92,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
 
   if (!isOpen || !seriesItem) return null;
 
-  const currentEpisodes: SeriesEpisode[] =
+  const currentEpisodes: SeriesEpisode[] = loading ? [] :
     seriesDetail?.episodes[selectedSeason] ||
     seriesDetail?.episodes[String(selectedSeason)] ||
     [];
@@ -111,7 +113,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
         <div className="relative h-48 sm:h-60 landscape:h-auto landscape:w-[36%] landscape:min-w-[250px] landscape:max-w-[380px] w-full overflow-hidden shrink-0 bg-[#1c1b1d]">
           {/* Backdrop Image */}
           <img
-            src={seriesDetail?.backdrop || seriesDetail?.cover || seriesItem.poster}
+            src={seriesItem.backdrop || seriesItem.poster || seriesDetail?.backdrop || seriesDetail?.cover}
             alt={seriesItem.title}
             className="w-full h-full object-cover opacity-35 blur-xs scale-105"
             onError={(e) => {
@@ -134,7 +136,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
             {/* Poster Card */}
             <div className="w-16 sm:w-24 landscape:w-20 aspect-[2/3] rounded-xl sm:rounded-2xl overflow-hidden shrink-0 shadow-2xl border border-white/15 bg-[#201f21]">
               <img
-                src={seriesDetail?.cover || seriesItem.poster}
+                src={seriesItem.poster || seriesDetail?.cover}
                 alt={seriesItem.title}
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -165,7 +167,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
               </div>
 
               <h2 className="font-headline text-lg sm:text-2xl font-bold text-white truncate leading-tight">
-                {seriesDetail?.name || seriesItem.title}
+                {seriesItem.title}
               </h2>
 
               <p className="text-[11px] text-[#b9cacb] mt-1 line-clamp-2 leading-relaxed">
@@ -233,7 +235,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                               : 'bg-[#201f21] hover:bg-[#2a2a2c] text-[#b9cacb] border border-white/5'
                           }`}
                         >
-                          {season.name || `Sezon ${season.seasonNumber}`}
+                          {season.seasonNumber === 0 ? 'Özel Bölümler' : `Sezon ${season.seasonNumber}`}
                           {season.episodeCount ? ` (${season.episodeCount})` : ''}
                         </button>
                       );
@@ -298,7 +300,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                           {/* Episode thumbnail */}
                           <div className="relative w-20 h-14 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 border border-white/5">
                             <img
-                              src={episode.image || seriesDetail?.cover || seriesItem.poster}
+                              src={episode.image || seriesItem.poster || seriesDetail?.cover}
                               alt={episode.title}
                               className="w-full h-full object-cover"
                               onError={(e) => {
