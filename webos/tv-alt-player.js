@@ -30,6 +30,10 @@
     Promise.resolve(player.load(src,oldTime)).then(function(){
      active=true;busy=false;toggle.disabled=false;back.style.display='inline-block';
      var texts=player.getTextTracks?player.getTextTracks():[],audios=player.getVariantTracks?player.getVariantTracks():[];
+     var audioMenu=document.getElementById('tv-audio'),subtitleMenu=document.getElementById('tv-subtitles');
+     function add(menu,name,value){if(!menu)return;var option=document.createElement('option');option.textContent=name;option.value=value;menu.appendChild(option);}
+     for(var ai=0;ai<audios.length;ai++)add(audioMenu,'Shaka: '+(audios[ai].language||'Bilinmeyen')+' '+(audios[ai].height||''),'shaka:a:'+ai);
+     for(var si=0;si<texts.length;si++)add(subtitleMenu,'Shaka: '+(texts[si].language||'Bilinmeyen'),'shaka:s:'+si);
      say('Alternatif motor aktif: '+audios.length+' görüntü/ses varyantı, '+texts.length+' altyazı. MKV içi parçalar desteklenmeyebilir.');
      var play=video.play();if(play&&play.catch)play.catch(function(){});
     }).catch(function(){restore('Alternatif motor akışı açamadı; eski motor geri yüklendi.');});
@@ -41,6 +45,16 @@
   document.getElementsByTagName('head')[0].appendChild(script);
   setTimeout(function(){if(busy&&!active)restore('Alternatif oynatıcı zaman aşımı; eski motor geri yüklendi.');},12000);
  }
+ document.getElementById('tv-audio').addEventListener('change',function(){
+  if(!active||!player||this.value.indexOf('shaka:a:')!==0)return;
+  var list=player.getVariantTracks(),index=Number(this.value.split(':')[2]);
+  if(list[index])try{player.selectVariantTrack(list[index],true);}catch(e){say('Ses kanalı değiştirilemedi.');}
+ },false);
+ document.getElementById('tv-subtitles').addEventListener('change',function(){
+  if(!active||!player||this.value.indexOf('shaka:s:')!==0)return;
+  var list=player.getTextTracks(),index=Number(this.value.split(':')[2]);
+  if(list[index])try{player.selectTextTrack(list[index]);player.setTextTrackVisibility(true);}catch(e){say('Altyazı değiştirilemedi.');}
+ },false);
  toggle.onclick=start;back.onclick=function(){restore('Eski oynatıcıya dönüldü.');};
  window.XIPTVAltPlayer={beforeSourceChange:function(){if(player){try{player.destroy();}catch(e){}player=null;}active=false;busy=false;oldSource='';if(back)back.style.display='none';if(toggle)toggle.disabled=false;}};
 })();
