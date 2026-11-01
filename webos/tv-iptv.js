@@ -232,7 +232,7 @@
               image.onerror=function(){sourceIndex++;if(sourceIndex<sources.length)image.src=sources[sourceIndex];else{image.style.display='none';fallback.style.display='block';}};
               image.src=sources[0];line.appendChild(image);
             }
-          }else if(/^https?:\\/\\//i.test(picture)){
+          }else if(/^https?:\/\//i.test(picture)){
             var img=document.createElement('img');img.src=picture;
             img.alt='';img.loading='lazy';
             img.onerror=function(){this.style.display='none';};
