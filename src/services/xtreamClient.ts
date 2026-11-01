@@ -218,6 +218,16 @@ export class XtreamClientService {
                     combined.set(String(key), entry);
                   }
                 }
+                if (section.type === 'series') {
+                  try {
+                    const globalEntries = await fetchNativeAction(section.action);
+                    for (const entry of globalEntries) {
+                      if (entry.series_id != null) combined.set(String(entry.series_id), entry);
+                    }
+                  } catch (error) {
+                    console.warn('[XtreamClient] Global series lookup unavailable; category results retained.', error);
+                  }
+                }
                 entries = [...combined.values()];
               } else {
                 entries = await fetchNativeAction(section.action);
@@ -497,6 +507,10 @@ export class XtreamClientService {
         });
       }
 
+      seasonsList.forEach((season) => {
+        const episodes = episodesMap[String(season.seasonNumber)];
+        if (episodes) season.episodeCount = episodes.length;
+      });
       seasonsList.sort((a, b) => a.seasonNumber - b.seasonNumber);
 
       const seriesDetail: SeriesDetail = {
