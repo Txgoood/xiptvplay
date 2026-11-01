@@ -1,6 +1,5 @@
 import { MediaItem, Playlist, SeriesDetail, SeriesEpisode, SeriesSeason } from '../types';
 import { XtreamClientService } from './xtreamClient';
-import { StorageService } from './storage';
 
 export interface ResolvedXtreamConfig {
   serverUrl: string;
@@ -60,25 +59,11 @@ export class IptvService {
       }
     }
 
-    // 4. If seriesId is still missing, try extracting digits from stream filename or title
-    if (!seriesId) {
-      const idMatch = urlToCheck.match(/\/(\d+)\.(mp4|mkv|avi|m3u8|ts)/i);
-      if (idMatch) {
-        seriesId = idMatch[1];
-      }
-    }
-
-    // 5. Check if any other stored playlist has active Xtream credentials
-    if (!serverUrl || !username || !password) {
-      const allPlaylists = StorageService.getPlaylists();
-      const xtreamPl = allPlaylists.find(
-        (p) => p.type === 'xtream' && p.serverUrl && p.username && p.password
-      );
-      if (xtreamPl) {
-        serverUrl = xtreamPl.serverUrl;
-        username = xtreamPl.username;
-        password = xtreamPl.password;
-      }
+    // Bölüm URL'sindeki sayısal ID, dizi ID'si değildir. Başka playlist
+    // bilgilerini de kullanma: farklı sunucularda aynı ID başka diziyi açabilir.
+    if (match && seriesItem.streamId == null) {
+      // M3U episode URL'sinden dizi kimliği türetilemez.
+      seriesId = undefined;
     }
 
     if (serverUrl && username && password && seriesId) {
