@@ -139,6 +139,15 @@
       })(episodes[x]);}
       function paintSeason(){var target=document.getElementById('tv-season-episodes');clear(target);var chosen=seasons[selector.value]||[];for(var z=0;z<chosen.length;z++)(function(ep){action(target,String(ep.title||ep.episode_num||'Bölüm'),function(){var ext=String(ep.container_extension||'mp4').replace(/[^a-zA-Z0-9]/g,'');playStream('series',ep.id,ext,ep.title||'Dizi Bölümü');});})(chosen[z]);}
       selector.onchange=paintSeason;paintSeason();
+      if(window.XIPTVTV.resumeSeriesFromHome){
+        window.XIPTVTV.resumeSeriesFromHome=false;
+        var map=window.XIPTVTV.getResumeEpisodeMap?window.XIPTVTV.getResumeEpisodeMap():{};
+        var wanted=map['series:'+String(id)];
+        for(var q=0;q<episodes.length;q++)if(String(episodes[q].item.id)===String(wanted)){
+          var ep=episodes[q].item,ext=String(ep.container_extension||'mp4').replace(/[^a-zA-Z0-9]/g,'');
+          popup.style.display='none';playStream('series',ep.id,ext,ep.title||'Dizi Bölümü');return;
+        }
+      }
       say(episodes.length+' bölüm bulundu. Bölüm seç.');
     }
     if(cached)onSeries(null,cached);
