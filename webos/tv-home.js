@@ -52,7 +52,7 @@ window.XIPTVTVHome={catalog:null,refresh:function(){if(this.catalog)this.render(
   var im=String(record.item.stream_icon||record.item.cover||'');
   if(/^https?:\/\//i.test(im)){var picture=document.createElement('img');picture.src=im;picture.alt='';b.appendChild(picture);}
   var title=document.createElement('span');title.textContent=String(record.item.name||record.item.title||'İçerik');b.appendChild(title);
-  b.onclick=function(){open(record.type);window.XIPTVTV.openItem(record.type==='films'?'movie':'series',record.item);};
+  b.onclick=function(){open(record.type);if(record.type==='series')window.XIPTVTV.resumeSeriesFromHome=true;window.XIPTVTV.openItem(record.type==='films'?'movie':'series',record.item);};
   node.appendChild(b);
  })(continuing[z]);}
  shelf(document.getElementById('stitch-series'),series,'series',8);
