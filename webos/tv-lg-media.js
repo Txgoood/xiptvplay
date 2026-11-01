@@ -161,7 +161,7 @@
   busy=true;scanButton.disabled=true;say('Ses ve altyazı parçaları analiz ediliyor…');
   request('POST','/tracks',{serverUrl:ctx.serverUrl,username:ctx.username,password:ctx.password,kind:ctx.kind,id:ctx.id,extension:ctx.extension},function(err,data){
    busy=false;scanButton.disabled=false;
-   if(err){var fallback=scanNativeTracks();say('Sunucu analizi kullanılamadı: '+err.message+'. TV yerel taraması: '+fallback.audio+' ses, '+fallback.subtitle+' altyazı. Video oynatılmaya devam ediyor.');return;}
+   if(err){var fallback=scanNativeTracks();say('LG medya servisi: '+url+' — '+err.message+'. TV yerel taraması: '+fallback.audio+' ses, '+fallback.subtitle+' altyazı. MKV içi parçalar için servis bağlantısı gerekli.');return;}
    if(!data||!data.tracks){say('Parça listesi alınamadı.');return;}
    session=data;say(data.tracks.length+' parça bulundu: '+data.tracks.filter(function(t){return t.type==='audio';}).length+' ses, '+data.tracks.filter(function(t){return t.type==='subtitle';}).length+' altyazı. Desteklenmeyen altyazılar yalnızca bilgi amaçlıdır.');
    if(window.XIPTVTV&&window.XIPTVTV.refreshTracks)window.XIPTVTV.refreshTracks();
@@ -184,7 +184,7 @@
   if(this.value.indexOf('native:a:')===0){var n=Number(this.value.split(':')[2]);try{for(var i=0;i<video.audioTracks.length;i++)video.audioTracks[i].enabled=i===n;say('TV ses kanalı seçildi.');}catch(e){say('TV ses kanalı geçişini desteklemiyor.');}}
  },false);
  window.XIPTVLGMedia={
-  setSource:function(data){ctx=data;session=null;manual=false;busy=false;started=false;offset=0;cues=[];lastCue=-1;playerOverlay.style.display='none';scanButton.disabled=false;returnButton.style.display='none';summary.textContent='';},
+  setSource:function(data){ctx=data;session=null;manual=false;busy=false;started=false;offset=0;cues=[];lastCue=-1;playerOverlay.style.display='none';scanButton.disabled=false;returnButton.style.display='none';summary.textContent='';if(data){setTimeout(function(){if(ctx===data)scan();},1100);}},
   extendMenus:extendMenus,
   scan:scan
  };
