@@ -143,14 +143,14 @@ document.getElementById('tv-controls-toggle').onclick=function(){
 document.getElementById('tv-subtitles').onchange=function(){
  manualTrackChoice=true;
  var n=this.value,tracks=trackList('textTracks');
- if(n.indexOf('lg:s:')===0)return;
+ if(n.indexOf('lg:s:')===0||n.indexOf('shaka:s:')===0)return;
  for(var i=0;i<tracks.length;i++)try{tracks[i].mode=String(i)===n?'showing':'disabled';}catch(e){}
  tracksMenu();
 };
 document.getElementById('tv-audio').onchange=function(){
  manualTrackChoice=true;
  var n=this.value,tracks=trackList('audioTracks');
- if(n.indexOf('lg:a:')===0)return;
+ if(n.indexOf('lg:a:')===0||n.indexOf('shaka:a:')===0)return;
  if(n==='auto'){tracksMenu();return;}
  for(var i=0;i<tracks.length;i++)try{tracks[i].enabled=String(i)===n;}catch(e){}
  tracksMenu();
