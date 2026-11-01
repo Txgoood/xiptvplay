@@ -33,6 +33,7 @@ jobs:
           node --check lg-media-service/server.mjs
           node --test lg-media-service/test.mjs
           node --check webos/tv-lg-media.js
+          node --check webos/tv-alt-player.js
           node --check webos/tv-posters.js
           node --check webos/tv-home.js
           node --check webos/tv-features.js
@@ -73,6 +74,7 @@ jobs:
           test -s webos-package/tv-iptv.js
           test -s webos-package/tv-features.js
           test -s webos-package/tv-profiles.js
+          test -s webos-package/tv-alt-player.js
           test -s webos-package/tv-posters.js
           test -s webos-package/tv-home.js
           test -s webos-package/tv-keyboard.js
@@ -88,7 +90,7 @@ jobs:
             echo "Unsupported modern JavaScript module found in webOS 2 package"
             exit 1
           fi
-          node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv'||f.version!=='1.0.13'||f.trustLevel!=='netcast'||f.vendorExtension?.allowCrossDomain!==true) process.exit(1)"
+          node -e "const f=require('./webos-package/appinfo.json'); if(f.type!=='web'||f.main!=='index.html'||f.id!=='com.xiptvplay.tv'||f.version!=='1.0.14'||f.trustLevel!=='netcast'||f.vendorExtension?.allowCrossDomain!==true) process.exit(1)"
 
       - name: Run remote-control and playback UI smoke tests
         run: node webos/legacy-smoke-test.mjs
