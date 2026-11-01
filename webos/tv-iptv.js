@@ -222,7 +222,19 @@
         }
         if(mode!=='live'){
           var title=String(item.name||item.title||'İsimsiz');
-          window.XIPTVPoster.attach(line,item,mode);
+          var picture=String(item.stream_icon||item.cover||item.cover_big||'');
+          line.textContent='';
+          if(/^https?:\/\//i.test(picture)){
+            var img=document.createElement('img');img.src=picture;
+            img.alt='';img.loading='lazy';
+            img.onerror=function(){this.style.display='none';};
+            line.appendChild(img);
+          }else{
+            var placeholder=document.createElement('span');
+            placeholder.className='tv-poster-placeholder';
+            placeholder.textContent=mode==='movie'?'FİLM':'DİZİ';
+            line.appendChild(placeholder);
+          }
           var caption=document.createElement('span');caption.className='tv-card-title';
           caption.textContent=title;line.appendChild(caption);
           line.title=title;
