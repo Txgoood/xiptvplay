@@ -43,7 +43,16 @@ export const TmdbInfoModal: React.FC<Props> = ({ profileId = 'parent', media, ca
     let active = true;
     setDetails(null); setError(null); setLoading(true);
     getTmdbDetails(media, selectedId)
-      .then(data => { rememberMovieCollection(media, data); if (active) setDetails(data); })
+      .then(data => {
+        rememberMovieCollection(media, data);
+        if (data.poster) {
+          try {
+            sessionStorage.setItem('xiptv-tmdb-poster:' + media.id, data.poster);
+            window.dispatchEvent(new CustomEvent('xiptv-poster-updated', { detail: { id: media.id, poster: data.poster } }));
+          } catch { /* Cache is optional. */ }
+        }
+        if (active) setDetails(data);
+      })
       .catch(err => { if (active) {
         setError(err.message || 'Bağlantı hatası');
         if (err instanceof TmdbClientError && err.candidates.length) { setChoices(err.candidates); setSearchOpen(true); }
