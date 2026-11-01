@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - fix-download-cancel-season-queue
+      - fix-series-on-build248-20261101
     paths:
       - '.github/workflows/main.yml'
       - 'scripts/android-emulator-smoke.sh'
