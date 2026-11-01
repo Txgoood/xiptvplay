@@ -602,6 +602,42 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     };
   }, [isOpen, media?.id, fallbackStage, effectiveUrl, triggerNextFallback, resetControlsTimeout, nativePlayerUnavailable]);
 
+  // webOS: İzlemeye devam et bilgisi her oynatılan VOD için yerel olarak saklanır.
+  useEffect(() => {
+    if (!isOpen || !media || ('type' in media && media.type === 'live')) return;
+    const video = videoRef.current;
+    if (!video) return;
+    const key = 'xiptv-webos-resume:' + String(media.id);
+    const restore = () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(key) || 'null');
+        if (saved && Number.isFinite(saved.position) && Number.isFinite(video.duration)
+          && saved.position > 15 && saved.position < video.duration - 30) {
+          video.currentTime = saved.position;
+        }
+      } catch { /* storage may be unavailable */ }
+    };
+    const save = () => {
+      if (!Number.isFinite(video.currentTime) || !Number.isFinite(video.duration) || video.duration <= 0) return;
+      try {
+        if (video.currentTime >= video.duration - 30) localStorage.removeItem(key);
+        else if (video.currentTime > 5) localStorage.setItem(key, JSON.stringify({
+          id: String(media.id), title: media.title, position: video.currentTime,
+          duration: video.duration, updatedAt: Date.now(), poster: media.poster
+        }));
+      } catch { /* storage may be full */ }
+    };
+    video.addEventListener('loadedmetadata', restore);
+    video.addEventListener('timeupdate', save);
+    video.addEventListener('pause', save);
+    return () => {
+      save();
+      video.removeEventListener('loadedmetadata', restore);
+      video.removeEventListener('timeupdate', save);
+      video.removeEventListener('pause', save);
+    };
+  }, [isOpen, media?.id]);
+
   // Clean up subtitle blob url on unmount
   useEffect(() => {
     return () => {
@@ -1486,6 +1522,15 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               <span className="hidden sm:inline-block text-[11px] text-[#00f0ff] font-mono bg-[#00f0ff]/10 px-2 py-0.5 rounded border border-[#00f0ff]/20">
                 {quality}
               </span>
+
+              <button
+                onClick={togglePlay}
+                aria-label={isPlaying ? 'Duraklat' : 'Oynat'}
+                title={isPlaying ? 'Duraklat' : 'Oynat'}
+                className="w-9 h-9 rounded-full bg-[#00f0ff] text-[#00363a] flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white cursor-pointer"
+              >
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+              </button>
 
               <button
                 onClick={toggleFullscreen}
