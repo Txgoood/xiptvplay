@@ -202,6 +202,11 @@ window.XIPTVTV={
    // Bölüm kimliği yerine ana dizinin kimliğini kullan: ana sayfa doğru diziyi bulur.
    currentKey=kind==='series'&&playingItem&&playingItem.series_id
      ? 'series:'+String(playingItem.series_id) : kind+':'+String(id);
+   if(kind==='series'&&playingItem&&playingItem.series_id){
+     var episodeMap=read('seriesEpisodes',{});
+     episodeMap['series:'+String(playingItem.series_id)]=String(id);
+     save('seriesEpisodes',episodeMap);
+   }
    scanGeneration++;
    manualTrackChoice=false;autoAppliedTracks=false;
    document.getElementById('tv-track-scan-results').textContent='';
