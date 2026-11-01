@@ -90,6 +90,9 @@ public class NativeDownloadPlugin extends Plugin {
                                 total = Long.parseLong(range.substring(slash + 1).trim());
                         } else {
                             // Sunucu Range desteklemiyorsa eskisini ekleme: dosyayı sıfırdan indir.
+                            if (received > 0) {
+                                DownloadForegroundService.clearDownloadProgress(id);
+                            }
                             received = 0L;
                             total = connection.getContentLengthLong();
                         }
@@ -113,7 +116,7 @@ public class NativeDownloadPlugin extends Plugin {
                                 event.put("id", id);
                                 event.put("bytes", received);
                                 event.put("contentLength", total);
-                                notifyListeners("downloadProgress", event);
+                                mainHandler.post(() -> notifyListeners("downloadProgress", event));
                                 lastEmit = now;
                             }
                         }
@@ -154,7 +157,7 @@ public class NativeDownloadPlugin extends Plugin {
                 finalEvent.put("id", id);
                 finalEvent.put("bytes", target.length());
                 finalEvent.put("contentLength", total > 0 ? total : target.length());
-                notifyListeners("downloadProgress", finalEvent);
+                mainHandler.post(() -> notifyListeners("downloadProgress", finalEvent));
                 JSObject result = new JSObject();
                 result.put("path", "downloads/" + safeName);
                 result.put("fileUri", "file://" + target.getAbsolutePath());
