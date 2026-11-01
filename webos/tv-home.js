@@ -29,7 +29,7 @@ function shelf(node,items,type,limit){
  for(var n=0;n<items.length&&n<limit;n++){(function(item){
   var b=document.createElement('button');b.type='button';b.className='stitch-movie-tile';
   var cover=String(item.stream_icon||item.cover_big||item.cover||'');
-  if(/^https?:\/\//i.test(cover)){var img=document.createElement('img');img.src=cover;img.alt='';img.onerror=function(){this.style.display='none';};b.appendChild(img);}
+  if(/^https?:\/\//i.test(cover)){var img=document.createElement('img');img.src=cover;img.alt='';img.onerror=function(){if(!this.getAttribute('data-tried')&&item.cover&&item.cover!==cover){this.setAttribute('data-tried','1');this.src=item.cover;}else{this.style.display='none';}};b.appendChild(img);}
   var title=document.createElement('span');title.textContent=String(item.name||item.title||'İçerik');b.appendChild(title);
   b.onclick=function(){open(type==='films'?'films':type==='series'?'series':'live');window.XIPTVTV.openItem(type==='films'?'movie':type==='series'?'series':'live',item);};
   node.appendChild(b);
@@ -50,7 +50,7 @@ window.XIPTVTVHome={catalog:null,refresh:function(){if(this.catalog)this.render(
  for(var z=0;z<continuing.length;z++){(function(record){
   var b=document.createElement('button');b.type='button';b.className='stitch-movie-tile';
   var im=String(record.item.stream_icon||record.item.cover||'');
-  if(/^https?:\/\//i.test(im)){var picture=document.createElement('img');picture.src=im;picture.alt='';b.appendChild(picture);}
+  if(/^https?:\/\//i.test(im)){var picture=document.createElement('img');picture.src=im;picture.alt='';picture.onerror=function(){if(!this.getAttribute('data-tried')&&record.item.cover&&record.item.cover!==im){this.setAttribute('data-tried','1');this.src=record.item.cover;}else{this.style.display='none';}};b.appendChild(picture);}
   var title=document.createElement('span');title.textContent=String(record.item.name||record.item.title||'İçerik');b.appendChild(title);
   b.onclick=function(){open(record.type);if(record.type==='series')window.XIPTVTV.resumeSeriesFromHome=true;window.XIPTVTV.openItem(record.type==='films'?'movie':'series',record.item);};
   node.appendChild(b);
