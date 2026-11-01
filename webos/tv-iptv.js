@@ -215,7 +215,24 @@
           var title=String(item.name||item.title||'İsimsiz');
           var picture=String(item.stream_icon||item.cover||item.cover_big||'');
           line.textContent='';
-          if(/^https?:\/\//i.test(picture)){
+          if(mode==='series'){
+            // Xtream providers often omit stream_icon for series; prefer the real series cover.
+            var sources=[],fields=[item.cover,item.cover_big,item.stream_icon,item.movie_image,item.poster],seen={};
+            for(var pi=0;pi<fields.length;pi++){
+              var src=String(fields[pi]||'').replace(/^\\s+|\\s+$/g,'');
+              if(src.indexOf('//')===0)src='https:'+src;
+              if(/^\\/[^\\/]/.test(src))src='https://image.tmdb.org/t/p/w500'+src;
+              if(!/^https?:\\/\\//i.test(src)||seen[src])continue;
+              seen[src]=true;sources.push(src);
+            }
+            var fallback=document.createElement('span');fallback.className='tv-poster-placeholder';fallback.textContent='DİZİ';line.appendChild(fallback);
+            if(sources.length){var image=document.createElement('img'),sourceIndex=0;
+              image.alt='';image.style.display='none';
+              image.onload=function(){fallback.style.display='none';image.style.display='block';};
+              image.onerror=function(){sourceIndex++;if(sourceIndex<sources.length)image.src=sources[sourceIndex];else{image.style.display='none';fallback.style.display='block';}};
+              image.src=sources[0];line.appendChild(image);
+            }
+          }else if(/^https?:\\/\\//i.test(picture)){
             var img=document.createElement('img');img.src=picture;
             img.alt='';img.loading='lazy';
             img.onerror=function(){this.style.display='none';};
@@ -223,7 +240,7 @@
           }else{
             var placeholder=document.createElement('span');
             placeholder.className='tv-poster-placeholder';
-            placeholder.textContent=mode==='movie'?'FİLM':'DİZİ';
+            placeholder.textContent='FİLM';
             line.appendChild(placeholder);
           }
           var caption=document.createElement('span');caption.className='tv-card-title';
