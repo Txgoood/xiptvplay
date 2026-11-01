@@ -218,6 +218,19 @@ export class XtreamClientService {
                     combined.set(String(key), entry);
                   }
                 }
+                // Some Xtream panels omit uncategorized/alternate entries in category-scoped lists.
+                // Merge the global list as well, without losing legitimate category results.
+                if (section.type === 'series') {
+                  try {
+                    const globalEntries = await fetchNativeAction(section.action);
+                    for (const entry of globalEntries) {
+                      const key = entry.series_id;
+                      if (key != null) combined.set(String(key), entry);
+                    }
+                  } catch (error) {
+                    console.warn('[XtreamClient] Global series lookup unavailable; preserving category results.', error);
+                  }
+                }
                 entries = [...combined.values()];
               } else {
                 entries = await fetchNativeAction(section.action);
