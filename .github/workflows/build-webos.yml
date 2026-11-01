@@ -33,6 +33,9 @@ jobs:
           node --check lg-media-service/server.mjs
           node --test lg-media-service/test.mjs
           node --check webos/tv-lg-media.js
+          node --check webos/tv-home.js
+          node --check webos/tv-features.js
+          node --check webos/tv-iptv.js
 
       - name: Prepare standalone webOS 2 app
         run: |
