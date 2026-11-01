@@ -1,5 +1,6 @@
 import { MediaItem, Playlist, SeriesDetail, SeriesEpisode, SeriesSeason } from '../types';
 import { XtreamClientService } from './xtreamClient';
+import { StorageService } from './storage';
 
 export interface ResolvedXtreamConfig {
   serverUrl: string;
@@ -20,7 +21,7 @@ export class IptvService {
     let serverUrl: string | undefined = undefined;
     let username: string | undefined = undefined;
     let password: string | undefined = undefined;
-    let seriesId: string | number | undefined = seriesItem.streamId;
+    let seriesId: string | number | undefined = activePlaylist?.type === 'xtream' ? seriesItem.streamId : undefined;
 
     // 1. Check active playlist direct credentials
     if (activePlaylist?.serverUrl && activePlaylist?.username && activePlaylist?.password) {
@@ -39,7 +40,8 @@ export class IptvService {
       if (!serverUrl) serverUrl = match[1];
       if (!username) username = match[2];
       if (!password) password = match[3];
-      if (!seriesId) seriesId = match[4];
+      // A /series/ URL contains an episode stream ID, not a series ID.
+      // Never use the episode ID with get_series_info.
     }
 
     // 3. Check M3U URL for embedded Xtream credentials
@@ -59,13 +61,7 @@ export class IptvService {
       }
     }
 
-    // Bölüm URL'sindeki sayısal ID, dizi ID'si değildir. Başka playlist
-    // bilgilerini de kullanma: farklı sunucularda aynı ID başka diziyi açabilir.
-    if (match && seriesItem.streamId == null) {
-      // M3U episode URL'sinden dizi kimliği türetilemez.
-      seriesId = undefined;
-    }
-
+    // Never borrow credentials from another playlist or treat episode file IDs as series IDs.
     if (serverUrl && username && password && seriesId) {
       return {
         serverUrl: XtreamClientService.normalizeServerUrl(serverUrl),
@@ -94,84 +90,74 @@ export class IptvService {
     isFallback?: boolean;
     error?: string;
   }> {
-    const config = this.resolveSeriesConfig(seriesItem, activePlaylist);
-
-    if (config) {
-      try {
-        const xtreamRes = await XtreamClientService.fetchSeriesInfo(
-          config.serverUrl,
-          config.username,
-          config.password,
-          config.seriesId
-        );
-
-        if (xtreamRes.success && xtreamRes.seriesDetail && xtreamRes.seriesDetail.seasons.length > 0) {
-          // Ensure all episode stream URLs pass through proxy to bypass port blocks
-          const sanitizedEpisodes: Record<string | number, SeriesEpisode[]> = {};
-          Object.keys(xtreamRes.seriesDetail.episodes).forEach((seasonKey) => {
-            sanitizedEpisodes[seasonKey] = xtreamRes.seriesDetail!.episodes[seasonKey].map((ep) => ({
-              ...ep,
-              streamUrl: XtreamClientService.getSafeStreamUrl(ep.rawStreamUrl || ep.streamUrl),
-            }));
+    // M3U exports commonly contain one item per episode, rather than a series ID.
+    // Reconstruct seasons from the actual saved playlist items, never from guessed Xtream IDs.
+    if (activePlaylist?.type === 'm3u') {
+      const allItems = StorageService.getPlaylistItems(activePlaylist.id);
+      const parseEpisode = (item: MediaItem) => {
+        const title = item.title || '';
+        const match = title.match(/^(.*?)[\\s._-]*(?:S(\\d{1,2})[\\s._-]*E(\\d{1,3})|(?:sezon|season)[\\s._-]*(\\d{1,2})[\\s._-]*(?:bölüm|bolum|episode|ep)[\\s._-]*(\\d{1,3}))/i);
+        if (!match) return null;
+        const name = match[1].replace(/[\\s._|:-]+$/g, '').replace(/\\s*\\(\\d{4}\\)\\s*$/, '').trim();
+        return { name, season: Number(match[2] || match[4]), episode: Number(match[3] || match[5]) };
+      };
+      const normalize = (value: string) => value.toLocaleLowerCase('tr-TR').replace(/[^a-z0-9çğıöşü]/g, '');
+      const selectedParsed = parseEpisode(seriesItem);
+      const baseName = selectedParsed?.name || seriesItem.title.replace(/\\s*\\(\\d{4}\\).*$/, '').trim();
+      const matches = allItems.map((item) => ({ item, parsed: parseEpisode(item) }))
+        .filter((entry) => entry.item.type === 'series' && entry.parsed &&
+          normalize(entry.parsed.name) === normalize(baseName));
+      if (matches.length > 0) {
+        const episodes: Record<string, SeriesEpisode[]> = {};
+        for (const { item, parsed } of matches) {
+          const season = String(parsed!.season);
+          (episodes[season] ||= []).push({
+            id: item.id,
+            episodeNum: parsed!.episode,
+            seasonNum: parsed!.season,
+            title: item.title,
+            containerExtension: item.containerExtension || 'mp4',
+            image: item.poster,
+            rating: item.rating,
+            streamUrl: XtreamClientService.getSafeStreamUrl(item.rawStreamUrl || item.streamUrl),
+            rawStreamUrl: item.rawStreamUrl || item.streamUrl,
           });
-
-          return {
-            success: true,
-            seriesDetail: {
-              ...xtreamRes.seriesDetail,
-              episodes: sanitizedEpisodes,
-            },
-          };
         }
-      } catch (err: any) {
-        console.warn('[IptvService] Xtream series info fetch error, creating smooth fallback:', err);
+        for (const list of Object.values(episodes)) list.sort((a, b) => a.episodeNum - b.episodeNum);
+        return {
+          success: true,
+          seriesDetail: {
+            name: baseName, cover: seriesItem.poster, genre: seriesItem.category,
+            rating: seriesItem.rating, backdrop: seriesItem.backdrop || seriesItem.poster,
+            seasons: Object.keys(episodes).map((key) => ({
+              seasonNumber: Number(key), name: `Sezon ${key}`, episodeCount: episodes[key].length,
+            })).sort((a, b) => a.seasonNumber - b.seasonNumber),
+            episodes,
+          },
+        };
       }
+      return { success: false, seriesDetail: { seasons: [], episodes: {} },
+        error: 'M3U listesindeki bu dizi için sezon/bölüm bilgisi bulunamadı. Playlist yenilemeyi deneyin.' };
     }
 
-    // Synthesize fallback SeriesDetail for M3U stream items to prevent "Dizi Bilgisi Alınamadı" error
-    const safeStreamUrl = XtreamClientService.getSafeStreamUrl(
-      seriesItem.rawStreamUrl || seriesItem.streamUrl
-    );
-
-    const fallbackEpisode: SeriesEpisode = {
-      id: seriesItem.streamId ? String(seriesItem.streamId) : seriesItem.id,
-      episodeNum: 1,
-      seasonNum: 1,
-      title: seriesItem.title,
-      containerExtension: seriesItem.containerExtension || 'mp4',
-      duration: seriesItem.duration || 'Bölüm Yayını',
-      plot: `${seriesItem.title} - M3U akış bağlantısı hazır.`,
-      rating: seriesItem.rating || '8.5',
-      image: seriesItem.poster,
-      streamUrl: safeStreamUrl,
-      rawStreamUrl: seriesItem.rawStreamUrl || seriesItem.streamUrl,
-    };
-
-    const fallbackSeason: SeriesSeason = {
-      seasonNumber: 1,
-      name: 'Sezon 1',
-      episodeCount: 1,
-      cover: seriesItem.poster,
-    };
-
-    const fallbackDetail: SeriesDetail = {
-      name: seriesItem.title,
-      cover: seriesItem.poster,
-      plot: `${seriesItem.title} (${seriesItem.category}). Akış adresi tünellenerek oynatmaya hazırlandı.`,
-      genre: seriesItem.category,
-      rating: seriesItem.rating || '8.5',
-      releaseDate: seriesItem.year ? String(seriesItem.year) : undefined,
-      backdrop: seriesItem.backdrop || seriesItem.poster,
-      seasons: [fallbackSeason],
-      episodes: {
-        1: [fallbackEpisode],
-      },
-    };
-
-    return {
-      success: true,
-      seriesDetail: fallbackDetail,
-      isFallback: true,
-    };
+    const config = this.resolveSeriesConfig(seriesItem, activePlaylist);
+    if (!config) {
+      return { success: false, seriesDetail: { seasons: [], episodes: {} },
+        error: 'Diziye ait geçerli Xtream kimliği bulunamadı.' };
+    }
+    try {
+      const result = await XtreamClientService.fetchSeriesInfo(
+        config.serverUrl, config.username, config.password, config.seriesId
+      );
+      if (result.success && result.seriesDetail &&
+          Object.values(result.seriesDetail.episodes).some((list) => list.length > 0)) {
+        return { success: true, seriesDetail: result.seriesDetail };
+      }
+      return { success: false, seriesDetail: { seasons: [], episodes: {} },
+        error: result.error || 'Sunucu bu dizi için bölüm listesi döndürmedi.' };
+    } catch (error: any) {
+      return { success: false, seriesDetail: { seasons: [], episodes: {} },
+        error: error?.message || 'Dizi bilgileri yüklenemedi.' };
+    }
   }
 }
