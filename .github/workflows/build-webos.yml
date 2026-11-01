@@ -1,5 +1,5 @@
 name: Build LG webOS IPK
-run-name: XIPTV Play LG webOS v1.0.12 • ${{ github.event_name }} • ${{ github.sha }}
+run-name: XIPTV Play LG webOS v1.0.13 • ${{ github.event_name }} • ${{ github.sha }}
 
 on:
   workflow_dispatch:
