@@ -243,7 +243,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
       {/* Legal & App Version Footprint */}
       <div className="text-center text-[11px] text-[#849495] py-2 flex flex-col items-center gap-1">
-        <span>xiptvplay Engine v4.2.8</span>
+        <span>XIPTV Play v{__XIPTV_ANDROID_VERSION__} • Android Build {__XIPTV_ANDROID_BUILD__}</span>
+        <span>Engine v4.2.8</span>
         <span>AES-256 Encrypted Keystore • Scoped Storage Compliant</span>
       </div>
     </div>
