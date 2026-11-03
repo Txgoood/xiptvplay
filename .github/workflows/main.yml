@@ -1,5 +1,5 @@
 name: Build Android APK
-run-name: XIPTV Play Android v1.4.8 (16) • ${{ github.event_name }} • ${{ github.sha }}
+run-name: XIPTV Play Android v1.4.9 (17) • ${{ github.event_name }} • ${{ github.sha }}
 # Stable signing verification after GitHub repository secret registration.
 
 on:
