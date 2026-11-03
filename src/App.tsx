@@ -52,6 +52,36 @@ export default function App() {
 
   // Persistent Application Data States (Clean Empty Initial States)
   const [stats, setStats] = useState(INITIAL_STATS);
+  // Android reports real internal storage capacity and available bytes.
+  // The UI must never infer free space from the app's download list.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const disk = registerPlugin<{
+      getStorageStats(): Promise<{ totalBytes: number; freeBytes: number }>;
+    }>('DownloadFiles');
+    let active = true;
+    const updateStorage = async () => {
+      try {
+        const data = await disk.getStorageStats();
+        const total = Number(data.totalBytes);
+        const free = Number(data.freeBytes);
+        if (!active || !Number.isFinite(total) || !Number.isFinite(free) || total <= 0) return;
+        const gb = 1024 ** 3;
+        setStats(previous => ({
+          ...previous,
+          totalStorageGb: total / gb,
+          freeStorageGb: Math.max(0, Math.min(free, total)) / gb,
+        }));
+      } catch (error) {
+        console.warn('[Storage] Android depolama bilgisi okunamadı:', error);
+      }
+    };
+    void updateStorage();
+    const onResume = () => { if (document.visibilityState === 'visible') void updateStorage(); };
+    document.addEventListener('visibilitychange', onResume);
+    return () => { active = false; document.removeEventListener('visibilitychange', onResume); };
+  }, []);
+
   const [playlists, setPlaylists] = useState<Playlist[]>(() => StorageService.getPlaylists());
   const [downloads, setDownloads] = useState<DownloadItem[]>(() => StorageService.getDownloads());
   const [scheduledDownloads, setScheduledDownloads] = useState<ScheduledDownload[]>([]);
