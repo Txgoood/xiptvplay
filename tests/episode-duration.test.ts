@@ -20,3 +20,21 @@ test('invalid runtime values are not guessed', () => {
   assert.equal(normalizeEpisodeDuration({ value: '-1' }), undefined);
   assert.equal(normalizeEpisodeDuration({ value: '00:61:00' }), undefined);
 });
+
+test('series episode_run_time can recover missing per-episode runtime', () => {
+  assert.equal(normalizeEpisodeDuration(
+    { value: '00:00:00' },
+    { value: undefined },
+    { value: '45' },
+  ), '45:00');
+  assert.equal(normalizeEpisodeDuration(
+    { value: '00:00:00' },
+    { value: '00:49:18' },
+    { value: '45' },
+  ), '49:18');
+  assert.equal(normalizeEpisodeDuration(
+    { value: '00:00:00' },
+    { value: '00:00:00' },
+    { value: undefined },
+  ), undefined);
+});
