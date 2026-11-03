@@ -489,7 +489,17 @@ export class XtreamClientService {
                   { value: ep.duration },
                   { value: info.duration_secs, unit: 'seconds' },
                   { value: ep.duration_secs, unit: 'seconds' },
+                  { value: info.duration_seconds, unit: 'seconds' },
+                  { value: ep.duration_seconds, unit: 'seconds' },
                   { value: info.runtime },
+                  { value: ep.runtime },
+                  // Xtream providers may omit per-episode durations but return
+                  // episode_run_time for the series (typical episode length).
+                  { value: info.episode_run_time },
+                  { value: ep.episode_run_time },
+                  { value: rawInfo.episode_run_time },
+                  { value: rawInfo.episode_runtime },
+                  { value: rawInfo.runtime },
                 ),
                 plot: info.plot || info.description,
                 rating: info.rating ? String(info.rating) : undefined,
