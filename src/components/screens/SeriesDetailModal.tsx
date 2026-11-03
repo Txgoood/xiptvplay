@@ -328,7 +328,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                             )}
 
                             <div className="flex items-center gap-2 mt-1 text-[10px] text-[#849495] font-mono">
-                              {episode.duration && (
+                              {episode.duration && !/^(?:0+(?::0+){0,2}|0+\s*(?:dk|dakika|min))$/i.test(String(episode.duration).trim()) && (
                                 <span className="flex items-center gap-1">
                                   <Clock className="w-3 h-3 text-[#849495]" />
                                   {episode.duration}
