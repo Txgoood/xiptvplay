@@ -119,6 +119,7 @@ export class IptvService {
             containerExtension: item.containerExtension || 'mp4',
             image: item.poster,
             rating: item.rating,
+            duration: item.duration,
             streamUrl: XtreamClientService.getSafeStreamUrl(item.rawStreamUrl || item.streamUrl),
             rawStreamUrl: item.rawStreamUrl || item.streamUrl,
           });
