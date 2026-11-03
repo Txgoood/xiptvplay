@@ -1,5 +1,6 @@
 import { MediaItem, XtreamUserInfo, XtreamServerInfo, SeriesDetail, SeriesEpisode, SeriesSeason } from '../types';
 import { isNative, httpGetJson, httpGetCatalogJson } from './net';
+import { normalizeEpisodeDuration } from './episodeDuration';
 import { catalogTimestamp, catalogRating, catalogReleaseDate } from './catalogDiscovery';
 
 export interface XtreamVerificationResult {
@@ -483,7 +484,13 @@ export class XtreamClientService {
                 seasonNum: seasonNum,
                 title: ep.title || info.name || `Bölüm ${epNum}`,
                 containerExtension: ext,
-                duration: info.duration || (info.duration_secs ? `${Math.round(info.duration_secs / 60)} dk` : undefined),
+                duration: normalizeEpisodeDuration(
+                  { value: info.duration },
+                  { value: ep.duration },
+                  { value: info.duration_secs, unit: 'seconds' },
+                  { value: ep.duration_secs, unit: 'seconds' },
+                  { value: info.runtime },
+                ),
                 plot: info.plot || info.description,
                 rating: info.rating ? String(info.rating) : undefined,
                 releaseDate: info.releasedate || info.release_date,
