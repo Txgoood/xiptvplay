@@ -180,6 +180,7 @@ public class NativePlayerActivity extends Activity {
         root.setBackgroundColor(Color.BLACK);
         root.setOnClickListener(v -> showControlsTemporarily());
         videoContainer = new FrameLayout(this);
+        videoContainer.setClipChildren(true);
         FrameLayout.LayoutParams videoParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.CENTER
         );
@@ -196,6 +197,7 @@ public class NativePlayerActivity extends Activity {
         // Pinch zoom applies only to the video surface, not our playback controls.
         playerView.setOnTouchListener((view, event) -> {
             int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) return true;
             if (action == MotionEvent.ACTION_POINTER_DOWN && event.getPointerCount() >= 2) {
                 pinchStartDistance = pinchDistance(event);
                 pinchStartZoom = videoZoom;
