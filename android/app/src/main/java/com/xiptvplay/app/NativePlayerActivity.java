@@ -25,6 +25,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Rational;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.OrientationEventListener;
 import android.view.View;
 import android.view.Window;
@@ -79,6 +80,10 @@ public class NativePlayerActivity extends Activity {
 
     private ExoPlayer player;
     private PlayerView playerView;
+    private float videoZoom = 1f;
+    private float pinchStartDistance = 0f;
+    private float pinchStartZoom = 1f;
+    private boolean pinchActive = false;
     private FrameLayout root;
     private FrameLayout videoContainer;
     private LinearLayout topBar;
@@ -188,6 +193,35 @@ public class NativePlayerActivity extends Activity {
         playerView.setUseController(false);
         playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS);
         playerView.setKeepContentOnPlayerReset(true);
+        // Pinch zoom applies only to the video surface, not our playback controls.
+        playerView.setOnTouchListener((view, event) -> {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_POINTER_DOWN && event.getPointerCount() >= 2) {
+                pinchStartDistance = pinchDistance(event);
+                pinchStartZoom = videoZoom;
+                pinchActive = pinchStartDistance > 12f;
+                return true;
+            }
+            if (action == MotionEvent.ACTION_MOVE && pinchActive && event.getPointerCount() >= 2) {
+                float distance = pinchDistance(event);
+                if (distance > 12f) {
+                    videoZoom = Math.max(1f, Math.min(3f, pinchStartZoom * distance / pinchStartDistance));
+                    applyPinchZoom();
+                }
+                return true;
+            }
+            if (action == MotionEvent.ACTION_POINTER_UP || action == MotionEvent.ACTION_CANCEL) {
+                pinchActive = false;
+                return true;
+            }
+            if (action == MotionEvent.ACTION_UP) {
+                boolean usedPinch = pinchActive;
+                pinchActive = false;
+                if (!usedPinch) showControlsTemporarily();
+                return true;
+            }
+            return pinchActive;
+        });
         videoContainer.addView(playerView, new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
         ));
@@ -673,6 +707,21 @@ public class NativePlayerActivity extends Activity {
         controlsHandler.removeCallbacks(orientationResetRunnable);
         controlsHandler.postDelayed(orientationResetRunnable,700);
         showControlsTemporarily();
+    }
+
+    private float pinchDistance(MotionEvent event) {
+        if (event.getPointerCount() < 2) return 0f;
+        float dx = event.getX(0) - event.getX(1);
+        float dy = event.getY(0) - event.getY(1);
+        return (float) Math.hypot(dx, dy);
+    }
+
+    private void applyPinchZoom() {
+        if (playerView == null) return;
+        playerView.setPivotX(playerView.getWidth() / 2f);
+        playerView.setPivotY(playerView.getHeight() / 2f);
+        playerView.setScaleX(videoZoom);
+        playerView.setScaleY(videoZoom);
     }
 
     private void applyVideoBounds() {
