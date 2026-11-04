@@ -1250,6 +1250,7 @@ export default function App() {
             {!isChildProfile && currentScreen === 'downloads' && (
               <DownloadsScreen
                 downloads={downloads}
+                watchHistory={watchHistory}
                 scheduledDownloads={scheduledDownloads}
                 onRefreshScheduled={() => void refreshScheduled()}
                 onCancelScheduled={(id) => { void ScheduleService.cancel(id).then(() => refreshScheduled()).catch(err => showToast(String(err))); }}
