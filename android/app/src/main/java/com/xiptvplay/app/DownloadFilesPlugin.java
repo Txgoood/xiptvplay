@@ -7,6 +7,8 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.StatFs;
+import com.getcapacitor.JSObject;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.content.ContentUris;
@@ -24,6 +26,26 @@ import java.io.OutputStream;
 @CapacitorPlugin(name = "DownloadFiles")
 public class DownloadFilesPlugin extends Plugin {
     private static final String FOLDER = "Movies/XIPTVPlay/";
+
+    // Read real internal user-data partition capacity; never use mock storage totals.
+    @PluginMethod
+    public void getStorageStats(PluginCall call) {
+        try {
+            StatFs disk = new StatFs(Environment.getDataDirectory().getAbsolutePath());
+            long totalBytes = disk.getTotalBytes();
+            long freeBytes = disk.getAvailableBytes();
+            if (totalBytes <= 0L || freeBytes < 0L) {
+                call.reject("Geçerli depolama bilgisi alınamadı.");
+                return;
+            }
+            JSObject result = new JSObject();
+            result.put("totalBytes", totalBytes);
+            result.put("freeBytes", freeBytes);
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Depolama bilgisi okunamadı.", error);
+        }
+    }
 
     @PluginMethod
     public void openLocation(PluginCall call) {
