@@ -1,7 +1,7 @@
 # XIPTV Play Android — Proje durumu / Tek Dal Birleştirme
 
 **Resmî Android dalı:** `tek-dal-birlestirme-xiptvplay-android`  
-**Yeni sürüm:** `v1.4.12 (versionCode 20)`  
+**Yeni sürüm:** `v1.4.13 (versionCode 21)`  
 **Depo:** https://github.com/Txgoood/xiptvplay  
 **Derleme:** https://github.com/Txgoood/xiptvplay/actions/workflows/main.yml  
 **Kontrol durumu:** Kaynak dosyaları incelendi ve regresyon testleri eklendi; GitHub Actions / fiziksel cihaz sonucu ayrıca doğrulanmalı.
@@ -16,7 +16,7 @@
 | İncelenen farklı dosya | Dizi dalındaki fark | İndirme dalındaki fark | Birleşim kararı |
 |---|---|---|---|
 | `.github/workflows/main.yml` | v1.4.11 (19) ve iki dal için push | v1.4.9 (17) | Sadece tek dal push, birleşim etiketli yeni sürüm |
-| `android/app/build.gradle` | v1.4.11, aynı appId ve stableDebug | v1.4.9, aynı appId ve stableDebug | v1.4.12 / code 20, aynı paket ve imza şartı |
+| `android/app/build.gradle` | v1.4.11, aynı appId ve stableDebug | v1.4.9, aynı appId ve stableDebug | v1.4.13 / code 21, aynı paket ve imza şartı |
 | `android/app/src/main/java/com/xiptvplay/app/DownloadFilesPlugin.java` | Dosya konumu açma | + gerçek Android disk StatFs ölçümü | İndirme dalından tamamı |
 | `android/app/src/main/java/com/xiptvplay/app/NativeDownloadPlugin.java` | Native indirme akışı | Range istekleri ve tekrar deneyerek devam ettirme | İndirme dalından tamamı |
 | `src/App.tsx` | Başlangıç/senkronizasyon | + disk ölçümünün Android köprüsünden okunması | İndirme dalından tamamı; mevcut fonksiyonlar aynı |
@@ -45,3 +45,10 @@
 - Mevcut telefon APK'sı farklı sertifikayla imzalanmışsa yalnızca yeni versionCode kurulum uyuşmazlığını gidermez; eski uygulamayı silmeden imzayı doğrula.
 - CI başarılı olmadan yeni APK çalışıyor denilmez.
 - Daha önceki iki dalda çalışıp yeni birleşimde başarısız olan bir özellik tespit edilirse önce Git dosyası farkı ve test logu incelenir; eski dallar korunur.
+
+## 4 Kasım 2026 — İndirilenlerde izleme ilerlemesi
+- v1.4.13 (21): tamamlanmış film ve dizi indirmelerinde mevcut profilin izleme geçmişinden kalan süre, yüzde çubuğu ve `İzlendi` etiketi gösterilir.
+- Kaynaklar: `src/services/downloadWatchProgress.ts`, `src/components/screens/DownloadsScreen.tsx`, `src/App.tsx`, `src/services/watchHistory.ts`.
+- `tests/download-watch-progress.test.ts` yeni regresyon testi eklendi.
+- Yalnızca tamamlanmış indirmeler için görüntülenir; dosyanın indirme yüzdesi izleme ilerlemesi sanılmaz.
+- Android yerel oynatıcısında mevcut son oynatma konumu, oyuncu kapanıp uygulamaya dönüldüğünde izleme geçmişine yazılır. Fiziksel cihaz testi bekleniyor.
