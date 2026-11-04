@@ -28,7 +28,11 @@ export const WatchHistoryService = {
     const existing = entries.find(e => e.id === media.id);
     const duration = Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : existing?.durationSeconds || 0;
     const position = Number.isFinite(positionSeconds) && positionSeconds > 0 ? positionSeconds : existing?.positionSeconds || 0;
-    const completed = finished || (duration > 60 && position / duration >= 0.95);
+    // Opening an already watched item calls record(media) with no timing data.
+    // Preserve its watched state until a real new playback position is received.
+    const isOpenOnly = positionSeconds === 0 && durationSeconds === 0 && !finished;
+    const completed = finished || (isOpenOnly && existing?.completed === true) ||
+      (duration > 60 && position / duration >= 0.95);
     const next: WatchHistoryEntry = {
       id: media.id, profileId, media,
       watchedAt: Date.now(),
