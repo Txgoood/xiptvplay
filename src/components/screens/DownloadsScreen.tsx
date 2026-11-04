@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { DownloadItem, SystemStats } from '../../types';
 import type { ScheduledDownload } from '../../services/downloadSchedule';
+import type { WatchHistoryEntry } from '../../services/watchHistory';
+import { getDownloadedWatchProgress, formatWatchTime } from '../../services/downloadWatchProgress';
 import {
   Gauge,
   Download,
@@ -24,6 +26,7 @@ import {
 
 interface DownloadsScreenProps {
   downloads: DownloadItem[];
+  watchHistory: WatchHistoryEntry[];
   scheduledDownloads: ScheduledDownload[];
   onRefreshScheduled: () => void;
   onCancelScheduled: (id: string) => void;
@@ -42,6 +45,7 @@ interface DownloadsScreenProps {
 
 export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
   downloads,
+  watchHistory,
   scheduledDownloads,
   onRefreshScheduled,
   onCancelScheduled,
@@ -165,8 +169,10 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
     };
   })();
 
-  const renderDownloadItem = (item: DownloadItem) => {
+  const historyByDownloadId = new Map(watchHistory.map(entry => [entry.id, entry]));
 
+  const renderDownloadItem = (item: DownloadItem) => {
+            const watchProgress = getDownloadedWatchProgress(item, historyByDownloadId.get(item.id));
             const isCompleted = item.status === 'completed';
             const isQueued = item.status === 'queued';
             const isPaused = item.status === 'paused';
@@ -210,6 +216,36 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                       <span className="text-[11px] text-[#849495] truncate">{item.subtitle}</span>
                     </div>
                   </div>
+
+                  {watchProgress && (
+                    <div className="pl-1 pr-1" aria-label={watchProgress.completed ? `İzlendi: ${item.title}` : `İzleme ilerlemesi: ${item.title}`}>
+                      <div className="flex items-center justify-between gap-2 text-[11px] mb-1.5">
+                        <span className={`font-semibold ${watchProgress.completed ? 'text-[#4edea3]' : 'text-[#7df4ff]'}`}>
+                          {watchProgress.completed ? '✓ İzlendi' : `▶ Kaldığın yer: ${formatWatchTime(watchProgress.positionSeconds)}`}
+                        </span>
+                        {watchProgress.durationSeconds > 0 && (
+                          <span className="text-[#849495] tabular-nums shrink-0">
+                            {watchProgress.completed
+                              ? formatWatchTime(watchProgress.durationSeconds)
+                              : `${Math.round(watchProgress.percent)}% · ${formatWatchTime(watchProgress.durationSeconds)}`}
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className="w-full h-1.5 rounded-full bg-[#353437] overflow-hidden"
+                        role="progressbar"
+                        aria-label="İzleme ilerlemesi"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(watchProgress.percent)}
+                      >
+                        <div
+                          className={`h-full rounded-full transition-[width] duration-300 ${watchProgress.completed ? 'bg-[#4edea3]' : 'bg-gradient-to-r from-[#0566d9] to-[#00f0ff]'}`}
+                          style={{ width: `${watchProgress.percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between gap-1 pt-1.5 pl-1 bg-[#201f21]/60 rounded-xl px-2.5 py-1.5 border border-white/5">
                     <div className="flex items-center gap-1 text-[#b9cacb] text-[11px] font-medium">
