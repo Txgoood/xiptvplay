@@ -34,8 +34,8 @@ test('single branch retains series identification, M3U episodes and runtimes', (
 test('single branch version matches the next update code and stable signing', () => {
   const gradle = read('android/app/build.gradle');
   const workflow = read('.github/workflows/main.yml');
-  assert.match(gradle, /versionCode 20/);
-  assert.match(gradle, /versionName "1\.4\.12"/);
+  assert.match(gradle, /versionCode 21/);
+  assert.match(gradle, /versionName "1\.4\.13"/);
   assert.match(gradle, /signingConfig signingConfigs\.stableDebug/);
   assert.match(workflow, /tek-dal-birlestirme-xiptvplay-android/);
   assert.match(workflow, /ANDROID_DEBUG_KEYSTORE_BASE64/);
