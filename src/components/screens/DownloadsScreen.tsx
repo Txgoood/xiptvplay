@@ -169,7 +169,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
     };
   })();
 
-  const historyByDownloadId = new Map(watchHistory.map(entry => [entry.id, entry]));
+  const historyByDownloadId = new Map<string, WatchHistoryEntry>(watchHistory.map(entry => [entry.id, entry] as [string, WatchHistoryEntry]));
 
   const renderDownloadItem = (item: DownloadItem) => {
             const watchProgress = getDownloadedWatchProgress(item, historyByDownloadId.get(item.id));
