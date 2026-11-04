@@ -115,6 +115,14 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
 
   const totalDownloadedGb = downloads.reduce((acc, curr) => acc + (curr.downloadedGb || 0), 0);
   const totalArchiveGb = parseFloat(totalDownloadedGb.toFixed(1));
+  const storageKnown = Number.isFinite(stats.totalStorageGb) && stats.totalStorageGb > 0;
+  const totalStorageGb = storageKnown ? stats.totalStorageGb : 0;
+  const freeStorageGb = storageKnown ? Math.max(0, Math.min(stats.freeStorageGb, totalStorageGb)) : 0;
+  const usedStorageGb = Math.max(0, totalStorageGb - freeStorageGb);
+  const storageUsedRatio = storageKnown ? Math.min(usedStorageGb / totalStorageGb, 1) : 0;
+  // Tracked downloads are not the same as device-wide disk usage.
+  const otherUsedGb = Math.max(0, usedStorageGb - totalArchiveGb);
+  const displayGb = (value: number) => value.toFixed(1) + ' GB';
 
   // Eski kayıtlar için başlıktaki S01E02 biçimini de okuyarak gruplamayı geriye dönük uyumlu tut.
   const getEpisodeGrouping = (item: DownloadItem) => {
@@ -437,11 +445,11 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                   r="40"
                   stroke="currentColor"
                   strokeDasharray="251.2"
-                  strokeDashoffset="180.8"
+                  strokeDashoffset="251.2"
                   strokeLinecap="round"
                   strokeWidth="8"
                 ></circle>
-                {totalArchiveGb > 0 && (
+                {storageKnown && (
                   <circle
                     className="text-[#00f0ff] drop-shadow-[0_0_8px_rgba(0,240,255,0.7)]"
                     cx="50"
@@ -450,7 +458,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                     r="40"
                     stroke="currentColor"
                     strokeDasharray="251.2"
-                    strokeDashoffset={`${251.2 - (251.2 * Math.min(totalArchiveGb / stats.totalStorageGb, 1))}`}
+                    strokeDashoffset={`${251.2 * (1 - storageUsedRatio)}`}
                     strokeLinecap="round"
                     strokeWidth="8.5"
                   ></circle>
@@ -458,10 +466,10 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                 <span className="font-headline text-[22px] text-[#7df4ff] font-bold leading-none">
-                  {totalArchiveGb > 0 ? `${Math.round((totalArchiveGb / stats.totalStorageGb) * 100)}%` : '0%'}
+                  {storageKnown ? `${Math.round(storageUsedRatio * 100)}%` : '—'}
                 </span>
                 <span className="font-headline text-[9px] text-[#b9cacb] uppercase tracking-wider mt-0.5 font-bold">
-                  xiptvplay
+                  Kullanılan
                 </span>
               </div>
             </div>
@@ -472,10 +480,10 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
             <div className="bg-[#201f21]/70 rounded-xl p-2 flex items-center justify-between border border-white/5">
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-[#00f0ff] shadow-[0_0_6px_#00f0ff] shrink-0"></span>
-                <span className="text-[12px] text-[#b9cacb] truncate font-medium">IPTV Arşivi</span>
+                <span className="text-[12px] text-[#b9cacb] truncate font-medium">İndirme Listesi</span>
               </div>
               <span className="font-headline text-[13px] font-bold text-[#7df4ff] shrink-0">
-                {totalArchiveGb} GB
+                {displayGb(totalArchiveGb)}
               </span>
             </div>
             <div className="bg-[#201f21]/70 rounded-xl p-2 flex items-center justify-between border border-white/5">
@@ -484,13 +492,19 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                 <span className="text-[12px] text-[#b9cacb] truncate font-medium">Kullanılabilir Boş</span>
               </div>
               <span className="font-headline text-[13px] font-bold text-[#4edea3] shrink-0">
-                {parseFloat((stats.totalStorageGb - totalArchiveGb).toFixed(1))} GB
+                {storageKnown ? displayGb(freeStorageGb) : 'Hesaplanıyor'}
+              </span>
+            </div>
+            <div className="bg-[#201f21]/70 rounded-xl p-2 flex items-center justify-between border border-white/5">
+              <span className="text-[11px] text-[#b9cacb] truncate font-medium">Diğer Kullanım</span>
+              <span className="font-headline text-[12px] text-[#b9cacb] shrink-0">
+                {storageKnown ? displayGb(otherUsedGb) : '—'}
               </span>
             </div>
             <div className="bg-[#201f21]/40 rounded-xl px-2 py-1 flex items-center justify-between border border-white/5">
               <span className="text-[10px] text-[#849495]">Toplam Depolama</span>
               <span className="text-[10px] text-[#b9cacb] font-mono font-semibold">
-                {stats.totalStorageGb} GB
+                {storageKnown ? displayGb(totalStorageGb) : 'Hesaplanıyor'}
               </span>
             </div>
           </div>
