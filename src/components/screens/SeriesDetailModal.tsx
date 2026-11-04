@@ -60,6 +60,8 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
 
     let cancelled = false;
     setVerifiedDetail(undefined);
+    setSeriesDetail(null);
+    setSelectedSeason(1);
     const loadSeriesInfo = async () => {
       setLoading(true);
       setError(null);
@@ -90,7 +92,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
 
   if (!isOpen || !seriesItem) return null;
 
-  const currentEpisodes: SeriesEpisode[] =
+  const currentEpisodes: SeriesEpisode[] = loading ? [] :
     seriesDetail?.episodes[selectedSeason] ||
     seriesDetail?.episodes[String(selectedSeason)] ||
     [];
