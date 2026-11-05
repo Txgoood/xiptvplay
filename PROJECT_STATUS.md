@@ -69,4 +69,4 @@
 ## 5 Kasım 2026 — Android oynatıcı hareketleri
 - Zaman çubuğunun sağında +10 sn düğmesi. Görüntünün sağ ve sol yarısına çift dokunma sırasıyla +10 ve −10 saniye sarar.
 - Sağda dikey hareket medya sesini, solda dikey hareket oynatıcı penceresinin parlaklığını ayarlar. İki parmakla yakınlaştırma ve kontrol katmanı ayrı kalır.
-- v1.4.16 (24) APK doğrulaması bekleniyor.
+- v1.4.16 (24), commit `a5916f6`. Katalog testleri, web derlemesi, Gradle, APK imzası ve gerçek videoyla emülatör hareket testleri geçti. Fold 7 üzerinde fiziksel test bekleniyor. [Derleme #318](https://github.com/Txgoood/xiptvplay/actions/runs/42078660833) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/42078660833/artifacts/13438913571).
