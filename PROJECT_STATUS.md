@@ -75,4 +75,4 @@
 - Sağlayıcıdaki bölüm/film süresi önceliklidir. Yoksa oynatıcıdan öğrenilen gerçek süre, daha sonra yaklaşık TMDB süresi gösterilir.
 - Süreler tek yerel önbellekte en fazla 1000 kayıtla sınırlıdır; değişmeyen süre tekrar yazılmaz ve katalog için medya akışı açılmaz.
 - Yerel oynatıcı sonraki bölüme geçmişse ilk bölümün kimliğine son bölümün süresi kaydedilmez. Sonraki bölümün otomatik geçişle öğrenilen süresi bu sürümde ayrıca kaydedilmez.
-- v1.4.17 (25) APK doğrulaması bekleniyor.
+- v1.4.17 (25), commit `4cbe15e`. Süre kayıt testleri, web derlemesi, Android derlemesi, imza ve emülatör kontrolleri geçti. Fold 7 performansı henüz ölçülmedi. [Derleme #319](https://github.com/Txgoood/xiptvplay/actions/runs/42081821957) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/42081821957/artifacts/13440912210).
