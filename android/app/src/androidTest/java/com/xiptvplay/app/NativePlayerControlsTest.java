@@ -6,6 +6,9 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.view.View;
+import android.view.MotionEvent;
+import android.os.SystemClock;
+import android.media.AudioManager;
 import android.view.ViewGroup;
 import android.widget.Button;
 import androidx.lifecycle.Lifecycle;
@@ -51,6 +54,65 @@ public class NativePlayerControlsTest {
         while(System.currentTimeMillis()<end){scenario.onActivity(a->{ExoPlayer p=player(a);ready.set(p!=null&&p.getDuration()>0&&p.getPlaybackState()==androidx.media3.common.Player.STATE_READY);});if(ready.get())return;Thread.sleep(100);}
         fail("Test videosu hazırlanamadı");
     }
+    private static void touch(NativePlayerActivity activity, long down, long time, int action, float x, float y) {
+        MotionEvent event = MotionEvent.obtain(down, time, action, x, y, 0);
+        try { activity.dispatchTouchEvent(event); } finally { event.recycle(); }
+    }
+    private static void doubleTap(NativePlayerActivity activity, float x, float y, long start) {
+        touch(activity, start, start, MotionEvent.ACTION_DOWN, x, y);
+        touch(activity, start, start + 15, MotionEvent.ACTION_UP, x, y);
+        touch(activity, start + 75, start + 75, MotionEvent.ACTION_DOWN, x, y);
+        touch(activity, start + 75, start + 90, MotionEvent.ACTION_UP, x, y);
+    }
+    private static void swipe(NativePlayerActivity activity, float x, float y, float distance, long start) {
+        touch(activity, start, start, MotionEvent.ACTION_DOWN, x, y);
+        touch(activity, start, start + 50, MotionEvent.ACTION_MOVE, x, y + distance);
+        touch(activity, start, start + 70, MotionEvent.ACTION_UP, x, y + distance);
+    }
+    private static void verifyPlayerGestures(NativePlayerActivity activity) {
+        ExoPlayer player = player(activity);
+        long initial = player.getCurrentPosition();
+        View surface = activity.getWindow().getDecorView().findViewWithTag("player-gesture-surface");
+        assertNotNull(surface);
+        int[] location = new int[2];
+        surface.getLocationInWindow(location);
+        float left = location[0] + surface.getWidth() * 0.2f;
+        float right = location[0] + surface.getWidth() * 0.8f;
+        float centerY = location[1] + surface.getHeight() * 0.5f;
+        float travel = surface.getHeight() * 0.25f;
+        long start = SystemClock.uptimeMillis() - 500;
+        View forward = button(activity, "10 saniye ileri sar");
+        assertTrue(forward.isShown() && forward.isEnabled());
+        forward.performClick();
+        assertEquals(initial + 10000L, player.getCurrentPosition(), 250L);
+        doubleTap(activity, right, centerY, start);
+        assertEquals(initial + 20000L, player.getCurrentPosition(), 250L);
+        doubleTap(activity, left, centerY, start + 100);
+        assertEquals(initial + 10000L, player.getCurrentPosition(), 250L);
+        swipe(activity, left, centerY, travel, start + 200);
+        float dimmed = activity.getWindow().getAttributes().screenBrightness;
+        assertTrue(dimmed < 0.7f);
+        swipe(activity, left, centerY, -travel, start + 300);
+        assertTrue(activity.getWindow().getAttributes().screenBrightness > dimmed);
+        AudioManager audio = (AudioManager) activity.getSystemService(Context.AUDIO_SERVICE);
+        if (audio != null && !audio.isVolumeFixed()) {
+            int stream = AudioManager.STREAM_MUSIC;
+            int original = audio.getStreamVolume(stream);
+            int max = audio.getStreamMaxVolume(stream);
+            try {
+                audio.setStreamVolume(stream, max, 0);
+                int before = audio.getStreamVolume(stream);
+                swipe(activity, right, centerY, travel, start + 400);
+                int reduced = audio.getStreamVolume(stream);
+                assertTrue(reduced < before);
+                swipe(activity, right, centerY, -travel, start + 500);
+                assertTrue(audio.getStreamVolume(stream) > reduced);
+            } finally {
+                audio.setStreamVolume(stream, original, 0);
+            }
+        }
+        player.seekTo(initial);
+    }
     private static void screenshot(String name) throws Exception {
         Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(bitmap);
         try(FileOutputStream out=new FileOutputStream(new File(InstrumentationRegistry.getInstrumentation().getTargetContext().getFilesDir(),name))){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();
@@ -68,7 +130,7 @@ public class NativePlayerControlsTest {
                 assertTrue(pause.getWidth()>=48*a.getResources().getDisplayMetrics().density-1);
                 assertIconPainted(pause,true);assertIconPainted(button(a,"Videoyu kapat"),false);assertIconPainted(brightness,false);
                 if(!pause.isShown())video(a.getWindow().getDecorView()).performClick();
-                assertTrue(pause.isShown());pause.performClick();assertFalse(player(a).getPlayWhenReady());assertEquals("Oynat",pause.getContentDescription());pausedPosition.set(player(a).getCurrentPosition());
+                assertTrue(pause.isShown());pause.performClick();assertFalse(player(a).getPlayWhenReady());assertEquals("Oynat",pause.getContentDescription());verifyPlayerGestures(a);pausedPosition.set(player(a).getCurrentPosition());
             });
             screenshot("player-controls-portrait.png");
             Thread.sleep(3900);

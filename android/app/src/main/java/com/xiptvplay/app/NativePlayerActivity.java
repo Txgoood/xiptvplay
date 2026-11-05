@@ -20,6 +20,7 @@ import android.graphics.drawable.RippleDrawable;
 import android.content.res.ColorStateList;
 import android.os.SystemClock;
 import android.net.Uri;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -28,6 +29,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.OrientationEventListener;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -84,6 +86,13 @@ public class NativePlayerActivity extends Activity {
     private float pinchStartDistance = 0f;
     private float pinchStartZoom = 1f;
     private boolean pinchActive = false;
+    private boolean multiTouchGesture, verticalGesture, touchMoved, rightGesture, secondTap;
+    private float touchX, touchY, firstTapX, firstTapY, gestureStartLevel;
+    private long firstTapTime = -1L;
+    private int touchSlop, doubleTapSlop;
+    private AudioManager audioManager;
+    private Button forwardButton;
+    private TextView gestureFeedback;
     private FrameLayout root;
     private FrameLayout videoContainer;
     private LinearLayout topBar;
@@ -137,6 +146,13 @@ public class NativePlayerActivity extends Activity {
     private int offlineEpisodeIndex = 0;
     private final Handler controlsHandler = new Handler(Looper.getMainLooper());
     private boolean controlsVisible = true;
+    private final Runnable showControlsAfterTap = () -> {
+        firstTapTime = -1L;
+        if (root != null) root.performClick();
+    };
+    private final Runnable hideGestureFeedback = () -> {
+        if (gestureFeedback != null) gestureFeedback.setVisibility(View.INVISIBLE);
+    };
     private final Runnable hideControlsRunnable = () -> { if (!scrubbing && !controlDialogOpen) setControlsVisible(false); };
     private final Runnable orientationResetRunnable = () -> changingOrientation = false;
 
@@ -179,6 +195,12 @@ public class NativePlayerActivity extends Activity {
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
         root.setOnClickListener(v -> showControlsTemporarily());
+        root.setOnTouchListener((view, event) -> handlePlayerTouch(event));
+        ViewConfiguration touchConfig = ViewConfiguration.get(this);
+        touchSlop = touchConfig.getScaledTouchSlop();
+        doubleTapSlop = touchConfig.getScaledDoubleTapSlop();
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
         videoContainer = new FrameLayout(this);
         videoContainer.setClipChildren(true);
         FrameLayout.LayoutParams videoParams = new FrameLayout.LayoutParams(
@@ -194,41 +216,26 @@ public class NativePlayerActivity extends Activity {
         playerView.setUseController(false);
         playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS);
         playerView.setKeepContentOnPlayerReset(true);
-        // Pinch zoom applies only to the video surface, not our playback controls.
-        playerView.setOnTouchListener((view, event) -> {
-            int action = event.getActionMasked();
-            if (action == MotionEvent.ACTION_DOWN) return true;
-            if (action == MotionEvent.ACTION_POINTER_DOWN && event.getPointerCount() >= 2) {
-                pinchStartDistance = pinchDistance(event);
-                pinchStartZoom = videoZoom;
-                pinchActive = pinchStartDistance > 12f;
-                return true;
-            }
-            if (action == MotionEvent.ACTION_MOVE && pinchActive && event.getPointerCount() >= 2) {
-                float distance = pinchDistance(event);
-                if (distance > 12f) {
-                    videoZoom = Math.max(1f, Math.min(3f, pinchStartZoom * distance / pinchStartDistance));
-                    applyPinchZoom();
-                }
-                return true;
-            }
-            if (action == MotionEvent.ACTION_POINTER_UP || action == MotionEvent.ACTION_CANCEL) {
-                pinchActive = false;
-                return true;
-            }
-            if (action == MotionEvent.ACTION_UP) {
-                boolean usedPinch = pinchActive;
-                pinchActive = false;
-                if (!usedPinch) showControlsTemporarily();
-                return true;
-            }
-            return pinchActive;
-        });
         videoContainer.addView(playerView, new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
         ));
+        // Dokunma alanı video yakınlaşsa da sabit kalır; düğmeler üst katmandadır.
+        View gestureSurface = new View(this);
+        gestureSurface.setTag("player-gesture-surface");
+        gestureSurface.setOnTouchListener((view, event) -> handlePlayerTouch(event));
+        videoContainer.addView(gestureSurface, new FrameLayout.LayoutParams(-1, -1));
 
         buildCustomControls();
+        gestureFeedback = new TextView(this);
+        gestureFeedback.setTextColor(Color.WHITE);
+        gestureFeedback.setTextSize(16);
+        gestureFeedback.setPadding(dp(16), dp(10), dp(16), dp(10));
+        GradientDrawable feedbackBackground = new GradientDrawable();
+        feedbackBackground.setColor(0xDE202024);
+        feedbackBackground.setCornerRadius(dp(18));
+        gestureFeedback.setBackground(feedbackBackground);
+        gestureFeedback.setVisibility(View.INVISIBLE);
+        videoContainer.addView(gestureFeedback, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         setContentView(root);
         root.post(() -> {
             if (!fullscreen && root != null && videoContainer != null) {
@@ -432,7 +439,7 @@ public class NativePlayerActivity extends Activity {
         timelineRow.setGravity(Gravity.CENTER_VERTICAL);
         timelineRow.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.addView(timelineRow, new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(32)
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(48)
         ));
         positionText = new TextView(this);
         positionText.setText("00:00");
@@ -453,6 +460,11 @@ public class NativePlayerActivity extends Activity {
         durationText.setTextSize(11);
         durationText.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         timelineRow.addView(durationText, new LinearLayout.LayoutParams(dp(48), -2));
+        forwardButton = makeButton("+10 sn");
+        forwardButton.setContentDescription("10 saniye ileri sar");
+        forwardButton.setEnabled(false);
+        forwardButton.setOnClickListener(v -> seekByTenSeconds(true));
+        timelineRow.addView(forwardButton);
 
         timeBar.addListener(new androidx.media3.ui.TimeBar.OnScrubListener() {
             @Override public void onScrubStart(androidx.media3.ui.TimeBar bar, long position) { scrubbing=true; controlsHandler.removeCallbacks(hideControlsRunnable); }
@@ -711,6 +723,133 @@ public class NativePlayerActivity extends Activity {
         showControlsTemporarily();
     }
 
+    private boolean handlePlayerTouch(MotionEvent event) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                touchX = event.getRawX();
+                touchY = event.getRawY();
+                int[] rootLocation = new int[2];
+                root.getLocationOnScreen(rootLocation);
+                float center = rootLocation[0] + root.getWidth() / 2f;
+                rightGesture = touchX >= center;
+                secondTap = firstTapTime >= 0L
+                    && event.getEventTime() - firstTapTime <= ViewConfiguration.getDoubleTapTimeout()
+                    && (firstTapX >= center) == rightGesture
+                    && Math.hypot(touchX - firstTapX, touchY - firstTapY) <= doubleTapSlop;
+                if (firstTapTime >= 0L) {
+                    controlsHandler.removeCallbacks(showControlsAfterTap);
+                    firstTapTime = -1L;
+                }
+                multiTouchGesture = verticalGesture = touchMoved = pinchActive = false;
+                return true;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                multiTouchGesture = true;
+                pinchStartDistance = pinchDistance(event);
+                pinchStartZoom = videoZoom;
+                pinchActive = pinchStartDistance > 12f;
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                if (multiTouchGesture) {
+                    if (pinchActive && event.getPointerCount() >= 2) {
+                        float distance = pinchDistance(event);
+                        if (distance > 12f) {
+                            videoZoom = Math.max(1f, Math.min(3f, pinchStartZoom * distance / pinchStartDistance));
+                            applyPinchZoom();
+                        }
+                    }
+                    return true;
+                }
+                float dx = event.getRawX() - touchX;
+                float dy = touchY - event.getRawY();
+                if (!touchMoved && Math.max(Math.abs(dx), Math.abs(dy)) > touchSlop) {
+                    touchMoved = true;
+                    verticalGesture = Math.abs(dy) > Math.abs(dx);
+                    if (verticalGesture) gestureStartLevel = rightGesture ? mediaVolumeFraction() : lastBrightness;
+                }
+                if (verticalGesture) adjustGestureLevel(dy);
+                return true;
+            case MotionEvent.ACTION_POINTER_UP:
+                pinchActive = false;
+                return true;
+            case MotionEvent.ACTION_CANCEL:
+                pinchActive = false;
+                return true;
+            case MotionEvent.ACTION_UP:
+                pinchActive = false;
+                if (!multiTouchGesture && !touchMoved && event.getEventTime() - event.getDownTime() < ViewConfiguration.getLongPressTimeout()) {
+                    if (secondTap) seekByTenSeconds(rightGesture);
+                    else {
+                        firstTapX = touchX;
+                        firstTapY = touchY;
+                        firstTapTime = event.getEventTime();
+                        controlsHandler.postDelayed(showControlsAfterTap, ViewConfiguration.getDoubleTapTimeout());
+                    }
+                }
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    private boolean canSeek() {
+        return player != null && player.isCurrentMediaItemSeekable() && player.getDuration() > 0;
+    }
+
+    private void seekByTenSeconds(boolean forward) {
+        if (!canSeek()) {
+            showGestureFeedback("Bu yayında sarma yok");
+            return;
+        }
+        long position = player.getCurrentPosition() + (forward ? 10_000L : -10_000L);
+        player.seekTo(Math.max(0L, Math.min(player.getDuration() - 1L, position)));
+        savePlaybackPosition();
+        updateProgressLabels();
+        showGestureFeedback(forward ? "+10 sn" : "−10 sn");
+        if (controlsVisible) showControlsTemporarily();
+    }
+
+    private float mediaVolumeFraction() {
+        if (audioManager == null) return 0f;
+        return (float) audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            / Math.max(1, audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+    }
+
+    private void adjustGestureLevel(float distanceUp) {
+        float level = Math.max(0f, Math.min(1f, gestureStartLevel + distanceUp / Math.max(1f, root.getHeight() * 0.5f)));
+        if (rightGesture) {
+            if (audioManager == null || audioManager.isVolumeFixed()) return;
+            int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            int volume = Math.round(level * maxVolume);
+            if (volume != audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)) {
+                try {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume, 0);
+                } catch (SecurityException ignored) {
+                    return;
+                }
+            }
+            showGestureFeedback("Ses %" + Math.round(mediaVolumeFraction() * 100f));
+        } else {
+            setScreenBrightness(level);
+            showGestureFeedback("Parlaklık %" + Math.round(lastBrightness * 100f));
+        }
+    }
+
+    private void setScreenBrightness(float level) {
+        lastBrightness = Math.max(0.05f, Math.min(1f, level));
+        WindowManager.LayoutParams params = getWindow().getAttributes();
+        if (params.screenBrightness == lastBrightness) return;
+        params.screenBrightness = lastBrightness;
+        getWindow().setAttributes(params);
+    }
+
+    private void showGestureFeedback(String label) {
+        if (gestureFeedback == null || isInPictureInPictureMode()) return;
+        if (!label.contentEquals(gestureFeedback.getText())) gestureFeedback.setText(label);
+        gestureFeedback.setVisibility(View.VISIBLE);
+        controlsHandler.removeCallbacks(hideGestureFeedback);
+        controlsHandler.postDelayed(hideGestureFeedback, 850);
+    }
+
     private float pinchDistance(MotionEvent event) {
         if (event.getPointerCount() < 2) return 0f;
         float dx = event.getX(0) - event.getX(1);
@@ -766,6 +905,7 @@ public class NativePlayerActivity extends Activity {
 
     private void updateProgressLabels() {
         if (player == null || timeBar == null) return;
+        if (forwardButton != null) forwardButton.setEnabled(canSeek());
         long duration = player.getDuration();
         if (duration == C.TIME_UNSET || duration < 0) duration = 0;
         long position = Math.max(0, player.getCurrentPosition());
@@ -894,10 +1034,7 @@ public class NativePlayerActivity extends Activity {
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
                 if (!fromUser) return;
-                lastBrightness = Math.max(0.05f, value / 100f);
-                WindowManager.LayoutParams params = getWindow().getAttributes();
-                params.screenBrightness = lastBrightness;
-                getWindow().setAttributes(params);
+                setScreenBrightness(value / 100f);
             }
             public void onStartTrackingTouch(SeekBar bar) {}
             public void onStopTrackingTouch(SeekBar bar) {}
@@ -1000,6 +1137,10 @@ public class NativePlayerActivity extends Activity {
             releasePlayer();
             controlsHandler.removeCallbacks(hideControlsRunnable);
             controlsHandler.removeCallbacks(progressUpdater);
+            controlsHandler.removeCallbacks(showControlsAfterTap);
+            controlsHandler.removeCallbacks(hideGestureFeedback);
+            firstTapTime = -1L;
+            hideGestureFeedback.run();
             if (orientationListener != null) orientationListener.disable();
         }
         super.onStop();
