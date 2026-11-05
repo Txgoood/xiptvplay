@@ -30,3 +30,10 @@ export function normalizeEpisodeDuration(...values: Array<{ value: unknown; unit
   }
   return undefined;
 }
+
+export function formatRuntimeMinutes(value: unknown): string | undefined {
+  const duration = normalizeEpisodeDuration({ value });
+  if (!duration) return undefined;
+  const seconds = duration.split(':').reduce((total, part) => total * 60 + Number(part), 0);
+  return seconds > 0 ? `${Math.max(1, Math.round(seconds / 60))} dk` : undefined;
+}

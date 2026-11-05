@@ -1,3 +1,4 @@
+import { normalizeEpisodeDuration } from './episodeDuration';
 import { MediaItem } from '../types';
 import { XtreamClientService } from './xtreamClient';
 import { isNative, httpGetText, fetchWithProtocolFallback } from './net';
@@ -207,6 +208,7 @@ export class M3UParserService {
       tvgName?: string;
       tvgLogo?: string;
       groupTitle?: string;
+      duration?: string;
     } | null = null;
 
     let epgUrl: string | undefined = undefined;
@@ -245,6 +247,7 @@ export class M3UParserService {
           tvgName: repairTurkishEncoding(tvgName),
           tvgLogo,
           groupTitle: repairTurkishEncoding(groupTitle),
+          duration: attrSection.match(/^\s*(\d+(?:\.\d+)?)(?=\s|$)/)?.[1],
         };
         continue;
       }
@@ -361,6 +364,7 @@ export class M3UParserService {
           title: itemTitle,
           category: group,
           type,
+          duration: type === 'live' ? undefined : normalizeEpisodeDuration({ value: currentExtinf.duration, unit: 'seconds' }),
           resolution,
           poster:
             currentExtinf.tvgLogo ||

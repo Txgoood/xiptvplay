@@ -27,7 +27,7 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
         <img className={`w-full h-full ${live ? 'object-contain p-3' : 'object-cover'}`} src={item.poster || '/brand/xiptvplay-icon.svg'} alt="" loading="lazy" decoding="async"
           onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = '/brand/xiptvplay-icon.svg'; }} />
       </button>
-      {item.type === 'movie' && <MovieCollectionBadge media={item}/>}
+      {!live && <MovieCollectionBadge media={item} showRuntime />}
       <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 pointer-events-none" />
       <span className="absolute bottom-2 left-2 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-[#00f0ff] pointer-events-none">{live ? 'CANLI' : series ? 'DİZİ' : 'FİLM'}</span>
       {rating && <span className="absolute bottom-2 right-2 rounded bg-black/70 text-amber-300 px-1.5 py-0.5 text-[11px] pointer-events-none" title="Sağlayıcı puanı / 10">★ {rating}</span>}
@@ -43,7 +43,7 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
       </button>
       {view === 'details' && <div className="text-xs text-[#b9cacb] flex flex-wrap gap-x-3 gap-y-1">
         <span>{live ? 'Canlı TV' : series ? 'Dizi' : 'Film'}</span><span>{item.resolution}</span>
-        {item.year && <span>{item.year}</span>}{item.duration && <span>{item.duration}</span>}
+        {item.year && <span>{item.year}</span>}
         {item.addedAt && <span>Eklendi: {new Date(item.addedAt).toLocaleDateString('tr-TR')}</span>}
         {item.releaseDate && <span>İlk yayın: {item.releaseDate}</span>}
       </div>}

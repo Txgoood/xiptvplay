@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeEpisodeDuration } from '../src/services/episodeDuration';
+import { formatRuntimeMinutes, normalizeEpisodeDuration } from '../src/services/episodeDuration';
 
 test('zero Xtream runtimes are ignored and seconds fallback is used', () => {
   assert.equal(normalizeEpisodeDuration({ value: '00:00:00' }, { value: 2820, unit: 'seconds' }), '47:00');
@@ -37,4 +37,12 @@ test('series episode_run_time can recover missing per-episode runtime', () => {
     { value: '00:00:00' },
     { value: undefined },
   ), undefined);
+});
+
+test('catalog runtime displays minutes and skips unavailable metadata', () => {
+  assert.equal(formatRuntimeMinutes('01:47:12'), '107 dk');
+  assert.equal(formatRuntimeMinutes('46:55'), '47 dk');
+  assert.equal(formatRuntimeMinutes(48), '48 dk');
+  assert.equal(formatRuntimeMinutes('00:00:00'), undefined);
+  assert.equal(formatRuntimeMinutes('unknown'), undefined);
 });

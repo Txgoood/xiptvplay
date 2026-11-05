@@ -4,6 +4,8 @@ import { FollowButton } from './FollowingShelf';
 import { updateFollowing } from '../../services/seriesFollowing';
 import { XtreamClientService } from '../../services/xtreamClient';
 import { IptvService } from '../../services/iptvService';
+import { formatRuntimeMinutes } from '../../services/episodeDuration';
+import { getTmdbDetails, peekTmdbDetails } from '../../services/tmdbClient';
 import {
   X,
   Play,
@@ -45,6 +47,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   profileId = 'parent',
 }) => {
   const [verifiedDetail,setVerifiedDetail]=useState<SeriesDetail | undefined>();
+  const [typicalRuntime, setTypicalRuntime] = useState<number>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seriesDetail, setSeriesDetail] = useState<SeriesDetail | null>(null);
@@ -60,6 +63,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
 
     let cancelled = false;
     setVerifiedDetail(undefined);
+    setTypicalRuntime(undefined);
     setSeriesDetail(null);
     setSelectedSeason(1);
     const loadSeriesInfo = async () => {
@@ -73,6 +77,14 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
       if (res.success && res.seriesDetail) {
         if (!res.isFallback) { setVerifiedDetail(res.seriesDetail); updateFollowing(profileId,seriesItem.id,res.seriesDetail); }
         setSeriesDetail(res.seriesDetail);
+        if (activePlaylist?.type === 'xtream' && !formatRuntimeMinutes(seriesItem.duration) &&
+            Object.values(res.seriesDetail.episodes).some(list => list.some(episode => !formatRuntimeMinutes(episode.duration)))) {
+          const cached = peekTmdbDetails(seriesItem);
+          if (cached) setTypicalRuntime(cached.runtimeMinutes);
+          else void getTmdbDetails(seriesItem).then(details => {
+            if (!cancelled) setTypicalRuntime(details.runtimeMinutes);
+          }).catch(() => {});
+        }
         if (res.seriesDetail.seasons.length > 0) {
           const requestedSeason = res.seriesDetail.seasons.find((season) => season.seasonNumber === initialSeason);
           setSelectedSeason(requestedSeason?.seasonNumber ?? res.seriesDetail.seasons[0].seasonNumber);
@@ -288,6 +300,10 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                     const seasonStr = String(episode.seasonNum).padStart(2, '0');
                     const epStr = String(episode.episodeNum).padStart(2, '0');
                     const episodeCode = `S${seasonStr}E${epStr}`;
+                    const episodeRuntime = formatRuntimeMinutes(episode.duration);
+                    const fallbackRuntime = activePlaylist?.type === 'xtream' ? formatRuntimeMinutes(seriesItem.duration) || formatRuntimeMinutes(typicalRuntime) : undefined;
+                    const runtime = episodeRuntime || fallbackRuntime;
+                    const approximate = episode.durationIsApproximate || !episodeRuntime;
 
                     return (
                       <div
@@ -330,12 +346,10 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                             )}
 
                             <div className="flex items-center gap-2 mt-1 text-[10px] text-[#849495] font-mono">
-                              {episode.duration && !/^(?:0+(?::0+){0,2}|0+\s*(?:dk|dakika|min))$/i.test(String(episode.duration).trim()) && (
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-[#849495]" />
-                                  {episode.duration}
-                                </span>
-                              )}
+                              <span className="flex items-center gap-1" title={runtime ? (approximate ? 'Yaklaşık bölüm süresi' : 'Bölüm süresi') : 'Süre bilgisi yok'}>
+                                <Clock className="w-3 h-3 text-[#849495]" />
+                                {runtime ? (approximate ? '~' + runtime : runtime) : '—'}
+                              </span>
                               <span>•</span>
                               <span className="uppercase text-[#00f0ff]">
                                 {episode.containerExtension || 'mp4'}

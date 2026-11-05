@@ -1,7 +1,7 @@
 # XIPTV Play Android — Proje durumu / Tek Dal Birleştirme
 
 **Resmî Android dalı:** `tek-dal-birlestirme-xiptvplay-android`  
-**Yeni sürüm:** `v1.4.13 (versionCode 21)`  
+**Yeni sürüm:** `v1.4.14 (versionCode 22)`  
 **Depo:** https://github.com/Txgoood/xiptvplay  
 **Derleme:** https://github.com/Txgoood/xiptvplay/actions/workflows/main.yml  
 **Kontrol durumu:** Kaynak dosyaları incelendi ve regresyon testleri eklendi; GitHub Actions / fiziksel cihaz sonucu ayrıca doğrulanmalı.
@@ -52,3 +52,9 @@
 - `tests/download-watch-progress.test.ts` yeni regresyon testi eklendi.
 - Yalnızca tamamlanmış indirmeler için görüntülenir; dosyanın indirme yüzdesi izleme ilerlemesi sanılmaz.
 - Android yerel oynatıcısında mevcut son oynatma konumu, oyuncu kapanıp uygulamaya dönüldüğünde izleme geçmişine yazılır. Fiziksel cihaz testi bekleniyor.
+
+## 5 Kasım 2026 — Katalog yenileme ve süreler
+- Xtream film/dizi kategori istekleri ikişer yürütülür. Hata halinde tek istekle devam edilir; dizi genel taraması ve önceki katalog koruması sürer.
+- Film ve dizi kartlarında süre gösterilir. Bölüm listesi, bölüm süresi eksik olduğunda varsa dizi genel süresini yaklaşık olarak işaretler.
+- Sağlayıcı süreleri önceliklidir. TMDB yedeği, katalogda görünen kartlarla sınırlı mevcut iş kuyruğunu kullanır.
+- Başarılı önceki APK: [v1.4.13 · GitHub Actions #315](https://github.com/Txgoood/xiptvplay/actions/runs/41779831292). Yeni APK için CI ve cihaz sonucu bekleniyor.

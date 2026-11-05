@@ -143,6 +143,7 @@ export interface SeriesEpisode {
   title: string;
   containerExtension: string;
   duration?: string;
+  durationIsApproximate?: boolean;
   plot?: string;
   rating?: string;
   releaseDate?: string;

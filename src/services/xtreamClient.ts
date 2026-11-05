@@ -199,6 +199,7 @@ export class XtreamClientService {
           { type: 'movie', categories: 'vodCategories', list: 'vodStreams', catAction: 'get_vod_categories', action: 'get_vod_streams' },
           { type: 'series', categories: 'seriesCategories', list: 'seriesList', catAction: 'get_series_categories', action: 'get_series' },
         ] as const;
+        const result: XtreamCatalogResult = { items: [], counts: { live: 0, movie: 0, series: 0 } };
         for (const section of sections) {
           try {
             if (!data[section.list]) {
@@ -208,15 +209,30 @@ export class XtreamClientService {
                 // Keep each bridge response small on older Android devices.
                 const combined = new Map<string, any>();
                 const deadline = Date.now() + 180000;
-                for (const category of categories) {
-                  if (Date.now() > deadline) throw new Error('Kategori listeleri için süre sınırı aşıldı; tekrar deneyin.');
+                const categoryIds = categories.map(category => {
                   const id = String(category.category_id ?? '');
                   if (!id) throw new Error('Sunucu geçersiz kategori kimliği döndürdü.');
-                  const batch = await fetchNativeAction(section.action, id);
-                  for (const entry of batch) {
-                    const key = entry.stream_id ?? entry.series_id;
-                    if (key == null) throw new Error('Sunucu eksik içerik kimliği döndürdü.');
-                    combined.set(String(key), entry);
+                  return id;
+                });
+                const loadCategory = (id: string) => {
+                  if (Date.now() > deadline) throw new Error('Kategori listeleri için süre sınırı aşıldı; tekrar deneyin.');
+                  return fetchNativeAction(section.action, id);
+                };
+                let batchSize = 2;
+                for (let offset = 0; offset < categoryIds.length;) {
+                  // Büyük listeleri parçalara ayır ve sağlayıcı paralel istekleri reddederse sırayla devam et.
+                  const ids = categoryIds.slice(offset, offset + batchSize);
+                  const batches = await Promise.allSettled(ids.map(loadCategory));
+                  offset += ids.length;
+                  for (const [index, result] of batches.entries()) {
+                    if (result.status === 'rejected' && ids.length === 1) throw result.reason;
+                    if (result.status === 'rejected') batchSize = 1;
+                    const entries = result.status === 'fulfilled' ? result.value : await loadCategory(ids[index]);
+                    for (const entry of entries) {
+                      const key = entry.stream_id ?? entry.series_id;
+                      if (key == null) throw new Error('Sunucu eksik içerik kimliği döndürdü.');
+                      combined.set(String(key), entry);
+                    }
                   }
                 }
                 if (section.type === 'series') {
@@ -239,6 +255,8 @@ export class XtreamClientService {
             }
             const sectionData = { [section.categories]: data[section.categories], [section.list]: data[section.list] };
             const parsed = this.processCatalogData(sectionData, cleanUrl, username, password, playlistId);
+            result.items = result.items.concat(parsed.items);
+            result.counts[section.type] = parsed.counts[section.type];
             onSection?.(section.type, parsed.items);
           } catch (error: any) {
             errors.push(section.type + ': ' + (error?.message || 'Liste alınamadı.'));
@@ -246,7 +264,7 @@ export class XtreamClientService {
         }
         if (errors.length) throw new Error(errors.join(' | '));
         this.partialCatalogs.delete(cacheKey);
-        return this.processCatalogData(data, cleanUrl, username, password, playlistId);
+        return result;
       } catch (err: any) {
         console.warn('[XtreamClient] Native catalog fetch failed:', err?.message || 'unknown');
         throw new Error(err?.message || 'IPTV kataloğu alınamadı. Sunucu ya da ağ bağlantısını kontrol edin.');
@@ -320,6 +338,7 @@ export class XtreamClientService {
             title: vod.name || 'İsimsiz Film',
             category: categoryName,
             type: 'movie',
+            duration: normalizeEpisodeDuration({ value: vod.duration }, { value: vod.duration_secs ?? vod.duration_seconds, unit: 'seconds' }, { value: vod.runtime }),
             resolution: vod.name?.toUpperCase().includes('4K') ? '4K UHD' : '1080p HEVC',
             year: vod.year ? parseInt(vod.year, 10) : undefined,
             rating: catalogRating(vod.rating) || catalogRating(vod.rating_5based, true),
@@ -353,6 +372,7 @@ export class XtreamClientService {
             title: series.name || 'İsimsiz Dizi',
             category: categoryName,
             type: 'series',
+            duration: normalizeEpisodeDuration({ value: series.episode_run_time }, { value: series.episode_runtime }, { value: series.runtime }),
             resolution: 'FHD 60P',
             rating: catalogRating(series.rating) || catalogRating(series.rating_5based, true),
             addedAt: catalogTimestamp(series.added),
@@ -447,6 +467,7 @@ export class XtreamClientService {
       const rawInfo = data.info || {};
       const rawSeasons = data.seasons || [];
       const rawEpisodes = data.episodes || {};
+      const typicalDuration = normalizeEpisodeDuration({ value: rawInfo.episode_run_time }, { value: rawInfo.episode_runtime }, { value: rawInfo.runtime });
 
       const seasonsList: SeriesSeason[] = [];
       if (Array.isArray(rawSeasons)) {
@@ -475,6 +496,18 @@ export class XtreamClientService {
               const safeUrl = this.getSafeStreamUrl(directStreamUrl);
 
               const info = ep.info || {};
+              const duration = normalizeEpisodeDuration(
+                { value: info.duration },
+                { value: ep.duration },
+                { value: info.duration_secs, unit: 'seconds' },
+                { value: ep.duration_secs, unit: 'seconds' },
+                { value: info.duration_seconds, unit: 'seconds' },
+                { value: ep.duration_seconds, unit: 'seconds' },
+                { value: info.runtime },
+                { value: ep.runtime },
+                { value: info.episode_run_time },
+                { value: ep.episode_run_time },
+              );
               const epNum = Number(ep.episode_num || 1);
               const seasonNum = Number(ep.season || seasonKey || 1);
 
@@ -484,23 +517,8 @@ export class XtreamClientService {
                 seasonNum: seasonNum,
                 title: ep.title || info.name || `Bölüm ${epNum}`,
                 containerExtension: ext,
-                duration: normalizeEpisodeDuration(
-                  { value: info.duration },
-                  { value: ep.duration },
-                  { value: info.duration_secs, unit: 'seconds' },
-                  { value: ep.duration_secs, unit: 'seconds' },
-                  { value: info.duration_seconds, unit: 'seconds' },
-                  { value: ep.duration_seconds, unit: 'seconds' },
-                  { value: info.runtime },
-                  { value: ep.runtime },
-                  // Xtream providers may omit per-episode durations but return
-                  // episode_run_time for the series (typical episode length).
-                  { value: info.episode_run_time },
-                  { value: ep.episode_run_time },
-                  { value: rawInfo.episode_run_time },
-                  { value: rawInfo.episode_runtime },
-                  { value: rawInfo.runtime },
-                ),
+                duration: duration || typicalDuration,
+                durationIsApproximate: !duration && Boolean(typicalDuration),
                 plot: info.plot || info.description,
                 rating: info.rating ? String(info.rating) : undefined,
                 releaseDate: info.releasedate || info.release_date,

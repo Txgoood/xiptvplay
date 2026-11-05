@@ -2,7 +2,7 @@ import type { MediaItem } from '../types';
 import { normalizeTmdbTitle, tmdbTitleQueries } from './tmdbTitle';
 import { getTmdbDetails, savedChoices, type MovieCollectionPart, type TmdbDetails } from './tmdbClient';
 
-type MovieIndexEntry = { signature: string; until: number; tmdbId: number; collection: { id: number; name: string } | null };
+type MovieIndexEntry = { signature: string; until: number; tmdbId: number; runtimeMinutes?: number | null; collection: { id: number; name: string } | null };
 const KEY = 'xiptvplay_movie_collection_index_v1';
 let index: Record<string, MovieIndexEntry> | undefined;
 const listeners = new Map<string, Set<() => void>>();
@@ -12,7 +12,7 @@ const failedUntil = new Map<string, number>();
 const jobs = new Map<string, Promise<void>>();
 const queue: Array<() => Promise<void>> = [];
 let active = 0, saveTimer: ReturnType<typeof setTimeout> | undefined;
-const signature = (media: MediaItem) => JSON.stringify([media.title, media.year, media.tmdbId]);
+const signature = (media: MediaItem) => JSON.stringify([media.title, media.year, media.tmdbId, media.imdbId]);
 function entries(): Record<string, MovieIndexEntry> {
   if (!index) { try { index = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { index = {}; } }
   return index!;
@@ -23,10 +23,12 @@ export function movieCollectionStatus(media: MediaItem): MovieIndexEntry | undef
   return entry?.until > Date.now() && entry.signature === signature(media) && (!manual || manual === entry.tmdbId) ? entry : undefined;
 }
 export function rememberMovieCollection(media: MediaItem, data: TmdbDetails) {
-  if (media.type !== 'movie' || !Object.hasOwn(data, 'collection')) return;
-  entries()[media.id] = { signature: signature(media), until: Date.now() + 7 * 86400000, tmdbId: data.id, collection: data.collection || null };
+  if (media.type === 'movie' && Object.hasOwn(data, 'collection')) rememberCatalogDetails(media, data);
+}
+function rememberCatalogDetails(media: MediaItem, data: TmdbDetails) {
+  entries()[media.id] = { signature: signature(media), until: Date.now() + 7 * 86400000, tmdbId: data.id, runtimeMinutes: data.runtimeMinutes ?? null, collection: data.collection || null };
   listeners.get(media.id)?.forEach(listener => listener());
-  changeListeners.forEach(listener => listener(data.id));
+  if (media.type === 'movie') changeListeners.forEach(listener => listener(data.id));
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try {
@@ -45,15 +47,15 @@ function pump() {
     void job().finally(() => { active--; pump(); });
   }
 }
-export function ensureMovieCollection(media: MediaItem): Promise<void> {
-  if (media.type !== 'movie' || movieCollectionStatus(media) || (failedUntil.get(media.id) || 0) > Date.now()) return Promise.resolve();
+export function ensureCatalogDetails(media: MediaItem): Promise<void> {
+  if (media.type === 'live' || movieCollectionStatus(media)?.runtimeMinutes !== undefined || (failedUntil.get(media.id) || 0) > Date.now()) return Promise.resolve();
   const existing = jobs.get(media.id); if (existing) return existing;
   // Hızlı kaydırmada görünmeyen afişler sınırsız arka plan kuyruğu oluşturmaz.
   if (queue.length >= 32) return Promise.resolve();
   // Büyük katalogda yalnızca ekranda görünen afişler kontrol edilir.
   const work = new Promise<void>(resolve => {
     queue.push(async () => {
-      try { rememberMovieCollection(media, await getTmdbDetails(media)); }
+      try { rememberCatalogDetails(media, await getTmdbDetails(media)); }
       catch { failedUntil.set(media.id, Date.now() + 5 * 60000); if (failedUntil.size > 2000) failedUntil.delete(failedUntil.keys().next().value!); }
       finally { jobs.delete(media.id); resolve(); }
     });

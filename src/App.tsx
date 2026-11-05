@@ -492,7 +492,7 @@ export default function App() {
         ]);
       }finally{if(deadline)clearTimeout(deadline);}
     };
-    if(isSelected())setIsCatalogLoading(true);
+    if(isSelected())setIsCatalogLoading(StorageService.getPlaylistItems(id).length === 0);
     setPlaylists(prev=>prev.map(p=>p.id===id?{...p,lastSync:'Yenileniyor',statusLabel:'Bağlantı kontrol ediliyor...',errorMessage:undefined}:p));
     try {
       let items:MediaItem[]=[];
