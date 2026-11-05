@@ -84,4 +84,4 @@
 
 ## 5 Kasım 2026 — Film afişleri
 - Film kartları da boş, varsayılan veya yüklenemeyen sağlayıcı afişlerinde mevcut TMDB afişi ve arka plan görseli yedeğini kullanır.
-- v1.4.19 (27) APK doğrulaması bekleniyor.
+- v1.4.19 (27), commit `160acbe`. Katalog testleri, Android derlemesi, APK imzası ve emülatör kontrolleri geçti. Film afişleri gerçek katalogda fiziksel cihazda henüz doğrulanmadı. [Derleme #321](https://github.com/Txgoood/xiptvplay/actions/runs/42091307783) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/42091307783/artifacts/13444094817).
