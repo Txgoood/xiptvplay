@@ -64,4 +64,4 @@
 ## 5 Kasım 2026 — Sağlayıcı detayından süre okuma
 - Android, toplu katalogda süre yoksa görünür film ve dizi kartları için Xtream detay uçlarını sırayla sorgular. Video akışı açılmaz.
 - Film ve bölüm için sağlayıcının saniye ve iç medya üstverisi alanları okunur. Dizide genel süre eksikse mevcut bölüm sürelerinin medyanı yaklaşık süre olarak kullanılır.
-- v1.4.15 (23) APK doğrulaması bekleniyor.
+- v1.4.15 (23), commit `e60f970`. Tür denetimi, süre testleri, web derlemesi, Gradle ve APK imza doğrulaması geçti. Euroturk ile fiziksel cihaz testi henüz yapılmadı. [Derleme #317](https://github.com/Txgoood/xiptvplay/actions/runs/42076360446) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/42076360446/artifacts/13437404833).
