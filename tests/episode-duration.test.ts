@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatRuntimeMinutes, normalizeEpisodeDuration } from '../src/services/episodeDuration';
+import { formatRuntimeMinutes, normalizeEpisodeDuration, readXtreamDuration, typicalEpisodeDuration } from '../src/services/episodeDuration';
 
 test('zero Xtream runtimes are ignored and seconds fallback is used', () => {
   assert.equal(normalizeEpisodeDuration({ value: '00:00:00' }, { value: 2820, unit: 'seconds' }), '47:00');
@@ -45,4 +45,11 @@ test('catalog runtime displays minutes and skips unavailable metadata', () => {
   assert.equal(formatRuntimeMinutes(48), '48 dk');
   assert.equal(formatRuntimeMinutes('00:00:00'), undefined);
   assert.equal(formatRuntimeMinutes('unknown'), undefined);
+});
+
+test('Xtream detail can expose duration in seconds and nested stream metadata', () => {
+  assert.equal(readXtreamDuration({ duration: '00:00:00', video: { tags: { DURATION: '00:46:30.045000000' } } }), '46:30');
+  assert.equal(readXtreamDuration({ duration_secs: '0' }, { format: { duration: '6440.120' } }), '1:47:20');
+  assert.equal(readXtreamDuration({ duration: 'N/A', video: {} }), undefined);
+  assert.equal(typicalEpisodeDuration([undefined, '44:00', '48:00']), '46:00');
 });

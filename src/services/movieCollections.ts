@@ -1,3 +1,5 @@
+import { StorageService } from './storage';
+import { XtreamClientService } from './xtreamClient';
 import type { MediaItem } from '../types';
 import { normalizeTmdbTitle, tmdbTitleQueries } from './tmdbTitle';
 import { getTmdbDetails, savedChoices, type MovieCollectionPart, type TmdbDetails } from './tmdbClient';
@@ -8,6 +10,31 @@ let index: Record<string, MovieIndexEntry> | undefined;
 const listeners = new Map<string, Set<() => void>>();
 const changeListeners = new Set<(tmdbId: number) => void>();
 export function subscribeCollectionMatches(listener: (tmdbId: number) => void) { changeListeners.add(listener); return () => { changeListeners.delete(listener); }; }
+const providerRuntimes = new Map<string, { duration?: string; until: number }>();
+let providerRequest: Promise<void> = Promise.resolve();
+
+export function catalogProviderRuntime(media: MediaItem): string | undefined {
+  return providerRuntimes.get(media.id)?.duration;
+}
+
+async function loadProviderRuntime(media: MediaItem) {
+  const { id, streamId, type, playlistId } = media;
+  if (media.duration || type === 'live' || streamId == null || !playlistId) return;
+  const playlist = StorageService.getPlaylists().find(item => item.id === playlistId);
+  if (playlist?.type !== 'xtream' || !playlist.serverUrl || !playlist.username || !playlist.password) return;
+  const { serverUrl, username, password } = playlist;
+  if ((providerRuntimes.get(id)?.until || 0) > Date.now()) return;
+  providerRequest = providerRequest.then(async () => {
+    let duration: string | undefined;
+    try { duration = await XtreamClientService.fetchCatalogRuntime(serverUrl, username, password, streamId, type); }
+    catch { /* Sağlayıcı detay vermezse TMDB yedeği kullanılır. */ }
+    providerRuntimes.set(id, { duration, until: Date.now() + (duration ? 3600000 : 300000) });
+    if (providerRuntimes.size > 3000) providerRuntimes.delete(providerRuntimes.keys().next().value!);
+    if (duration) listeners.get(id)?.forEach(listener => listener());
+  });
+  await providerRequest;
+}
+
 const failedUntil = new Map<string, number>();
 const jobs = new Map<string, Promise<void>>();
 const queue: Array<() => Promise<void>> = [];
@@ -48,14 +75,22 @@ function pump() {
   }
 }
 export function ensureCatalogDetails(media: MediaItem): Promise<void> {
-  if (media.type === 'live' || movieCollectionStatus(media)?.runtimeMinutes !== undefined || (failedUntil.get(media.id) || 0) > Date.now()) return Promise.resolve();
+  if (media.type === 'live') return Promise.resolve();
+  const shouldLoadTmdb = () => movieCollectionStatus(media)?.runtimeMinutes === undefined && (failedUntil.get(media.id) || 0) <= Date.now();
+  const shouldLoadProvider = !media.duration && (providerRuntimes.get(media.id)?.until || 0) <= Date.now();
+  if (!shouldLoadProvider && !shouldLoadTmdb()) return Promise.resolve();
   const existing = jobs.get(media.id); if (existing) return existing;
   // Hızlı kaydırmada görünmeyen afişler sınırsız arka plan kuyruğu oluşturmaz.
   if (queue.length >= 32) return Promise.resolve();
   // Büyük katalogda yalnızca ekranda görünen afişler kontrol edilir.
   const work = new Promise<void>(resolve => {
     queue.push(async () => {
-      try { rememberCatalogDetails(media, await getTmdbDetails(media)); }
+      try {
+        if (shouldLoadProvider) await loadProviderRuntime(media);
+        if (shouldLoadTmdb() && (media.type === 'movie' || !catalogProviderRuntime(media))) {
+          rememberCatalogDetails(media, await getTmdbDetails(media));
+        }
+      }
       catch { failedUntil.set(media.id, Date.now() + 5 * 60000); if (failedUntil.size > 2000) failedUntil.delete(failedUntil.keys().next().value!); }
       finally { jobs.delete(media.id); resolve(); }
     });

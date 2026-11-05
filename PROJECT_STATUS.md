@@ -1,7 +1,7 @@
 # XIPTV Play Android — Proje durumu / Tek Dal Birleştirme
 
 **Resmî Android dalı:** `tek-dal-birlestirme-xiptvplay-android`  
-**Yeni sürüm:** `v1.4.14 (versionCode 22)`  
+**Yeni sürüm:** `v1.4.15 (versionCode 23)`  
 **Depo:** https://github.com/Txgoood/xiptvplay  
 **Derleme:** https://github.com/Txgoood/xiptvplay/actions/workflows/main.yml  
 **Kontrol durumu:** Kaynak dosyaları incelendi ve regresyon testleri eklendi; GitHub Actions / fiziksel cihaz sonucu ayrıca doğrulanmalı.
@@ -60,3 +60,8 @@
 - Başarılı önceki APK: [v1.4.13 · GitHub Actions #315](https://github.com/Txgoood/xiptvplay/actions/runs/41779831292).
 - Değişiklik commit'i: `f663380`. Tür denetimi, katalog testleri, web derlemesi, Gradle ve APK imza doğrulaması geçti. Fiziksel cihazda yenileme süresi henüz ölçülmedi.
 - [v1.4.14 (22) · GitHub Actions #316](https://github.com/Txgoood/xiptvplay/actions/runs/42073808321) · [app-debug APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/42073808321/artifacts/13435834795).
+
+## 5 Kasım 2026 — Sağlayıcı detayından süre okuma
+- Android, toplu katalogda süre yoksa görünür film ve dizi kartları için Xtream detay uçlarını sırayla sorgular. Video akışı açılmaz.
+- Film ve bölüm için sağlayıcının saniye ve iç medya üstverisi alanları okunur. Dizide genel süre eksikse mevcut bölüm sürelerinin medyanı yaklaşık süre olarak kullanılır.
+- v1.4.15 (23) APK doğrulaması bekleniyor.

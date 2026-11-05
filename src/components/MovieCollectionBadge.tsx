@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Clock, Layers3 } from 'lucide-react';
 import type { MediaItem } from '../types';
 import { formatRuntimeMinutes } from '../services/episodeDuration';
-import { ensureCatalogDetails, movieCollectionStatus, subscribeMovieCollection } from '../services/movieCollections';
+import { catalogProviderRuntime, ensureCatalogDetails, movieCollectionStatus, subscribeMovieCollection } from '../services/movieCollections';
 
 export function MovieCollectionBadge({ media, showRuntime = false }: { media: MediaItem; showRuntime?: boolean }) {
   const target = useRef<HTMLSpanElement>(null);
@@ -21,7 +21,7 @@ export function MovieCollectionBadge({ media, showRuntime = false }: { media: Me
   }, [media.id, media.title, media.year, media.tmdbId, media.imdbId, media.type, media.duration, showRuntime]);
   if (media.type === 'live' || (media.type === 'series' && !showRuntime)) return null;
   const collection = media.type === 'movie' ? entry?.collection : null;
-  const providerRuntime = formatRuntimeMinutes(media.duration);
+  const providerRuntime = formatRuntimeMinutes(media.duration || catalogProviderRuntime(media));
   const runtime = providerRuntime || formatRuntimeMinutes(entry?.runtimeMinutes);
   const approximate = media.type === 'series' && !(providerRuntime && (media.episodeNumber || media.id.startsWith('m3u-')));
   return <><span ref={target} role={collection ? 'img' : undefined} aria-label={collection ? `Film serisi: ${collection.name}` : undefined} aria-hidden={!collection}

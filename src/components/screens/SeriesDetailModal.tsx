@@ -4,6 +4,7 @@ import { FollowButton } from './FollowingShelf';
 import { updateFollowing } from '../../services/seriesFollowing';
 import { XtreamClientService } from '../../services/xtreamClient';
 import { IptvService } from '../../services/iptvService';
+import { catalogProviderRuntime } from '../../services/movieCollections';
 import { formatRuntimeMinutes } from '../../services/episodeDuration';
 import { getTmdbDetails, peekTmdbDetails } from '../../services/tmdbClient';
 import {
@@ -77,7 +78,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
       if (res.success && res.seriesDetail) {
         if (!res.isFallback) { setVerifiedDetail(res.seriesDetail); updateFollowing(profileId,seriesItem.id,res.seriesDetail); }
         setSeriesDetail(res.seriesDetail);
-        if (activePlaylist?.type === 'xtream' && !formatRuntimeMinutes(seriesItem.duration) &&
+        if (activePlaylist?.type === 'xtream' && !formatRuntimeMinutes(seriesItem.duration || catalogProviderRuntime(seriesItem)) &&
             Object.values(res.seriesDetail.episodes).some(list => list.some(episode => !formatRuntimeMinutes(episode.duration)))) {
           const cached = peekTmdbDetails(seriesItem);
           if (cached) setTypicalRuntime(cached.runtimeMinutes);
@@ -301,7 +302,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                     const epStr = String(episode.episodeNum).padStart(2, '0');
                     const episodeCode = `S${seasonStr}E${epStr}`;
                     const episodeRuntime = formatRuntimeMinutes(episode.duration);
-                    const fallbackRuntime = activePlaylist?.type === 'xtream' ? formatRuntimeMinutes(seriesItem.duration) || formatRuntimeMinutes(typicalRuntime) : undefined;
+                    const fallbackRuntime = activePlaylist?.type === 'xtream' ? formatRuntimeMinutes(seriesItem.duration || catalogProviderRuntime(seriesItem)) || formatRuntimeMinutes(typicalRuntime) : undefined;
                     const runtime = episodeRuntime || fallbackRuntime;
                     const approximate = episode.durationIsApproximate || !episodeRuntime;
 

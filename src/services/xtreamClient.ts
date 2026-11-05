@@ -1,6 +1,6 @@
 import { MediaItem, XtreamUserInfo, XtreamServerInfo, SeriesDetail, SeriesEpisode, SeriesSeason } from '../types';
 import { isNative, httpGetJson, httpGetCatalogJson } from './net';
-import { normalizeEpisodeDuration } from './episodeDuration';
+import { normalizeEpisodeDuration, readXtreamDuration, typicalEpisodeDuration } from './episodeDuration';
 import { catalogTimestamp, catalogRating, catalogReleaseDate } from './catalogDiscovery';
 
 export interface XtreamVerificationResult {
@@ -338,7 +338,7 @@ export class XtreamClientService {
             title: vod.name || 'İsimsiz Film',
             category: categoryName,
             type: 'movie',
-            duration: normalizeEpisodeDuration({ value: vod.duration }, { value: vod.duration_secs ?? vod.duration_seconds, unit: 'seconds' }, { value: vod.runtime }),
+            duration: readXtreamDuration(vod),
             resolution: vod.name?.toUpperCase().includes('4K') ? '4K UHD' : '1080p HEVC',
             year: vod.year ? parseInt(vod.year, 10) : undefined,
             rating: catalogRating(vod.rating) || catalogRating(vod.rating_5based, true),
@@ -407,6 +407,22 @@ export class XtreamClientService {
    * Builds safe stream URLs for each episode in Xtream format:
    * ${baseHost}/series/${username}/${password}/${episodeStreamId}.${containerExtension || 'mp4'}
    */
+  static async fetchCatalogRuntime(serverUrl: string, username: string, password: string, streamId: string | number, type: 'movie' | 'series'): Promise<string | undefined> {
+    if (!isNative() || !/^\d+$/.test(String(streamId))) return undefined;
+    const action = type === 'movie' ? 'get_vod_info' : 'get_series_info';
+    const idField = type === 'movie' ? 'vod_id' : 'series_id';
+    const params = new URLSearchParams({ username, password, action, [idField]: String(streamId) });
+    const data = await httpGetCatalogJson(`${this.normalizeServerUrl(serverUrl)}/player_api.php?${params}`, 8000);
+    if (type === 'movie') return readXtreamDuration(data?.info, data?.movie_data, data);
+    const info = data?.info;
+    const declared = readXtreamDuration(info);
+    if (declared) return declared;
+    const seasons = Object.values(data?.episodes || {});
+    return typicalEpisodeDuration(seasons.flatMap(season => Array.isArray(season)
+      ? season.map(episode => readXtreamDuration(episode?.info, episode))
+      : []));
+  }
+
   static async fetchSeriesInfo(
     serverUrl: string,
     username: string,
@@ -467,7 +483,7 @@ export class XtreamClientService {
       const rawInfo = data.info || {};
       const rawSeasons = data.seasons || [];
       const rawEpisodes = data.episodes || {};
-      const typicalDuration = normalizeEpisodeDuration({ value: rawInfo.episode_run_time }, { value: rawInfo.episode_runtime }, { value: rawInfo.runtime });
+      const typicalDuration = normalizeEpisodeDuration({ value: rawInfo.episode_run_time }, { value: rawInfo.episode_runtime }, { value: rawInfo.runtime }) || readXtreamDuration(rawInfo);
 
       const seasonsList: SeriesSeason[] = [];
       if (Array.isArray(rawSeasons)) {
@@ -496,18 +512,7 @@ export class XtreamClientService {
               const safeUrl = this.getSafeStreamUrl(directStreamUrl);
 
               const info = ep.info || {};
-              const duration = normalizeEpisodeDuration(
-                { value: info.duration },
-                { value: ep.duration },
-                { value: info.duration_secs, unit: 'seconds' },
-                { value: ep.duration_secs, unit: 'seconds' },
-                { value: info.duration_seconds, unit: 'seconds' },
-                { value: ep.duration_seconds, unit: 'seconds' },
-                { value: info.runtime },
-                { value: ep.runtime },
-                { value: info.episode_run_time },
-                { value: ep.episode_run_time },
-              );
+              const duration = readXtreamDuration(info, ep);
               const epNum = Number(ep.episode_num || 1);
               const seasonNum = Number(ep.season || seasonKey || 1);
 
