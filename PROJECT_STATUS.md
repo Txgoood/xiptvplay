@@ -1,7 +1,7 @@
 # XIPTV Play Android — Proje durumu / Tek Dal Birleştirme
 
 **Resmî Android dalı:** `tek-dal-birlestirme-xiptvplay-android`  
-**Yeni sürüm:** `v1.4.17 (versionCode 25)`  
+**Yeni sürüm:** `v1.4.18 (versionCode 26)`  
 **Depo:** https://github.com/Txgoood/xiptvplay  
 **Derleme:** https://github.com/Txgoood/xiptvplay/actions/workflows/main.yml  
 **Kontrol durumu:** Kaynak dosyaları incelendi ve regresyon testleri eklendi; GitHub Actions / fiziksel cihaz sonucu ayrıca doğrulanmalı.
@@ -76,3 +76,8 @@
 - Süreler tek yerel önbellekte en fazla 1000 kayıtla sınırlıdır; değişmeyen süre tekrar yazılmaz ve katalog için medya akışı açılmaz.
 - Yerel oynatıcı sonraki bölüme geçmişse ilk bölümün kimliğine son bölümün süresi kaydedilmez. Sonraki bölümün otomatik geçişle öğrenilen süresi bu sürümde ayrıca kaydedilmez.
 - v1.4.17 (25), commit `4cbe15e`. Süre kayıt testleri, web derlemesi, Android derlemesi, imza ve emülatör kontrolleri geçti. Fold 7 performansı henüz ölçülmedi. [Derleme #319](https://github.com/Txgoood/xiptvplay/actions/runs/42081821957) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/42081821957/artifacts/13440912210).
+
+## 5 Kasım 2026 — Katalog dizi afişleri
+- Sağlayıcı afişi boş veya bozuk olduğunda, görünür dizi kartı mevcut TMDB eşleştirmesinden afişi veya arka plan görselini alır.
+- Sonuçlar mevcut önbelleğe kaydedilir. Eşleşme yoksa başlıklı yer tutucu gösterilir. Katalog ve benzer içerik kartları aynı bileşeni kullanır.
+- v1.4.18 (26) APK doğrulaması bekleniyor.

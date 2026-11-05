@@ -1,3 +1,4 @@
+import { CatalogPoster } from '../CatalogPoster';
 import { CalendarDays, Download, Heart, Info, Layers, Play } from 'lucide-react';
 import { MovieCollectionBadge } from '../MovieCollectionBadge';
 import type { MediaItem } from '../../types';
@@ -24,8 +25,7 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
   return <article className={`catalog-card catalog-card--${view} group min-w-0 rounded-2xl bg-[#1c1b1d] border border-white/5 overflow-hidden hover:border-[#00f0ff]/30`}>
     <div className="catalog-card-poster relative bg-[#2a2a2c] overflow-hidden">
       <button type="button" onClick={open} className="block w-full h-full" aria-label={`${item.title} ${live ? 'izle' : 'bilgileri'}`}>
-        <img className={`w-full h-full ${live ? 'object-contain p-3' : 'object-cover'}`} src={item.poster || '/brand/xiptvplay-icon.svg'} alt="" loading="lazy" decoding="async"
-          onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = '/brand/xiptvplay-icon.svg'; }} />
+        <CatalogPoster media={item} className={`w-full h-full ${live ? 'object-contain p-3' : 'object-cover'}`} />
       </button>
       {!live && <MovieCollectionBadge media={item} showRuntime />}
       <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 pointer-events-none" />

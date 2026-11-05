@@ -4,7 +4,7 @@ import type { MediaItem } from '../types';
 import { normalizeTmdbTitle, tmdbTitleQueries } from './tmdbTitle';
 import { getTmdbDetails, savedChoices, type MovieCollectionPart, type TmdbDetails } from './tmdbClient';
 
-type MovieIndexEntry = { signature: string; until: number; tmdbId: number; runtimeMinutes?: number | null; collection: { id: number; name: string } | null };
+type MovieIndexEntry = { signature: string; until: number; tmdbId: number; runtimeMinutes?: number | null; poster?: string | null; backdrop?: string | null; collection: { id: number; name: string } | null };
 const KEY = 'xiptvplay_movie_collection_index_v1';
 let index: Record<string, MovieIndexEntry> | undefined;
 const listeners = new Map<string, Set<() => void>>();
@@ -49,11 +49,10 @@ export function movieCollectionStatus(media: MediaItem): MovieIndexEntry | undef
   const manual = savedChoices()[media.id];
   return entry?.until > Date.now() && entry.signature === signature(media) && (!manual || manual === entry.tmdbId) ? entry : undefined;
 }
-export function rememberMovieCollection(media: MediaItem, data: TmdbDetails) {
-  if (media.type === 'movie' && Object.hasOwn(data, 'collection')) rememberCatalogDetails(media, data);
-}
-function rememberCatalogDetails(media: MediaItem, data: TmdbDetails) {
-  entries()[media.id] = { signature: signature(media), until: Date.now() + 7 * 86400000, tmdbId: data.id, runtimeMinutes: data.runtimeMinutes ?? null, collection: data.collection || null };
+export function rememberCatalogDetails(media: MediaItem, data: TmdbDetails) {
+  const manual = savedChoices()[media.id];
+  if (manual && manual !== data.id) return;
+  entries()[media.id] = { signature: signature(media), until: Date.now() + 7 * 86400000, tmdbId: data.id, runtimeMinutes: data.runtimeMinutes ?? null, poster: data.poster || null, backdrop: data.backdrop || null, collection: data.collection || null };
   listeners.get(media.id)?.forEach(listener => listener());
   if (media.type === 'movie') changeListeners.forEach(listener => listener(data.id));
   clearTimeout(saveTimer);
@@ -74,28 +73,32 @@ function pump() {
     void job().finally(() => { active--; pump(); });
   }
 }
-export function ensureCatalogDetails(media: MediaItem): Promise<void> {
+export function ensureCatalogDetails(media: MediaItem, posterOnly = false): Promise<void> | undefined {
   if (media.type === 'live') return Promise.resolve();
-  const shouldLoadTmdb = () => movieCollectionStatus(media)?.runtimeMinutes === undefined && (failedUntil.get(media.id) || 0) <= Date.now();
-  const shouldLoadProvider = !media.duration && (providerRuntimes.get(media.id)?.until || 0) <= Date.now();
+  const jobKey = posterOnly ? `poster:${media.id}` : media.id;
+  const shouldLoadTmdb = () => {
+    const entry = movieCollectionStatus(media);
+    return (posterOnly ? entry?.poster === undefined : entry?.runtimeMinutes === undefined) && (failedUntil.get(jobKey) || 0) <= Date.now();
+  };
+  const shouldLoadProvider = !posterOnly && !media.duration && (providerRuntimes.get(media.id)?.until || 0) <= Date.now();
   if (!shouldLoadProvider && !shouldLoadTmdb()) return Promise.resolve();
-  const existing = jobs.get(media.id); if (existing) return existing;
+  const existing = jobs.get(jobKey); if (existing) return existing;
   // Hızlı kaydırmada görünmeyen afişler sınırsız arka plan kuyruğu oluşturmaz.
-  if (queue.length >= 32) return Promise.resolve();
+  if (queue.length >= 32) return posterOnly ? undefined : Promise.resolve();
   // Büyük katalogda yalnızca ekranda görünen afişler kontrol edilir.
   const work = new Promise<void>(resolve => {
     queue.push(async () => {
       try {
         if (shouldLoadProvider) await loadProviderRuntime(media);
-        if (shouldLoadTmdb() && (media.type === 'movie' || !catalogProviderRuntime(media))) {
+        if (shouldLoadTmdb() && (posterOnly || media.type === 'movie' || !catalogProviderRuntime(media))) {
           rememberCatalogDetails(media, await getTmdbDetails(media));
         }
       }
-      catch { failedUntil.set(media.id, Date.now() + 5 * 60000); if (failedUntil.size > 2000) failedUntil.delete(failedUntil.keys().next().value!); }
-      finally { jobs.delete(media.id); resolve(); }
+      catch { failedUntil.set(jobKey, Date.now() + 5 * 60000); if (failedUntil.size > 2000) failedUntil.delete(failedUntil.keys().next().value!); }
+      finally { jobs.delete(jobKey); resolve(); }
     });
   });
-  jobs.set(media.id, work); pump(); return work;
+  jobs.set(jobKey, work); pump(); return work;
 }
 
 export interface MatchedCollectionPart { part: MovieCollectionPart; media?: MediaItem }

@@ -3,7 +3,7 @@ import { X, Play, Download, Star, Film, Loader2, ExternalLink, Layers3 } from 'l
 import { MediaItem } from '../../types';
 import { getTmdbDetails, rememberTmdbChoice, searchTmdbChoices, TmdbClientError, type TmdbChoice, type TmdbDetails } from '../../services/tmdbClient';
 import { tmdbTitleQueries } from '../../services/tmdbTitle';
-import { rememberMovieCollection } from '../../services/movieCollections';
+import { rememberCatalogDetails } from '../../services/movieCollections';
 import { FollowButton } from './FollowingShelf';
 import { SimilarMediaSection } from './SimilarMediaSection';
 import { MovieCollectionSection } from './MovieCollectionSection';
@@ -43,7 +43,7 @@ export const TmdbInfoModal: React.FC<Props> = ({ profileId = 'parent', media, ca
     let active = true;
     setDetails(null); setError(null); setLoading(true);
     getTmdbDetails(media, selectedId)
-      .then(data => { rememberMovieCollection(media, data); if (active) setDetails(data); })
+      .then(data => { rememberCatalogDetails(media, data); if (active) setDetails(data); })
       .catch(err => { if (active) {
         setError(err.message || 'Bağlantı hatası');
         if (err instanceof TmdbClientError && err.candidates.length) { setChoices(err.candidates); setSearchOpen(true); }
