@@ -80,4 +80,4 @@
 ## 5 Kasım 2026 — Katalog dizi afişleri
 - Sağlayıcı afişi boş veya bozuk olduğunda, görünür dizi kartı mevcut TMDB eşleştirmesinden afişi veya arka plan görselini alır.
 - Sonuçlar mevcut önbelleğe kaydedilir. Eşleşme yoksa başlıklı yer tutucu gösterilir. Katalog ve benzer içerik kartları aynı bileşeni kullanır.
-- v1.4.18 (26) APK doğrulaması bekleniyor.
+- v1.4.18 (26), commit `d9fa166`. Katalog testleri, Android derlemesi, APK imzası ve emülatör kontrolleri geçti. Sağlayıcının gerçek kataloğunda afişler fiziksel cihazda henüz doğrulanmadı. [Derleme #320](https://github.com/Txgoood/xiptvplay/actions/runs/42087824977) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/42087824977/artifacts/13444336532).
