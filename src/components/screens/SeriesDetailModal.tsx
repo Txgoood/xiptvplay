@@ -4,6 +4,7 @@ import { FollowButton } from './FollowingShelf';
 import { updateFollowing } from '../../services/seriesFollowing';
 import { XtreamClientService } from '../../services/xtreamClient';
 import { IptvService } from '../../services/iptvService';
+import { playedDuration, subscribePlayedDurations } from '../../services/playedDuration';
 import { catalogProviderRuntime } from '../../services/movieCollections';
 import { formatRuntimeMinutes } from '../../services/episodeDuration';
 import { getTmdbDetails, peekTmdbDetails } from '../../services/tmdbClient';
@@ -49,6 +50,8 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
 }) => {
   const [verifiedDetail,setVerifiedDetail]=useState<SeriesDetail | undefined>();
   const [typicalRuntime, setTypicalRuntime] = useState<number>();
+  const [, updatePlayedDurations] = useState(0);
+  useEffect(() => subscribePlayedDurations(() => updatePlayedDurations(value => value + 1)), []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seriesDetail, setSeriesDetail] = useState<SeriesDetail | null>(null);
@@ -301,10 +304,11 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                     const seasonStr = String(episode.seasonNum).padStart(2, '0');
                     const epStr = String(episode.episodeNum).padStart(2, '0');
                     const episodeCode = `S${seasonStr}E${epStr}`;
-                    const episodeRuntime = formatRuntimeMinutes(episode.duration);
+                    const episodeRuntime = episode.durationIsApproximate ? undefined : formatRuntimeMinutes(episode.duration);
+                    const measuredRuntime = formatRuntimeMinutes((playedDuration(`ep-${seriesItem.id}-${episode.id}`) || 0) / 60);
                     const fallbackRuntime = activePlaylist?.type === 'xtream' ? formatRuntimeMinutes(seriesItem.duration || catalogProviderRuntime(seriesItem)) || formatRuntimeMinutes(typicalRuntime) : undefined;
-                    const runtime = episodeRuntime || fallbackRuntime;
-                    const approximate = episode.durationIsApproximate || !episodeRuntime;
+                    const runtime = episodeRuntime || measuredRuntime || formatRuntimeMinutes(episode.duration) || fallbackRuntime;
+                    const approximate = !episodeRuntime && !measuredRuntime;
 
                     return (
                       <div

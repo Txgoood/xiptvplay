@@ -3,7 +3,7 @@
 ## Tek resmî Android geliştirme dalı
 - **Branch:** `tek-dal-birlestirme-xiptvplay-android` (görünür adı: **tek dal birleştirme**).
 - **Repo:** `Txgoood/xiptvplay`.
-- **Referans sürüm:** `v1.4.16`, Android `versionCode=24`.
+- **Referans sürüm:** `v1.4.17`, Android `versionCode=25`.
 - **Geçmiş kaynak dallar:** `fix-series-on-build248-20261101` (dizi/katalog temeli) ve `fix-download-cancel-season-queue` (indirme/depolama/oynatıcı çalışmaları). Bunlar geçmiş referans olarak saklanır; yeni özellik geliştirme veya APK derlemesi bu dallarda yapılmaz.
 - **LG webOS:** ayrı repo, `Txgoood/xiptvplaywebosnew`; Android dalındaki kaynaklarla karıştırma.
 - Yeni sohbette önce bu dosyayı, `PROJECT_STATUS.md` dosyasını ve güncel branch durumunu oku. Ardından istenen değişikliğe başla.

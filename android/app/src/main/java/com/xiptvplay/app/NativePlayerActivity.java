@@ -614,6 +614,7 @@ public class NativePlayerActivity extends Activity {
         Intent historyData = new Intent();
         historyData.putExtra("positionMs", position);
         historyData.putExtra("durationMs", duration);
+        historyData.putExtra("sameMedia", currentUrl != null && currentUrl.equals(getIntent().getStringExtra("url")));
         setResult(Activity.RESULT_OK, historyData);
     }
 

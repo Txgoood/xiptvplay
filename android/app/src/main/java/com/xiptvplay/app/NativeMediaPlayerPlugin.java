@@ -61,6 +61,7 @@ public class NativeMediaPlayerPlugin extends Plugin {
         result.put("returnedToInline", returnedToInline);
         result.put("positionMs", data != null ? data.getLongExtra("positionMs", 0L) : 0L);
         result.put("durationMs", data != null ? data.getLongExtra("durationMs", 0L) : 0L);
+        result.put("sameMedia", data != null && data.getBooleanExtra("sameMedia", false));
         call.resolve(result);
     }
 }

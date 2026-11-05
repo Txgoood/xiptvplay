@@ -1,7 +1,7 @@
 # XIPTV Play Android — Proje durumu / Tek Dal Birleştirme
 
 **Resmî Android dalı:** `tek-dal-birlestirme-xiptvplay-android`  
-**Yeni sürüm:** `v1.4.16 (versionCode 24)`  
+**Yeni sürüm:** `v1.4.17 (versionCode 25)`  
 **Depo:** https://github.com/Txgoood/xiptvplay  
 **Derleme:** https://github.com/Txgoood/xiptvplay/actions/workflows/main.yml  
 **Kontrol durumu:** Kaynak dosyaları incelendi ve regresyon testleri eklendi; GitHub Actions / fiziksel cihaz sonucu ayrıca doğrulanmalı.
@@ -70,3 +70,9 @@
 - Zaman çubuğunun sağında +10 sn düğmesi. Görüntünün sağ ve sol yarısına çift dokunma sırasıyla +10 ve −10 saniye sarar.
 - Sağda dikey hareket medya sesini, solda dikey hareket oynatıcı penceresinin parlaklığını ayarlar. İki parmakla yakınlaştırma ve kontrol katmanı ayrı kalır.
 - v1.4.16 (24), commit `a5916f6`. Katalog testleri, web derlemesi, Gradle, APK imzası ve gerçek videoyla emülatör hareket testleri geçti. Fold 7 üzerinde fiziksel test bekleniyor. [Derleme #318](https://github.com/Txgoood/xiptvplay/actions/runs/42078660833) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/42078660833/artifacts/13438913571).
+
+## 5 Kasım 2026 — Oynatılan içerik süreleri
+- Sağlayıcıdaki bölüm/film süresi önceliklidir. Yoksa oynatıcıdan öğrenilen gerçek süre, daha sonra yaklaşık TMDB süresi gösterilir.
+- Süreler tek yerel önbellekte en fazla 1000 kayıtla sınırlıdır; değişmeyen süre tekrar yazılmaz ve katalog için medya akışı açılmaz.
+- Yerel oynatıcı sonraki bölüme geçmişse ilk bölümün kimliğine son bölümün süresi kaydedilmez. Sonraki bölümün otomatik geçişle öğrenilen süresi bu sürümde ayrıca kaydedilmez.
+- v1.4.17 (25) APK doğrulaması bekleniyor.

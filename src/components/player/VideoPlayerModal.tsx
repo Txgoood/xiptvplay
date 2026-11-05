@@ -1,3 +1,4 @@
+import { rememberPlayedDuration } from '../../services/playedDuration';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -40,7 +41,7 @@ interface VideoPlayerModalProps {
 const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 
 const NativeMediaPlayer = registerPlugin<{
-  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string; offlineEpisodeQueue?: Array<{uri: string; title: string}> }): Promise<{ started: boolean; returnedToInline?: boolean; positionMs?: number; durationMs?: number }>;
+  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string; offlineEpisodeQueue?: Array<{uri: string; title: string}> }): Promise<{ started: boolean; returnedToInline?: boolean; positionMs?: number; durationMs?: number; sameMedia?: boolean }>;
   stop(): Promise<void>;
 }>('NativeMediaPlayer');
 
@@ -376,6 +377,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         : {}),
     })
       .then((result) => {
+        if (result?.sameMedia && media) rememberPlayedDuration(media, Number(result.durationMs || 0) / 1000);
         if (result?.returnedToInline) {
           nativeResumePositionRef.current = Math.max(0, Number(result.positionMs || 0) / 1000);
           if (onProgress && nativeResumePositionRef.current > 0 && media) onProgress(media, nativeResumePositionRef.current, 0);
@@ -858,6 +860,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           ref={videoRef}
           key={`${media.id}-${fallbackStage}`}
           poster={media.poster}
+          onLoadedMetadata={event => { if (media) rememberPlayedDuration(media, event.currentTarget.duration); }}
           onTimeUpdate={handleTimeUpdate}
           onEnded={() => {
             setIsPlaying(false);
