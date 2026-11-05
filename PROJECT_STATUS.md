@@ -57,4 +57,6 @@
 - Xtream film/dizi kategori istekleri ikişer yürütülür. Hata halinde tek istekle devam edilir; dizi genel taraması ve önceki katalog koruması sürer.
 - Film ve dizi kartlarında süre gösterilir. Bölüm listesi, bölüm süresi eksik olduğunda varsa dizi genel süresini yaklaşık olarak işaretler.
 - Sağlayıcı süreleri önceliklidir. TMDB yedeği, katalogda görünen kartlarla sınırlı mevcut iş kuyruğunu kullanır.
-- Başarılı önceki APK: [v1.4.13 · GitHub Actions #315](https://github.com/Txgoood/xiptvplay/actions/runs/41779831292). Yeni APK için CI ve cihaz sonucu bekleniyor.
+- Başarılı önceki APK: [v1.4.13 · GitHub Actions #315](https://github.com/Txgoood/xiptvplay/actions/runs/41779831292).
+- Değişiklik commit'i: `f663380`. Tür denetimi, katalog testleri, web derlemesi, Gradle ve APK imza doğrulaması geçti. Fiziksel cihazda yenileme süresi henüz ölçülmedi.
+- [v1.4.14 (22) · GitHub Actions #316](https://github.com/Txgoood/xiptvplay/actions/runs/42073808321) · [app-debug APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/42073808321/artifacts/13435834795).
