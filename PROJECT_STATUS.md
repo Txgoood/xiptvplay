@@ -94,4 +94,4 @@
 ## 13 Kasım 2026 — İndirme hızı ve ilerleme ölçümü
 - Wi-Fi ve mobil veri aynı bağlantı, tampon ve yeniden deneme yolunu kullanır. Wi-Fi seçeneği yalnızca bağlantı iznini belirler.
 - İlerleme bildirimi yaklaşık saniyede bir aktarım iş parçacığının dışında güncellenir. Uygulama içi hız hesabı Android'in ölçüm zamanını kullanır.
-- v1.4.21 (29) APK doğrulaması bekleniyor.
+- v1.4.21 (29), commit `b4c99bd`. Derleme, otomatik testler, APK imzası ve emülatör kontrolleri geçti. Fiziksel cihazda aktarım hızı henüz ölçülmedi. [Derleme #323](https://github.com/Txgoood/xiptvplay/actions/runs/43444869294) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/43444869294/artifacts/14046479649).
