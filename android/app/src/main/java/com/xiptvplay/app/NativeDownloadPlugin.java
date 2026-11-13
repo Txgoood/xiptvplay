@@ -132,14 +132,20 @@ public class NativeDownloadPlugin extends Plugin {
                             if (count == -1) break;
                             output.write(buffer, 0, count);
                             received += count;
-                            DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, received, total, false);
                             long now = android.os.SystemClock.elapsedRealtime();
-                            if (now - lastEmit >= 900) {
+                            if (now - lastEmit >= 1000L) {
+                                final long progressBytes = received;
+                                final long totalBytes = total;
                                 JSObject event = new JSObject();
                                 event.put("id", id);
                                 event.put("bytes", received);
                                 event.put("contentLength", total);
-                                mainHandler.post(() -> notifyListeners("downloadProgress", event));
+                                event.put("sampledAtMs", now);
+                                mainHandler.post(() -> {
+                                    if (cancelled.get() || cancellations.get(id) != cancelled) return;
+                                    notifyListeners("downloadProgress", event);
+                                    DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, progressBytes, totalBytes, false);
+                                });
                                 lastEmit = now;
                             }
                         }
@@ -179,6 +185,7 @@ public class NativeDownloadPlugin extends Plugin {
                 JSObject finalEvent = new JSObject();
                 finalEvent.put("id", id);
                 finalEvent.put("bytes", target.length());
+                finalEvent.put("sampledAtMs", android.os.SystemClock.elapsedRealtime());
                 finalEvent.put("contentLength", total > 0 ? total : target.length());
                 mainHandler.post(() -> notifyListeners("downloadProgress", finalEvent));
                 JSObject result = new JSObject();

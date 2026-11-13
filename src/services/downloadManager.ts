@@ -8,7 +8,7 @@ type NativeDownloadBridge = {
   cancelDownload(options: { id: string }): Promise<void>;
   pauseDownload(options: { id: string }): Promise<void>;
   resumeDownload(options: { id: string }): Promise<void>;
-  addListener(eventName: 'downloadProgress', listenerFunc: (event: { id: string; bytes: number; contentLength: number }) => void): Promise<{ remove: () => Promise<void> }>;
+  addListener(eventName: 'downloadProgress', listenerFunc: (event: { id: string; bytes: number; contentLength: number; sampledAtMs: number }) => void): Promise<{ remove: () => Promise<void> }>;
 };
 const NativeDownload = registerPlugin<NativeDownloadBridge>('NativeDownload');
 
@@ -74,7 +74,7 @@ async function runSingleDownload(
 
   if (isNative()) {
     let lastBytes = 0;
-    let lastTime = Date.now();
+    let lastTime: number | undefined;
     let smoothedBytesPerSecond = 0;
 
     const progressHandler = (progress: any) => {
@@ -84,18 +84,21 @@ async function runSingleDownload(
       const percent = contentLength > 0 ? Math.floor((bytes / contentLength) * 100) : 0;
       const downloadedGb = bytes / 1e9;
 
-      const now = Date.now();
-      const dt = (now - lastTime) / 1000;
-      const deltaBytes = Math.max(0, bytes - lastBytes);
-      const instantaneousBps = dt > 0 ? deltaBytes / dt : 0;
-      // ETA tek bir yavaş/hızlı ölçümle zıplamasın diye son ölçümleri yumuşat.
-      smoothedBytesPerSecond = smoothedBytesPerSecond === 0
-        ? instantaneousBps
-        : (smoothedBytesPerSecond * 0.72) + (instantaneousBps * 0.28);
-      // Arayuzde MB/sn gosteriliyor: bit/saniye degil, bayt/saniye hesapla.
+      // WebView gecikmesi yerine Android'in baytları aldığı zamanı kullan.
+      const now = Number(progress.sampledAtMs);
+      if (Number.isFinite(now)) {
+        if (lastTime === undefined || bytes < lastBytes) {
+          smoothedBytesPerSecond = 0;
+        } else if (now > lastTime) {
+          const instantaneousBps = (bytes - lastBytes) * 1000 / (now - lastTime);
+          smoothedBytesPerSecond = smoothedBytesPerSecond === 0
+            ? instantaneousBps
+            : smoothedBytesPerSecond * 0.72 + instantaneousBps * 0.28;
+        }
+        lastBytes = bytes;
+        lastTime = now;
+      }
       const speedMbps = smoothedBytesPerSecond / 1e6;
-      lastBytes = Math.max(lastBytes, bytes);
-      lastTime = now;
 
       const remainingBytes = contentLength > 0 ? Math.max(0, contentLength - bytes) : 0;
       const etaSec = smoothedBytesPerSecond > 0 && remainingBytes > 0 ? remainingBytes / smoothedBytesPerSecond : 0;
@@ -136,6 +139,8 @@ async function runSingleDownload(
           const waitMs = 1200 * (attempt + 1);
           console.warn(`[DownloadManager] Temporary network error; retrying in ${waitMs}ms: `, message);
           await new Promise(resolve => setTimeout(resolve, waitMs));
+          lastTime = undefined;
+          smoothedBytesPerSecond = 0;
         }
       }
       if (cancelledDownloadIds.has(item.id)) throw new Error('İndirme iptal edildi.');
