@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class NativeDownloadPlugin extends Plugin {
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private static final ConcurrentHashMap<String, AtomicBoolean> cancellations = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, ParallelDownload> parallelTransfers = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, HttpURLConnection> connections = new ConcurrentHashMap<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private static final ConcurrentHashMap<String, PauseGate> pauseGates = new ConcurrentHashMap<>();
@@ -42,11 +43,11 @@ public class NativeDownloadPlugin extends Plugin {
         }
     }
 
-    private boolean hasActiveWifi() {
+    private boolean hasActiveTransport(int transport) {
         ConnectivityManager manager = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
         Network network = manager == null ? null : manager.getActiveNetwork();
         NetworkCapabilities capabilities = network == null ? null : manager.getNetworkCapabilities(network);
-        return capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+        return capabilities != null && capabilities.hasTransport(transport);
     }
 
     @PluginMethod
@@ -60,8 +61,10 @@ public class NativeDownloadPlugin extends Plugin {
             return;
         }
         final boolean wifiOnly = call.getBoolean("wifiOnly", true);
+        // Sınırlı sayıda eşzamanlı istekle sağlayıcının bağlantı kotasını koru.
+        final int mobileConnections = Math.max(2, Math.min(4, call.getInt("mobileConnections", 4)));
         final String wifiRequired = "Bu indirme için Wi-Fi bağlantısı gerekli. Mobil veri için Ayarlar’dan Sadece Wi-Fi seçeneğini kapatın.";
-        if (wifiOnly && !hasActiveWifi()) {
+        if (wifiOnly && !hasActiveTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
             call.reject(wifiRequired);
             return;
         }
@@ -83,9 +86,27 @@ public class NativeDownloadPlugin extends Plugin {
                 long total = -1L;
                 long lastEmit = 0L;
                 Exception lastError = null;
-                for (int attempt = 0; attempt < 5; attempt++) {
+                boolean parallelCompleted = false;
+                if (!wifiOnly && hasActiveTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                    ParallelDownload transfer = new ParallelDownload();
+                    parallelTransfers.put(id, transfer);
+                    try {
+                        parallelCompleted = transfer.download(new URL(url), target, mobileConnections, () -> {
+                            pauseGate.awaitResume(cancelled);
+                            if (cancelled.get()) throw new InterruptedException();
+                        }, (bytes, length) -> publishProgress(id, downloadTitle, cancelled, bytes, length));
+                    } finally {
+                        parallelTransfers.remove(id, transfer);
+                    }
                     if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
-                    if (wifiOnly && !hasActiveWifi()) throw new Exception(wifiRequired);
+                    if (!parallelCompleted) {
+                        DownloadForegroundService.clearDownloadProgress(id);
+                        publishProgress(id, downloadTitle, cancelled, 0L, -1L);
+                    }
+                }
+                for (int attempt = 0; !parallelCompleted && attempt < 5; attempt++) {
+                    if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
+                    if (wifiOnly && !hasActiveTransport(NetworkCapabilities.TRANSPORT_WIFI)) throw new Exception(wifiRequired);
                     HttpURLConnection connection = null;
                     try {
                         connection = (HttpURLConnection) new URL(url).openConnection();
@@ -124,7 +145,7 @@ public class NativeDownloadPlugin extends Plugin {
                         while (true) {
                             pauseGate.awaitResume(cancelled);
                             if (wifiOnly && android.os.SystemClock.elapsedRealtime() >= nextWifiCheck) {
-                                if (!hasActiveWifi()) throw new Exception(wifiRequired);
+                                if (!hasActiveTransport(NetworkCapabilities.TRANSPORT_WIFI)) throw new Exception(wifiRequired);
                                 nextWifiCheck = android.os.SystemClock.elapsedRealtime() + 1000L;
                             }
                             if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
@@ -134,18 +155,7 @@ public class NativeDownloadPlugin extends Plugin {
                             received += count;
                             long now = android.os.SystemClock.elapsedRealtime();
                             if (now - lastEmit >= 1000L) {
-                                final long progressBytes = received;
-                                final long totalBytes = total;
-                                JSObject event = new JSObject();
-                                event.put("id", id);
-                                event.put("bytes", received);
-                                event.put("contentLength", total);
-                                event.put("sampledAtMs", now);
-                                mainHandler.post(() -> {
-                                    if (cancelled.get() || cancellations.get(id) != cancelled) return;
-                                    notifyListeners("downloadProgress", event);
-                                    DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, progressBytes, totalBytes, false);
-                                });
+                                publishProgress(id, downloadTitle, cancelled, received, total);
                                 lastEmit = now;
                             }
                         }
@@ -209,12 +219,27 @@ public class NativeDownloadPlugin extends Plugin {
         });
     }
 
+    private void publishProgress(String id, String title, AtomicBoolean cancelled, long bytes, long total) {
+        JSObject event = new JSObject();
+        event.put("id", id);
+        event.put("bytes", bytes);
+        event.put("contentLength", total);
+        event.put("sampledAtMs", android.os.SystemClock.elapsedRealtime());
+        mainHandler.post(() -> {
+            if (cancelled.get() || cancellations.get(id) != cancelled) return;
+            notifyListeners("downloadProgress", event);
+            DownloadForegroundService.updateDownloadProgress(getContext(), id, title, bytes, total, false);
+        });
+    }
+
     public static void cancelDownloadById(String id) {
         if (id == null) return;
         AtomicBoolean flag = cancellations.get(id);
         if (flag != null) flag.set(true);
         PauseGate gate = pauseGates.get(id);
         if (gate != null) gate.resume();
+        ParallelDownload transfer = parallelTransfers.get(id);
+        if (transfer != null) transfer.cancel();
         HttpURLConnection connection = connections.get(id);
         if (connection != null) connection.disconnect();
     }

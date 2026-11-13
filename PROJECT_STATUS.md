@@ -1,7 +1,7 @@
 # XIPTV Play Android — Proje durumu / Tek Dal Birleştirme
 
 **Resmî Android dalı:** `tek-dal-birlestirme-xiptvplay-android`  
-**Yeni sürüm:** `v1.4.21 (versionCode 29)`  
+**Yeni sürüm:** `v1.4.22 (versionCode 30)`  
 **Depo:** https://github.com/Txgoood/xiptvplay  
 **Derleme:** https://github.com/Txgoood/xiptvplay/actions/workflows/main.yml  
 **Kontrol durumu:** Kaynak dosyaları incelendi ve regresyon testleri eklendi; GitHub Actions / fiziksel cihaz sonucu ayrıca doğrulanmalı.
@@ -95,3 +95,8 @@
 - Wi-Fi ve mobil veri aynı bağlantı, tampon ve yeniden deneme yolunu kullanır. Wi-Fi seçeneği yalnızca bağlantı iznini belirler.
 - İlerleme bildirimi yaklaşık saniyede bir aktarım iş parçacığının dışında güncellenir. Uygulama içi hız hesabı Android'in ölçüm zamanını kullanır.
 - v1.4.21 (29), commit `b4c99bd`. Derleme, otomatik testler, APK imzası ve emülatör kontrolleri geçti. Fiziksel cihazda aktarım hızı henüz ölçülmedi. [Derleme #323](https://github.com/Txgoood/xiptvplay/actions/runs/43444869294) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/43444869294/artifacts/14046479649).
+
+## 13 Kasım 2026 — Mobil veri indirme hızlandırması
+- Mobil veride, sağlayıcı byte aralıklarını kabul ederse büyük dosyalar 2–4 bağlantıyla indirilir. Uyumsuz yanıt veya bağlantı hatasında tek bağlantıya dönülür.
+- Wi-Fi indirme yolu ve bölüm kuyruğu korunur.
+- v1.4.22 (30) APK doğrulaması bekleniyor.

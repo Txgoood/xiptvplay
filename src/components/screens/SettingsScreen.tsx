@@ -20,7 +20,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   });
   const [bufferSeconds, setBufferSeconds] = useState(() => { const s = StorageService.getSettings(); return Number.isFinite(Number(s.bufferSeconds)) ? Math.max(3, Math.min(45, Number(s.bufferSeconds))) : 15; });
   const [wifiOnly, setWifiOnly] = useState(() => StorageService.isDownloadWifiOnly());
-  const [concurrency, setConcurrency] = useState(() => { const s = StorageService.getSettings(); return Number.isFinite(Number(s.downloadConcurrency)) ? Math.max(2, Math.min(16, Number(s.downloadConcurrency))) : 8; });
+  const [concurrency, setConcurrency] = useState(() => { const s = StorageService.getSettings(); return Number.isFinite(Number(s.downloadConcurrency)) ? Math.max(2, Math.min(4, Number(s.downloadConcurrency))) : 4; });
   const [defaultAudio, setDefaultAudio] = useState('Türkçe (Dublaj / Orijinal)');
   const [defaultSubtitle, setDefaultSubtitle] = useState('Türkçe (Kapalı)');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -152,14 +152,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
         <div className="flex flex-col gap-1.5 pt-1">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-[#e5e1e4] font-semibold">Eşzamanlı İndirme Soket Sayısı</span>
+            <span className="text-[#e5e1e4] font-semibold">Mobil Veride İndirme Bağlantısı</span>
             <span className="text-[#4edea3] font-mono font-bold">{concurrency} Hat</span>
           </div>
           <input
             type="range"
             min="2"
-            max="16"
-            step="2"
+            max="4"
+            step="1"
             value={concurrency}
             onChange={(e) => { const value = Number(e.target.value); setConcurrency(value); const settings = StorageService.getSettings(); if (!StorageService.saveSettings({ ...settings, downloadConcurrency: value })) showToast('İndirme ayarı kaydedilemedi'); }}
             className="w-full h-1.5 bg-[#2a2a2c] rounded-lg appearance-none cursor-pointer"

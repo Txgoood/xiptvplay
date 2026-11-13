@@ -4,7 +4,7 @@ import { DownloadItem, MediaItem } from '../types';
 import { StorageService } from './storage';
 import { DownloadNotifications } from './downloadNotifications';
 type NativeDownloadBridge = {
-  downloadFile(options: { id: string; url: string; path: string; title: string; wifiOnly: boolean }): Promise<{ path: string; fileUri: string; bytes: number }>;
+  downloadFile(options: { id: string; url: string; path: string; title: string; wifiOnly: boolean; mobileConnections: number }): Promise<{ path: string; fileUri: string; bytes: number }>;
   cancelDownload(options: { id: string }): Promise<void>;
   pauseDownload(options: { id: string }): Promise<void>;
   resumeDownload(options: { id: string }): Promise<void>;
@@ -129,6 +129,7 @@ async function runSingleDownload(
             path: fullPath,
             title: item.title,
             wifiOnly: StorageService.isDownloadWifiOnly(),
+            mobileConnections: Number(StorageService.getSettings().downloadConcurrency) || 4,
           });
           break;
         } catch (downloadError: any) {
