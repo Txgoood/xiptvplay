@@ -231,6 +231,10 @@ export class StorageService {
   /**
    * Retrieves app settings from storage.
    */
+  static isDownloadWifiOnly(): boolean {
+    return this.getSettings().wifiOnly !== false;
+  }
+
   static getSettings(): Record<string, any> {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);

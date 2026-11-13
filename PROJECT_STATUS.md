@@ -1,7 +1,7 @@
 # XIPTV Play Android — Proje durumu / Tek Dal Birleştirme
 
 **Resmî Android dalı:** `tek-dal-birlestirme-xiptvplay-android`  
-**Yeni sürüm:** `v1.4.19 (versionCode 27)`  
+**Yeni sürüm:** `v1.4.20 (versionCode 28)`  
 **Depo:** https://github.com/Txgoood/xiptvplay  
 **Derleme:** https://github.com/Txgoood/xiptvplay/actions/workflows/main.yml  
 **Kontrol durumu:** Kaynak dosyaları incelendi ve regresyon testleri eklendi; GitHub Actions / fiziksel cihaz sonucu ayrıca doğrulanmalı.
@@ -85,3 +85,8 @@
 ## 5 Kasım 2026 — Film afişleri
 - Film kartları da boş, varsayılan veya yüklenemeyen sağlayıcı afişlerinde mevcut TMDB afişi ve arka plan görseli yedeğini kullanır.
 - v1.4.19 (27), commit `160acbe`. Katalog testleri, Android derlemesi, APK imzası ve emülatör kontrolleri geçti. Film afişleri gerçek katalogda fiziksel cihazda henüz doğrulanmadı. [Derleme #321](https://github.com/Txgoood/xiptvplay/actions/runs/42091307783) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/42091307783/artifacts/13444094817).
+
+## 13 Kasım 2026 — Mobil veride indirme
+- Yalnızca Wi-Fi ayarı kalıcı olarak kaydedilir ve sıradaki manuel indirme başlarken Android servisine iletilir. Yeni zamanlanmış indirmeler bu ayarı varsayılan alır. Kayıtlı planlar kendi seçimini korur.
+- Katalogdan aynı içeriği tekrar indirmek eski hata kaydını değiştirir.
+- v1.4.20 (28) APK doğrulaması bekleniyor.

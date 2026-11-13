@@ -1,5 +1,9 @@
 package com.xiptvplay.app;
 
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.os.Handler;
 import android.os.Looper;
 import com.getcapacitor.JSObject;
@@ -38,6 +42,13 @@ public class NativeDownloadPlugin extends Plugin {
         }
     }
 
+    private boolean hasActiveWifi() {
+        ConnectivityManager manager = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        Network network = manager == null ? null : manager.getActiveNetwork();
+        NetworkCapabilities capabilities = network == null ? null : manager.getNetworkCapabilities(network);
+        return capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+    }
+
     @PluginMethod
     public void downloadFile(PluginCall call) {
         final String id = call.getString("id");
@@ -46,6 +57,12 @@ public class NativeDownloadPlugin extends Plugin {
         final String downloadTitle = call.getString("title", "İndiriliyor");
         if (id == null || id.isEmpty() || url == null || url.isEmpty() || relativePath == null || relativePath.isEmpty()) {
             call.reject("İndirme bilgileri eksik.");
+            return;
+        }
+        final boolean wifiOnly = call.getBoolean("wifiOnly", true);
+        final String wifiRequired = "Bu indirme için Wi-Fi bağlantısı gerekli. Mobil veri için Ayarlar’dan Sadece Wi-Fi seçeneğini kapatın.";
+        if (wifiOnly && !hasActiveWifi()) {
+            call.reject(wifiRequired);
             return;
         }
         final AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -68,6 +85,7 @@ public class NativeDownloadPlugin extends Plugin {
                 Exception lastError = null;
                 for (int attempt = 0; attempt < 5; attempt++) {
                     if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
+                    if (wifiOnly && !hasActiveWifi()) throw new Exception(wifiRequired);
                     HttpURLConnection connection = null;
                     try {
                         connection = (HttpURLConnection) new URL(url).openConnection();
@@ -102,8 +120,13 @@ public class NativeDownloadPlugin extends Plugin {
                         output = new BufferedOutputStream(new FileOutputStream(target, append), 256 * 1024);
                         byte[] buffer = new byte[256 * 1024];
                         int count;
+                        long nextWifiCheck = 0L;
                         while (true) {
                             pauseGate.awaitResume(cancelled);
+                            if (wifiOnly && android.os.SystemClock.elapsedRealtime() >= nextWifiCheck) {
+                                if (!hasActiveWifi()) throw new Exception(wifiRequired);
+                                nextWifiCheck = android.os.SystemClock.elapsedRealtime() + 1000L;
+                            }
                             if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
                             count = input.read(buffer);
                             if (count == -1) break;

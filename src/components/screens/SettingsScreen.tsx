@@ -19,7 +19,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     return settings.hardwareDecoder || 'HEVC/H.265 Donanım Hızlandırıcı (MediaCodec)';
   });
   const [bufferSeconds, setBufferSeconds] = useState(() => { const s = StorageService.getSettings(); return Number.isFinite(Number(s.bufferSeconds)) ? Math.max(3, Math.min(45, Number(s.bufferSeconds))) : 15; });
-  const [wifiOnly, setWifiOnly] = useState(stats.wifiOnly);
+  const [wifiOnly, setWifiOnly] = useState(() => StorageService.isDownloadWifiOnly());
   const [concurrency, setConcurrency] = useState(() => { const s = StorageService.getSettings(); return Number.isFinite(Number(s.downloadConcurrency)) ? Math.max(2, Math.min(16, Number(s.downloadConcurrency))) : 8; });
   const [defaultAudio, setDefaultAudio] = useState('Türkçe (Dublaj / Orijinal)');
   const [defaultSubtitle, setDefaultSubtitle] = useState('Türkçe (Kapalı)');
@@ -126,9 +126,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
           <button
             type="button"
+            role="switch"
+            aria-label="Sadece Wi-Fi Üzerinden İndir"
+            aria-checked={wifiOnly}
             onClick={() => {
-              setWifiOnly(!wifiOnly);
-              showToast(!wifiOnly ? 'Wi-Fi koruması açık' : 'Mobil veri izni verildi');
+              const next = !wifiOnly;
+              if (!StorageService.saveSettings({ ...StorageService.getSettings(), wifiOnly: next })) {
+                showToast('İndirme ayarı kaydedilemedi');
+                return;
+              }
+              setWifiOnly(next);
+              showToast(next ? 'Wi-Fi koruması açık' : 'Mobil veri izni verildi');
             }}
             className={`w-11 h-6 rounded-full transition-colors duration-200 p-0.5 flex items-center shrink-0 cursor-pointer ${
               wifiOnly ? 'bg-[#0566d9]' : 'bg-[#2a2a2c]'

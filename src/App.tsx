@@ -657,7 +657,7 @@ export default function App() {
 
   const handleDownloadMedia = (item: MediaItem) => {
     if (isChildProfile) { showToast('Çocuk profilinde indirme kapalı.'); return; }
-    const existing = downloads.find((d) => d.mediaId === item.id);
+    const existing = downloads.find((d) => d.mediaId === item.id && d.status !== 'error');
     if (existing) {
       showToast(`"${item.title}" zaten indirme listesinde mevcut.`);
       setCurrentScreen('downloads');
@@ -689,7 +689,7 @@ export default function App() {
       ...(item.episodeTitle ? { episodeTitle: item.episodeTitle } : {}),
     };
 
-    setDownloads((prev) => [newDownload, ...prev]);
+    setDownloads((prev) => [newDownload, ...prev.filter(d => d.mediaId !== item.id || d.status !== 'error')]);
     showToast(`"${item.title}" indirme başlatılıyor...`);
     void DownloadNotifications.progress(newDownload.id, item.title, 0, 'İndirme başlatılıyor');
     

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarClock, Wifi, BatteryCharging, Moon, X } from 'lucide-react';
 import type { MediaItem } from '../../types';
+import { StorageService } from '../../services/storage';
 import { ScheduleService, type ScheduledDownload } from '../../services/downloadSchedule';
 
 interface Props {
@@ -21,7 +22,7 @@ export const ScheduleDownloadModal: React.FC<Props> = ({items,onClose,onSaved}) 
  const [date,setDate]=useState(asLocalInput(new Date(Date.now()+3600000)));
  const [start,setStart]=useState('02:00');
  const [end,setEnd]=useState('07:00');
- const [wifiOnly,setWifiOnly]=useState(true);
+ const [wifiOnly,setWifiOnly]=useState(() => StorageService.isDownloadWifiOnly());
  const [chargingOnly,setChargingOnly]=useState(false);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');

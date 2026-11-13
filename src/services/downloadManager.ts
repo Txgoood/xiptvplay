@@ -1,9 +1,10 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { DownloadItem, MediaItem } from '../types';
+import { StorageService } from './storage';
 import { DownloadNotifications } from './downloadNotifications';
 type NativeDownloadBridge = {
-  downloadFile(options: { id: string; url: string; path: string; title: string }): Promise<{ path: string; fileUri: string; bytes: number }>;
+  downloadFile(options: { id: string; url: string; path: string; title: string; wifiOnly: boolean }): Promise<{ path: string; fileUri: string; bytes: number }>;
   cancelDownload(options: { id: string }): Promise<void>;
   pauseDownload(options: { id: string }): Promise<void>;
   resumeDownload(options: { id: string }): Promise<void>;
@@ -51,8 +52,8 @@ async function runSingleDownload(
   onDone: (localUrl: string, relativePath?: string, fileUri?: string) => void,
   onError: (error: string) => void
 ) {
-  // Sadece Wi-Fi kontrolü
-  if ((navigator as any).connection?.type === 'cellular') {
+  // Android bağlantı türünü yerel indirme servisi doğrular.
+  if (!isNative() && StorageService.isDownloadWifiOnly() && (navigator as any).connection?.type === 'cellular') {
     onError('Sadece Wi-Fi üzerinden indirme izinli.');
     return;
   }
@@ -119,7 +120,13 @@ async function runSingleDownload(
       let result: any;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          result = await NativeDownload.downloadFile({ id: item.id, url: rawUrl, path: fullPath, title: item.title });
+          result = await NativeDownload.downloadFile({
+            id: item.id,
+            url: rawUrl,
+            path: fullPath,
+            title: item.title,
+            wifiOnly: StorageService.isDownloadWifiOnly(),
+          });
           break;
         } catch (downloadError: any) {
           const message = String(downloadError?.message || downloadError || '');
