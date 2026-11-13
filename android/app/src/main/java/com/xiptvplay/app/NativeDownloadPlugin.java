@@ -104,7 +104,8 @@ public class NativeDownloadPlugin extends Plugin {
                         publishProgress(id, downloadTitle, cancelled, 0L, -1L);
                     }
                 }
-                for (int attempt = 0; !parallelCompleted && attempt < 5; attempt++) {
+                for (int attempt = 0; attempt < 5; attempt++) {
+                    if (parallelCompleted) break;
                     if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
                     if (wifiOnly && !hasActiveTransport(NetworkCapabilities.TRANSPORT_WIFI)) throw new Exception(wifiRequired);
                     HttpURLConnection connection = null;
