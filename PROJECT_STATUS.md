@@ -89,4 +89,4 @@
 ## 13 Kasım 2026 — Mobil veride indirme
 - Yalnızca Wi-Fi ayarı kalıcı olarak kaydedilir ve sıradaki manuel indirme başlarken Android servisine iletilir. Yeni zamanlanmış indirmeler bu ayarı varsayılan alır. Kayıtlı planlar kendi seçimini korur.
 - Katalogdan aynı içeriği tekrar indirmek eski hata kaydını değiştirir.
-- v1.4.20 (28) APK doğrulaması bekleniyor.
+- v1.4.20 (28), commit `bdeb3cb`. Otomatik testler, Android derlemesi, APK imzası ve emülatör kontrolleri geçti. Fiziksel cihazda hücresel indirme henüz doğrulanmadı. [Derleme #322](https://github.com/Txgoood/xiptvplay/actions/runs/43438528075) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/43438528075/artifacts/14045076541).
