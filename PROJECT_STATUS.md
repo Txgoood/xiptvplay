@@ -99,4 +99,4 @@
 ## 13 Kasım 2026 — Mobil veri indirme hızlandırması
 - Mobil veride, sağlayıcı byte aralıklarını kabul ederse büyük dosyalar 2–4 bağlantıyla indirilir. Uyumsuz yanıt veya bağlantı hatasında tek bağlantıya dönülür.
 - Wi-Fi indirme yolu ve bölüm kuyruğu korunur.
-- v1.4.22 (30) APK doğrulaması bekleniyor.
+- v1.4.22 (30), commit `41992d4`. Android derlemesi, imza, dosya bütünlüğü testleri ve emülatör kontrolleri geçti. Mobil veride gerçek aktarım hızı henüz ölçülmedi. [Derleme #326](https://github.com/Txgoood/xiptvplay/actions/runs/43454368484) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/43454368484/artifacts/14051709639).
