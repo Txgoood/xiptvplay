@@ -62,6 +62,13 @@ public class NativeMediaPlayerPlugin extends Plugin {
         result.put("positionMs", data != null ? data.getLongExtra("positionMs", 0L) : 0L);
         result.put("durationMs", data != null ? data.getLongExtra("durationMs", 0L) : 0L);
         result.put("sameMedia", data != null && data.getBooleanExtra("sameMedia", false));
+        if (data != null && data.hasExtra("history")) {
+            try {
+                result.put("history", new org.json.JSONArray(data.getStringExtra("history")));
+            } catch (org.json.JSONException ignored) {
+                // Eski oynatıcı sonuçları tek konum bilgisi taşır.
+            }
+        }
         call.resolve(result);
     }
 }

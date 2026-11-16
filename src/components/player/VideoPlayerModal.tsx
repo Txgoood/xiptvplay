@@ -41,7 +41,7 @@ interface VideoPlayerModalProps {
 const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 
 const NativeMediaPlayer = registerPlugin<{
-  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string; offlineEpisodeQueue?: Array<{uri: string; title: string}> }): Promise<{ started: boolean; returnedToInline?: boolean; positionMs?: number; durationMs?: number; sameMedia?: boolean }>;
+  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string; offlineEpisodeQueue?: Array<{uri: string; title: string}> }): Promise<{ started: boolean; returnedToInline?: boolean; positionMs?: number; durationMs?: number; sameMedia?: boolean; history?: { index: number; positionMs: number; durationMs: number; completed: boolean }[] }>;
   stop(): Promise<void>;
 }>('NativeMediaPlayer');
 
@@ -349,10 +349,12 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     if (nativeLaunchKeyRef.current === launchKey) return;
     nativeLaunchKeyRef.current = launchKey;
 
-    const mediaData = media as any;
-    const nextEpisode = mediaData.nextEpisode || mediaData.nextEpisodeItem || null;
-    const nextEpisodeUrl = mediaData.nextEpisodeUrl || nextEpisode?.streamUrl || nextEpisode?.url || null;
-    const nextEpisodeTitle = mediaData.nextEpisodeTitle || nextEpisode?.title || nextEpisode?.name || null;
+    const mediaData = media as typeof media & Pick<MediaItem, 'nativeEpisodeQueue' | 'nextEpisodeUrl' | 'nextEpisodeTitle' | 'nextNextEpisodeUrl' | 'nextNextEpisodeTitle'> & Pick<DownloadItem, 'fileUri'>;
+    const episodeQueue = mediaData.nativeEpisodeQueue || [];
+    const { nativeEpisodeQueue: _queue, ...initialMedia } = mediaData;
+    const nextEpisode = episodeQueue[0]?.media;
+    const nextEpisodeUrl = mediaData.nextEpisodeUrl || nextEpisode?.streamUrl || null;
+    const nextEpisodeTitle = mediaData.nextEpisodeTitle || nextEpisode?.title || null;
     const nextNextEpisodeUrl = mediaData.nextNextEpisodeUrl || null;
     const nextNextEpisodeTitle = mediaData.nextNextEpisodeTitle || null;
 
@@ -372,19 +374,24 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       ...(media.type === 'series' && nextEpisodeTitle ? { nextTitle: nextEpisodeTitle } : {}),
       ...(media.type === 'series' && nextNextEpisodeUrl ? { nextNextUrl: nextNextEpisodeUrl } : {}),
       ...(media.type === 'series' && nextNextEpisodeTitle ? { nextNextTitle: nextNextEpisodeTitle } : {}),
-      ...(media.type === 'series' && Array.isArray(mediaData.offlineEpisodeQueue)
-        ? { offlineEpisodeQueue: mediaData.offlineEpisodeQueue }
+      ...(episodeQueue.length > 0
+        ? { offlineEpisodeQueue: episodeQueue.map(({ uri, media }) => ({ uri, title: media.title })) }
         : {}),
     })
       .then((result) => {
-        if (result?.sameMedia && media) rememberPlayedDuration(media, Number(result.durationMs || 0) / 1000);
-        if (result?.returnedToInline) {
+        for (const checkpoint of result?.history || []) {
+          const watched = checkpoint.index === 0 ? initialMedia : episodeQueue[checkpoint.index - 1]?.media;
+          if (!watched) continue;
+          const position = checkpoint.positionMs / 1000;
+          const duration = checkpoint.durationMs / 1000;
+          rememberPlayedDuration(watched, duration);
+          onProgress?.(watched, position, duration, checkpoint.completed);
+        }
+        if (result?.returnedToInline && result.sameMedia) {
           nativeResumePositionRef.current = Math.max(0, Number(result.positionMs || 0) / 1000);
-          if (onProgress && nativeResumePositionRef.current > 0 && media) onProgress(media, nativeResumePositionRef.current, 0);
           setNativePlayerUnavailable(true);
           triggerNotice('Uygulama içi oynatıcıya dönüldü.');
         } else {
-          if (onProgress && media && Number(result?.positionMs || 0) > 0) onProgress(media, Math.max(0, Number(result.positionMs) / 1000), Math.max(0, Number(result.durationMs || 0) / 1000));
           onClose();
         }
       })

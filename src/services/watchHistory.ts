@@ -33,8 +33,9 @@ export const WatchHistoryService = {
     const isOpenOnly = positionSeconds === 0 && durationSeconds === 0 && !finished;
     const completed = finished || (isOpenOnly && existing?.completed === true) ||
       (duration > 60 && position / duration >= 0.95);
+    const { nativeEpisodeQueue: _queue, ...historyMedia } = media as (MediaItem | DownloadItem) & Pick<MediaItem, 'nativeEpisodeQueue'>;
     const next: WatchHistoryEntry = {
-      id: media.id, profileId, media,
+      id: media.id, profileId, media: historyMedia,
       watchedAt: Date.now(),
       positionSeconds: completed ? duration || position : position,
       durationSeconds: duration,

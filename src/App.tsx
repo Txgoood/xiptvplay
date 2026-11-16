@@ -798,52 +798,16 @@ export default function App() {
   };
 
   // Series Episode Play Handler
-  const handlePlayEpisode = (episode: SeriesEpisode, seriesItem: MediaItem, nextEpisode?: SeriesEpisode, nextNextEpisode?: SeriesEpisode) => {
+  const handlePlayEpisode = (episode: SeriesEpisode, seriesItem: MediaItem, upcoming: SeriesEpisode[]) => {
     if (!canAccessMedia(seriesItem)) return;
-    const seasonStr = String(episode.seasonNum).padStart(2, '0');
-    const epStr = String(episode.episodeNum).padStart(2, '0');
+    const toMedia = (episode: SeriesEpisode): MediaItem => {
+      const seasonStr = String(episode.seasonNum).padStart(2, '0');
+      const epStr = String(episode.episodeNum).padStart(2, '0');
 
-    // 1- Dizi Bölümü URL Oluşturma Mantığı:
-    // ${serverUrl}/series/${username}/${password}/${episode.id}.${episode.container_extension || 'mp4'}
-    let finalStreamUrl = episode.streamUrl;
-    let directUrl = episode.rawStreamUrl;
-    if (
-      activePlaylist &&
-      activePlaylist.type === 'xtream' &&
-      activePlaylist.serverUrl &&
-      activePlaylist.username &&
-      activePlaylist.password
-    ) {
-      const serverUrl = XtreamClientService.normalizeServerUrl(activePlaylist.serverUrl);
-      const ext = episode.containerExtension || 'mp4';
-      directUrl = `${serverUrl}/series/${activePlaylist.username}/${activePlaylist.password}/${episode.id}.${ext}`;
-      // 2- Proxy ve Güvenli Oynatıcı:
-      finalStreamUrl = XtreamClientService.getSafeStreamUrl(directUrl);
-    } else if (finalStreamUrl && !finalStreamUrl.startsWith('/api/')) {
-      directUrl = finalStreamUrl;
-      finalStreamUrl = XtreamClientService.getSafeStreamUrl(finalStreamUrl);
-    }
-
-    const episodeMedia: MediaItem = {
-      id: `ep-${seriesItem.id}-${episode.id}`,
-      parentSeriesId: seriesItem.id,
-      playlistId: seriesItem.playlistId,
-      title: `${seriesItem.title} - S${seasonStr}E${epStr}: ${episode.title}`,
-      category: seriesItem.category || 'Dizi',
-      type: 'series',
-      resolution: seriesItem.resolution || 'FHD 60P',
-      duration: episode.duration,
-      rating: episode.rating,
-      poster: episode.image || seriesItem.poster,
-      streamUrl: finalStreamUrl,
-      rawStreamUrl: directUrl || episode.rawStreamUrl,
-      audioTracks: ['Türkçe Dublaj', 'English (Dolby)'],
-      subtitles: ['Türkçe', 'English', 'Off'],
-      containerExtension: episode.containerExtension || 'mp4',
-      streamId: episode.id,
-    };
-    if (nextEpisode) {
-      let nextDirectUrl = nextEpisode.rawStreamUrl || nextEpisode.streamUrl;
+      // 1- Dizi Bölümü URL Oluşturma Mantığı:
+      // ${serverUrl}/series/${username}/${password}/${episode.id}.${episode.container_extension || 'mp4'}
+      let finalStreamUrl = episode.streamUrl;
+      let directUrl = episode.rawStreamUrl;
       if (
         activePlaylist &&
         activePlaylist.type === 'xtream' &&
@@ -852,26 +816,41 @@ export default function App() {
         activePlaylist.password
       ) {
         const serverUrl = XtreamClientService.normalizeServerUrl(activePlaylist.serverUrl);
-        const nextExt = nextEpisode.containerExtension || 'mp4';
-        nextDirectUrl = `${serverUrl}/series/${activePlaylist.username}/${activePlaylist.password}/${nextEpisode.id}.${nextExt}`;
+        const ext = episode.containerExtension || 'mp4';
+        directUrl = `${serverUrl}/series/${activePlaylist.username}/${activePlaylist.password}/${episode.id}.${ext}`;
+        // 2- Proxy ve Güvenli Oynatıcı:
+        finalStreamUrl = XtreamClientService.getSafeStreamUrl(directUrl);
+      } else if (finalStreamUrl && !finalStreamUrl.startsWith('/api/')) {
+        directUrl = finalStreamUrl;
+        finalStreamUrl = XtreamClientService.getSafeStreamUrl(finalStreamUrl);
       }
-      const nextSeasonStr = String(nextEpisode.seasonNum).padStart(2, '0');
-      const nextEpStr = String(nextEpisode.episodeNum).padStart(2, '0');
-      episodeMedia.nextEpisodeUrl = nextDirectUrl || undefined;
-      episodeMedia.nextEpisodeTitle = `${seriesItem.title} - S${nextSeasonStr}E${nextEpStr}: ${nextEpisode.title}`;
-      if (nextNextEpisode) {
-        let nextNextDirectUrl = nextNextEpisode.rawStreamUrl || nextNextEpisode.streamUrl;
-        if (activePlaylist && activePlaylist.type === 'xtream' && activePlaylist.serverUrl && activePlaylist.username && activePlaylist.password) {
-          const serverUrl = XtreamClientService.normalizeServerUrl(activePlaylist.serverUrl);
-          const nextNextExt = nextNextEpisode.containerExtension || 'mp4';
-          nextNextDirectUrl = `${serverUrl}/series/${activePlaylist.username}/${activePlaylist.password}/${nextNextEpisode.id}.${nextNextExt}`;
-        }
-        const nextNextSeasonStr = String(nextNextEpisode.seasonNum).padStart(2, '0');
-        const nextNextEpStr = String(nextNextEpisode.episodeNum).padStart(2, '0');
-        episodeMedia.nextNextEpisodeUrl = nextNextDirectUrl || undefined;
-        episodeMedia.nextNextEpisodeTitle = `${seriesItem.title} - S${nextNextSeasonStr}E${nextNextEpStr}: ${nextNextEpisode.title}`;
-      }
-    }
+
+      return {
+        id: `ep-${seriesItem.id}-${episode.id}`,
+        parentSeriesId: seriesItem.id,
+        playlistId: seriesItem.playlistId,
+        title: `${seriesItem.title} - S${seasonStr}E${epStr}: ${episode.title}`,
+        category: seriesItem.category || 'Dizi',
+        type: 'series',
+        resolution: seriesItem.resolution || 'FHD 60P',
+        duration: episode.duration,
+        rating: episode.rating,
+        poster: episode.image || seriesItem.poster,
+        streamUrl: finalStreamUrl,
+        rawStreamUrl: directUrl || episode.rawStreamUrl,
+        audioTracks: ['Türkçe Dublaj', 'English (Dolby)'],
+        subtitles: ['Türkçe', 'English', 'Off'],
+        containerExtension: episode.containerExtension || 'mp4',
+        streamId: episode.id,
+        seasonNumber: episode.seasonNum,
+        episodeNumber: episode.episodeNum,
+        episodeTitle: episode.title,
+      };
+    };
+    const episodeMedia = toMedia(episode);
+    episodeMedia.nativeEpisodeQueue = upcoming.slice(0, 200).map(toMedia)
+      .map(media => ({ uri: media.rawStreamUrl || media.streamUrl, media }))
+      .filter(entry => /^https?:\/\//i.test(entry.uri));
     safePlay(episodeMedia);
   };
 
@@ -945,7 +924,7 @@ export default function App() {
         const actualSizeGb = Number(fileInfo.size || 0) / 1_000_000_000;
         // Offline dizilerde yalnizca ayni dizinin art arda gelen,
         // telefonda gercekten bulunan bolumlerini siraya ekle.
-        const offlineNext: Array<{ uri: string; title: string }> = [];
+        const offlineNext: NonNullable<MediaItem['nativeEpisodeQueue']> = [];
         if (item.type === 'series' && item.seriesTitle &&
             typeof item.seasonNumber === 'number' &&
             typeof item.episodeNumber === 'number') {
@@ -973,7 +952,7 @@ export default function App() {
               }
               const found = await Filesystem.getUri({ path: next.offlinePath!, directory: nextDirectory });
               if (!found.uri?.startsWith('file://')) break;
-              offlineNext.push({ uri: found.uri, title: next.title });
+              offlineNext.push({ uri: found.uri, media: { ...next, fileUri: found.uri, localUrl: Capacitor.convertFileSrc(found.uri) } });
               expectedEpisode++;
             } catch {
               break; // Siradaki bolum yoksa asla internete gecme.
@@ -984,11 +963,7 @@ export default function App() {
           ...item,
           fileUri: localFileUri,
           localUrl,
-          nextEpisodeUrl: offlineNext[0]?.uri,
-          nextEpisodeTitle: offlineNext[0]?.title,
-          nextNextEpisodeUrl: offlineNext[1]?.uri,
-          nextNextEpisodeTitle: offlineNext[1]?.title,
-          offlineEpisodeQueue: offlineNext,
+          nativeEpisodeQueue: offlineNext.slice(0, 200),
           ...(actualSizeGb > 0 ? { totalSizeGb: actualSizeGb, downloadedGb: actualSizeGb } : {}),
         });
         showToast('İndirilen dosya telefondan açılıyor; internetten yeniden indirilmeyecek.');
@@ -1364,7 +1339,7 @@ export default function App() {
         activePlaylist={activePlaylist}
         isOpen={!!selectedSeriesItem}
         onClose={() => { setSelectedSeriesItem(null); setCatalogTargetSeason(undefined); setFollowEpisode(undefined); }}
-        onPlayEpisode={(episode, seriesItem, nextEpisode, nextNextEpisode) => { if (canAccessMedia(seriesItem)) handlePlayEpisode(episode, seriesItem, nextEpisode, nextNextEpisode); }}
+        onPlayEpisode={(episode, seriesItem, upcoming) => { if (canAccessMedia(seriesItem)) handlePlayEpisode(episode, seriesItem, upcoming); }}
         onDownloadEpisode={handleDownloadEpisode}
         onScheduleEpisodes={handleScheduleEpisodes}
         initialSeason={catalogTargetSeason}

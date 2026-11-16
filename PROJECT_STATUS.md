@@ -1,7 +1,7 @@
 # XIPTV Play Android — Proje durumu / Tek Dal Birleştirme
 
 **Resmî Android dalı:** `tek-dal-birlestirme-xiptvplay-android`  
-**Yeni sürüm:** `v1.4.22 (versionCode 30)`  
+**Yeni sürüm:** `v1.4.23 (versionCode 31)`  
 **Depo:** https://github.com/Txgoood/xiptvplay  
 **Derleme:** https://github.com/Txgoood/xiptvplay/actions/workflows/main.yml  
 **Kontrol durumu:** Kaynak dosyaları incelendi ve regresyon testleri eklendi; GitHub Actions / fiziksel cihaz sonucu ayrıca doğrulanmalı.
@@ -100,3 +100,8 @@
 - Mobil veride, sağlayıcı byte aralıklarını kabul ederse büyük dosyalar 2–4 bağlantıyla indirilir. Uyumsuz yanıt veya bağlantı hatasında tek bağlantıya dönülür.
 - Wi-Fi indirme yolu ve bölüm kuyruğu korunur.
 - v1.4.22 (30), commit `41992d4`. Android derlemesi, imza, dosya bütünlüğü testleri ve emülatör kontrolleri geçti. Mobil veride gerçek aktarım hızı henüz ölçülmedi. [Derleme #326](https://github.com/Txgoood/xiptvplay/actions/runs/43454368484) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/43454368484/artifacts/14051709639).
+
+## 17 Kasım 2026 — Sonraki bölüm ve izleme geçmişi
+- Android oynatıcı, bölüm geçişlerinde önceki ve güncel bölümün konumunu ayrı kaydeder. Uygulamaya dönülünce izlenen bölümler kendi kimlikleriyle geçmişe yazılır.
+- Dizi detayından açılan oynatıcı, sonraki sezonlar dahil sıradaki bölümleri alır. Yerel dosya kuyruğunun bölüm kimlikleri de geçmişe aktarılır.
+- v1.4.23 (31) APK doğrulaması bekleniyor.

@@ -43,7 +43,7 @@ export interface MediaItem {
   updatedAt?: number;
   releaseDate?: string;
   genres?: string[];
-  offlineEpisodeQueue?: { uri: string; title: string }[];
+  nativeEpisodeQueue?: { uri: string; media: MediaItem | DownloadItem }[];
   poster: string;
   backdrop?: string;
   streamUrl: string;

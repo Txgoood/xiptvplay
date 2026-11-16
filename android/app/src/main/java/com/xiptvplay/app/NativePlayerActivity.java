@@ -102,6 +102,8 @@ public class NativePlayerActivity extends Activity {
     private ImageButton fullscreenButton;
     private ImageButton closeButton;
     private String currentUrl;
+    private int historyIndex;
+    private final java.util.Map<Integer, JSONObject> history = new java.util.LinkedHashMap<>();
     private String progressPreferenceKey;
     private ImageButton playPauseButton;
     private boolean displayedPause = false;
@@ -611,10 +613,23 @@ public class NativePlayerActivity extends Activity {
         long duration = Math.max(0L, player.getDuration());
         getSharedPreferences("playback_progress", MODE_PRIVATE).edit()
             .putLong(progressPreferenceKey, position).apply();
+        if (duration > 0 && player.getPlaybackState() != Player.STATE_IDLE) {
+            JSONObject entry = new JSONObject();
+            try {
+                entry.put("index", historyIndex);
+                entry.put("positionMs", position);
+                entry.put("durationMs", duration);
+                entry.put("completed", player.getPlaybackState() == Player.STATE_ENDED);
+                history.put(historyIndex, entry);
+            } catch (org.json.JSONException ignored) {
+                // Oynatma konumu cihazda ayrıca saklanır.
+            }
+        }
         Intent historyData = new Intent();
+        historyData.putExtra("history", new JSONArray(history.values()).toString());
         historyData.putExtra("positionMs", position);
         historyData.putExtra("durationMs", duration);
-        historyData.putExtra("sameMedia", currentUrl != null && currentUrl.equals(getIntent().getStringExtra("url")));
+        historyData.putExtra("sameMedia", historyIndex == 0);
         setResult(Activity.RESULT_OK, historyData);
     }
 
@@ -1107,6 +1122,7 @@ public class NativePlayerActivity extends Activity {
             .setMediaId(titleToPlay == null ? "Sonraki bölüm" : titleToPlay)
             .build();
         currentUrl = urlToPlay;
+        historyIndex++;
         progressPreferenceKey = "native_player_position_" + Integer.toHexString(urlToPlay.hashCode());
         player.setMediaItem(next);
         player.prepare();
