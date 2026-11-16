@@ -896,7 +896,7 @@ export default function App() {
       nextNextEpisodeUrl: _afterUrl, nextNextEpisodeTitle: _afterTitle,
       ...currentEpisode
     } = item;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: number | undefined;
     let queue: NonNullable<MediaItem['nativeEpisodeQueue']> = [];
     let queueUnavailable = false;
     try {
@@ -917,7 +917,7 @@ export default function App() {
       };
       const loaded = await Promise.race([
         loadQueue(),
-        new Promise<undefined>(resolve => { timer = setTimeout(resolve, 7000); }),
+        new Promise<undefined>(resolve => { timer = window.setTimeout(resolve, 7000); }),
       ]);
       queue = loaded || [];
       queueUnavailable = !loaded;
