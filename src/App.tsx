@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { ScreenType, AppMode, Playlist, DownloadItem, MediaItem, SeriesEpisode } from './types';
 import { INITIAL_STATS } from './data/mockData';
 import { StorageService } from './services/storage';
+import { IptvService } from './services/iptvService';
 import { XtreamClientService } from './services/xtreamClient';
 import { M3UParserService } from './services/m3uParser';
 import { Header } from './components/Header';
@@ -166,6 +167,7 @@ export default function App() {
   // Modals & Player State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addModalType, setAddModalType] = useState<'xtream' | 'm3u'>('xtream');
+  const historyPlayRequestRef = useRef(0);
   const [activePlayerMedia, setActivePlayerMedia] = useState<MediaItem | DownloadItem | null>(null);
   // Central history hook also covers TMDB, EPG, offline playback and automatic selections.
   useEffect(() => {
@@ -283,6 +285,7 @@ export default function App() {
     setFamilyDialogMode(familyConfiguration ? 'manage' : 'setup');
   };
   const safePlay = (item: MediaItem) => {
+    historyPlayRequestRef.current += 1;
     if (canAccessMedia(item)) { setWatchHistory(WatchHistoryService.record(historyProfileId, item)); setCastCandidate(item); if(isCastConnected&&!isChildProfile){void sendToTv(item).then(()=>showToast('Yayın TV’ye gönderildi.')).catch(error=>showToast(error.message));}else setActivePlayerMedia(item); }
     else showToast('Bu içerik çocuk profili için izinli değil.');
   };
@@ -797,61 +800,135 @@ export default function App() {
     }
   };
 
-  // Series Episode Play Handler
-  const handlePlayEpisode = (episode: SeriesEpisode, seriesItem: MediaItem, upcoming: SeriesEpisode[]) => {
-    if (!canAccessMedia(seriesItem)) return;
-    const toMedia = (episode: SeriesEpisode): MediaItem => {
-      const seasonStr = String(episode.seasonNum).padStart(2, '0');
-      const epStr = String(episode.episodeNum).padStart(2, '0');
+  const buildEpisodeMedia = (episode: SeriesEpisode, seriesItem: MediaItem, playlist: Playlist | null): MediaItem => {
+    const seasonStr = String(episode.seasonNum).padStart(2, '0');
+    const epStr = String(episode.episodeNum).padStart(2, '0');
 
-      // 1- Dizi Bölümü URL Oluşturma Mantığı:
-      // ${serverUrl}/series/${username}/${password}/${episode.id}.${episode.container_extension || 'mp4'}
-      let finalStreamUrl = episode.streamUrl;
-      let directUrl = episode.rawStreamUrl;
-      if (
-        activePlaylist &&
-        activePlaylist.type === 'xtream' &&
-        activePlaylist.serverUrl &&
-        activePlaylist.username &&
-        activePlaylist.password
-      ) {
-        const serverUrl = XtreamClientService.normalizeServerUrl(activePlaylist.serverUrl);
-        const ext = episode.containerExtension || 'mp4';
-        directUrl = `${serverUrl}/series/${activePlaylist.username}/${activePlaylist.password}/${episode.id}.${ext}`;
-        // 2- Proxy ve Güvenli Oynatıcı:
-        finalStreamUrl = XtreamClientService.getSafeStreamUrl(directUrl);
-      } else if (finalStreamUrl && !finalStreamUrl.startsWith('/api/')) {
-        directUrl = finalStreamUrl;
-        finalStreamUrl = XtreamClientService.getSafeStreamUrl(finalStreamUrl);
-      }
+    // 1- Dizi Bölümü URL Oluşturma Mantığı:
+    // ${serverUrl}/series/${username}/${password}/${episode.id}.${episode.container_extension || 'mp4'}
+    let finalStreamUrl = episode.streamUrl;
+    let directUrl = episode.rawStreamUrl;
+    if (
+      playlist &&
+      playlist.type === 'xtream' &&
+      playlist.serverUrl &&
+      playlist.username &&
+      playlist.password
+    ) {
+      const serverUrl = XtreamClientService.normalizeServerUrl(playlist.serverUrl);
+      const ext = episode.containerExtension || 'mp4';
+      directUrl = `${serverUrl}/series/${playlist.username}/${playlist.password}/${episode.id}.${ext}`;
+      // 2- Proxy ve Güvenli Oynatıcı:
+      finalStreamUrl = XtreamClientService.getSafeStreamUrl(directUrl);
+    } else if (finalStreamUrl && !finalStreamUrl.startsWith('/api/')) {
+      directUrl = finalStreamUrl;
+      finalStreamUrl = XtreamClientService.getSafeStreamUrl(finalStreamUrl);
+    }
 
-      return {
-        id: `ep-${seriesItem.id}-${episode.id}`,
-        parentSeriesId: seriesItem.id,
-        playlistId: seriesItem.playlistId,
-        title: `${seriesItem.title} - S${seasonStr}E${epStr}: ${episode.title}`,
-        category: seriesItem.category || 'Dizi',
-        type: 'series',
-        resolution: seriesItem.resolution || 'FHD 60P',
-        duration: episode.duration,
-        rating: episode.rating,
-        poster: episode.image || seriesItem.poster,
-        streamUrl: finalStreamUrl,
-        rawStreamUrl: directUrl || episode.rawStreamUrl,
-        audioTracks: ['Türkçe Dublaj', 'English (Dolby)'],
-        subtitles: ['Türkçe', 'English', 'Off'],
-        containerExtension: episode.containerExtension || 'mp4',
-        streamId: episode.id,
-        seasonNumber: episode.seasonNum,
-        episodeNumber: episode.episodeNum,
-        episodeTitle: episode.title,
-      };
+    return {
+      id: `ep-${seriesItem.id}-${episode.id}`,
+      parentSeriesId: seriesItem.id,
+      playlistId: seriesItem.playlistId,
+      title: `${seriesItem.title} - S${seasonStr}E${epStr}: ${episode.title}`,
+      category: seriesItem.category || 'Dizi',
+      type: 'series',
+      resolution: seriesItem.resolution || 'FHD 60P',
+      duration: episode.duration,
+      rating: episode.rating,
+      poster: episode.image || seriesItem.poster,
+      streamUrl: finalStreamUrl,
+      rawStreamUrl: directUrl || episode.rawStreamUrl,
+      audioTracks: ['Türkçe Dublaj', 'English (Dolby)'],
+      subtitles: ['Türkçe', 'English', 'Off'],
+      containerExtension: episode.containerExtension || 'mp4',
+      streamId: episode.id,
+      seasonNumber: episode.seasonNum,
+      episodeNumber: episode.episodeNum,
+      episodeTitle: episode.title,
     };
-    const episodeMedia = toMedia(episode);
-    episodeMedia.nativeEpisodeQueue = upcoming.slice(0, 200).map(toMedia)
+  };
+
+  const buildEpisodeQueue = (upcoming: SeriesEpisode[], series: MediaItem, playlist: Playlist | null) =>
+    upcoming.slice(0, 200)
+      .map(episode => buildEpisodeMedia(episode, series, playlist))
       .map(media => ({ uri: media.rawStreamUrl || media.streamUrl, media }))
       .filter(entry => /^https?:\/\//i.test(entry.uri));
-    safePlay(episodeMedia);
+
+  const handlePlayEpisode = (episode: SeriesEpisode, seriesItem: MediaItem, upcoming: SeriesEpisode[]) => {
+    if (!canAccessMedia(seriesItem)) return;
+    const episodeMedia = buildEpisodeMedia(episode, seriesItem, activePlaylist);
+    safePlay({ ...episodeMedia, nativeEpisodeQueue: buildEpisodeQueue(upcoming, seriesItem, activePlaylist) });
+  };
+
+  const handlePlayFromHistory = async (item: MediaItem | DownloadItem) => {
+    if (!canAccessMedia(item as MediaItem)) {
+      showToast('Bu içerik çocuk profili için izinli değil.');
+      return;
+    }
+    if (!('audioTracks' in item)) {
+      historyPlayRequestRef.current += 1;
+      const localDownload = downloads.find(download => download.id === item.id && download.status === 'completed');
+      if (localDownload) await handlePlayDownloadedItem(localDownload);
+      else setActivePlayerMedia(item);
+      return;
+    }
+    if (item.type !== 'series' || !item.playlistId) {
+      safePlay(item);
+      return;
+    }
+
+    // Eski geçmiş kayıtlarının bazılarında ana dizi kimliği ayrı alan olarak bulunmaz.
+    const suffix = item.streamId == null ? '' : `-${item.streamId}`;
+    const seriesId = item.parentSeriesId || (suffix && item.id.startsWith('ep-') && item.id.endsWith(suffix)
+      ? item.id.slice(3, -suffix.length) : undefined);
+    const playlist = playlistsRef.current.find(candidate => candidate.id === item.playlistId)
+      || StorageService.getPlaylists().find(candidate => candidate.id === item.playlistId);
+    if (!seriesId || !playlist) {
+      safePlay(item);
+      return;
+    }
+
+    const request = ++historyPlayRequestRef.current;
+    showToast('Sonraki bölümler hazırlanıyor…');
+    const profile = profileRef.current;
+    const {
+      nextEpisodeUrl: _nextUrl, nextEpisodeTitle: _nextTitle,
+      nextNextEpisodeUrl: _afterUrl, nextNextEpisodeTitle: _afterTitle,
+      ...currentEpisode
+    } = item;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let queue: NonNullable<MediaItem['nativeEpisodeQueue']> = [];
+    let queueUnavailable = false;
+    try {
+      const loadQueue = async () => {
+        const savedCatalog = StorageService.getPlaylistItems(playlist.id);
+        const findSeries = (items: MediaItem[]) =>
+          items.find(media => media.id === seriesId && media.type === 'series');
+        const series = findSeries(savedCatalog)
+          || findSeries(await StorageService.loadPlaylistItemsPersistent(playlist.id) || []);
+        if (!series || !canAccessMedia(series)) return undefined;
+        const result = await IptvService.fetchSeriesDetail(series, playlist);
+        if (!result.success) return undefined;
+        const episodes = Object.values(result.seriesDetail.episodes).flat()
+          .sort((a, b) => a.seasonNum - b.seasonNum || a.episodeNum - b.episodeNum);
+        const index = episodes.findIndex(episode => item.id === `ep-${series.id}-${episode.id}`
+          || (item.streamId != null && String(episode.id) === String(item.streamId)));
+        return index < 0 ? undefined : buildEpisodeQueue(episodes.slice(index + 1), series, playlist);
+      };
+      const loaded = await Promise.race([
+        loadQueue(),
+        new Promise<undefined>(resolve => { timer = setTimeout(resolve, 7000); }),
+      ]);
+      queue = loaded || [];
+      queueUnavailable = !loaded;
+    } catch {
+      queueUnavailable = true;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (historyPlayRequestRef.current !== request || profileRef.current !== profile) return;
+    if (queueUnavailable) showToast('Sonraki bölümler alınamadı. Kaldığın bölüm açılıyor.');
+    safePlay({ ...currentEpisode, nativeEpisodeQueue: queue });
   };
 
   // Series Episode Download Handler
@@ -1207,6 +1284,7 @@ export default function App() {
                 catalog={decoratedCatalog}
                 isChildMode={Boolean(isChildProfile)}
                 continueWatching={continueWatching}
+                onResumeHistory={(item) => { void handlePlayFromHistory(item); }}
                 onOpenFollowed={(item,season,episode)=>{if(canAccessMedia(item)){setCatalogTargetSeason(season);setFollowEpisode(episode);setSelectedSeriesItem(item);}}}
                 activePlaylist={activePlaylist}
                 onBackToPlaylists={() => { if (!isChildProfile) setCurrentScreen('playlists'); }}
@@ -1266,11 +1344,7 @@ export default function App() {
               <WatchHistoryScreen
                 entries={watchHistory.filter(e => !isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, e.media as MediaItem))}
                 isChildMode={Boolean(isChildProfile)}
-                onPlay={(item) => {
-                  if (isChildProfile && !FamilyProfilesService.allows(activeFamilyProfile, item as MediaItem)) { showToast('Bu içerik çocuk profili için izinli değil.'); return; }
-                  setWatchHistory(WatchHistoryService.record(historyProfileId, item));
-                  if ('audioTracks' in item) safePlay(item); else setActivePlayerMedia(item);
-                }}
+                onPlay={(item) => { void handlePlayFromHistory(item); }}
                 onRemove={(id) => setWatchHistory(WatchHistoryService.remove(historyProfileId, id))}
                 onComplete={(id) => setWatchHistory(WatchHistoryService.complete(historyProfileId, id))}
                 onClear={() => setWatchHistory(WatchHistoryService.clear(historyProfileId))}

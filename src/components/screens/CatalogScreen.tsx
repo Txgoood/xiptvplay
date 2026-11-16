@@ -41,6 +41,7 @@ interface CatalogScreenProps {
   isCatalogLoading?: boolean;
   isChildMode?: boolean;
   continueWatching?: WatchHistoryEntry[];
+  onResumeHistory: (item: WatchHistoryEntry['media']) => void;
 }
 
 const PAGE_CHUNK = 60;
@@ -63,6 +64,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   onOpenFollowed,
   isChildMode = false,
   continueWatching = [],
+  onResumeHistory,
 }) => {
   const gridStart = React.useRef<HTMLDivElement>(null);
   const [decisionOpen, setDecisionOpen] = useState(false);
@@ -265,7 +267,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
           <h2 className="font-bold text-sm text-[#00f0ff] mb-2">▶ İzlemeye Devam Et</h2>
           <div className="flex gap-3 overflow-x-auto pb-1">
             {continueWatching.slice(0, 12).map(entry => (
-              <button key={entry.id} className="w-32 shrink-0 text-left" onClick={() => onPlayMedia(entry.media as MediaItem)}>
+              <button key={entry.id} className="w-32 shrink-0 text-left" onClick={() => onResumeHistory(entry.media)}>
                 <div className="relative"><img src={entry.media.poster} alt="" className="w-full h-20 rounded-lg object-cover bg-[#29292c]"/>{entry.media.type === 'movie' && <MovieCollectionBadge media={entry.media as MediaItem}/>}</div>
                 <span className="text-xs font-bold line-clamp-2 mt-1">{entry.media.title}</span>
                 <div className="h-1.5 mt-2 rounded-full bg-white/10 overflow-hidden">

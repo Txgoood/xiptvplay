@@ -1,7 +1,7 @@
 # XIPTV Play Android — Proje durumu / Tek Dal Birleştirme
 
 **Resmî Android dalı:** `tek-dal-birlestirme-xiptvplay-android`  
-**Yeni sürüm:** `v1.4.23 (versionCode 31)`  
+**Yeni sürüm:** `v1.4.24 (versionCode 32)`  
 **Depo:** https://github.com/Txgoood/xiptvplay  
 **Derleme:** https://github.com/Txgoood/xiptvplay/actions/workflows/main.yml  
 **Kontrol durumu:** Kaynak dosyaları incelendi ve regresyon testleri eklendi; GitHub Actions / fiziksel cihaz sonucu ayrıca doğrulanmalı.
@@ -105,3 +105,7 @@
 - Android oynatıcı, bölüm geçişlerinde önceki ve güncel bölümün konumunu ayrı kaydeder. Uygulamaya dönülünce izlenen bölümler kendi kimlikleriyle geçmişe yazılır.
 - Dizi detayından açılan oynatıcı, sonraki sezonlar dahil sıradaki bölümleri alır. Yerel dosya kuyruğunun bölüm kimlikleri de geçmişe aktarılır.
 - v1.4.23 (31), commit `ef09bd2`. Android derlemesi, imza ve emülatörde mevcut bölüm geçişi testi geçti. Punisher ve Geçmiş ekranının uçtan uca kontrolü Fold 7 üzerinde henüz yapılmadı. [Derleme #327](https://github.com/Txgoood/xiptvplay/actions/runs/43969141253) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/43969141253/artifacts/14278076557).
+
+## 17 Kasım 2026 — Geçmişten devam ve bölüm kuyruğu
+- İzleme Geçmişi ve İzlemeye Devam Et, dizinin kendi listesinden sonraki bölümleri bulup oynatıcıya kimlikleriyle verir. Bölüm listesi alınamazsa mevcut bölüm açılır.
+- v1.4.24 (32) APK doğrulaması bekleniyor.
