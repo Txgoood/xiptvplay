@@ -108,4 +108,4 @@
 
 ## 17 Kasım 2026 — Geçmişten devam ve bölüm kuyruğu
 - İzleme Geçmişi ve İzlemeye Devam Et, dizinin kendi listesinden sonraki bölümleri bulup oynatıcıya kimlikleriyle verir. Bölüm listesi alınamazsa mevcut bölüm açılır.
-- v1.4.24 (32) APK doğrulaması bekleniyor.
+- v1.4.24 (32), commit `0d92416`. Tür denetimi, otomatik testler, Android derlemesi, imza ve genel emülatör testleri geçti. Geçmişten devam akışında eski kimlik, sezon geçişi ve liste alınamadığında mevcut bölümün açılması örnek verilerle kontrol edildi. Fold 7 üzerinde fiziksel kontrol yapılmadı. [Derleme #329](https://github.com/Txgoood/xiptvplay/actions/runs/43971424998) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/43971424998/artifacts/14279800661).
