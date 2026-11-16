@@ -104,4 +104,4 @@
 ## 17 Kasım 2026 — Sonraki bölüm ve izleme geçmişi
 - Android oynatıcı, bölüm geçişlerinde önceki ve güncel bölümün konumunu ayrı kaydeder. Uygulamaya dönülünce izlenen bölümler kendi kimlikleriyle geçmişe yazılır.
 - Dizi detayından açılan oynatıcı, sonraki sezonlar dahil sıradaki bölümleri alır. Yerel dosya kuyruğunun bölüm kimlikleri de geçmişe aktarılır.
-- v1.4.23 (31) APK doğrulaması bekleniyor.
+- v1.4.23 (31), commit `ef09bd2`. Android derlemesi, imza ve emülatörde mevcut bölüm geçişi testi geçti. Punisher ve Geçmiş ekranının uçtan uca kontrolü Fold 7 üzerinde henüz yapılmadı. [Derleme #327](https://github.com/Txgoood/xiptvplay/actions/runs/43969141253) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/43969141253/artifacts/14278076557).
