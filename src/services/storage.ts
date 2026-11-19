@@ -9,10 +9,59 @@ const STORAGE_KEYS = {
   ACTIVE_PLAYLIST_ID: 'xiptvplay_active_playlist_v1',
   SETTINGS: 'xiptvplay_settings_v3',
   DELETED_PLAYLIST_IDS: 'xiptvplay_deleted_playlist_ids_v1',
+  EMPTY_START_MIGRATION: 'xiptvplay_android_empty_start_build35_v1',
+  MANUAL_PLAYLISTS_ONLY: 'xiptvplay_manual_playlists_only_v1',
 };
 
 // Safe localStorage wrapper for xiptvplay
 export class StorageService {
+  /** One-time migration for Build 35: start with zero IPTV connections on this device.
+   * Keep downloads, profiles, preferences and favorites untouched.
+   */
+  static prepareEmptyPlaylistInstall(): void {
+    if (localStorage.getItem(STORAGE_KEYS.EMPTY_START_MIGRATION) === 'done') return;
+    const previous = this.getPlaylists();
+    const deleted = this.getDeletedPlaylistIds();
+    for (const playlist of previous) deleted.add(playlist.id);
+    try {
+      localStorage.setItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS, JSON.stringify([...deleted]));
+      localStorage.setItem(STORAGE_KEYS.PLAYLISTS, '[]');
+      localStorage.setItem(STORAGE_KEYS.MANUAL_PLAYLISTS_ONLY, 'true');
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_PLAYLIST_ID);
+      this.inMemoryPlaylistItems.clear();
+      // Remove orphaned catalog shortcuts too; IndexedDB is cleared separately.
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX)) localStorage.removeItem(key);
+        if (key?.startsWith('xiptv_catalog_session_')) localStorage.removeItem(key);
+      }
+      // Remove persisted catalogs only (not download/favorite data).
+      void this.clearPersistentPlaylistCatalogs();
+      localStorage.setItem(STORAGE_KEYS.EMPTY_START_MIGRATION, 'done');
+    } catch (err) {
+      console.error('[StorageService] Could not prepare empty playlist start:', err);
+    }
+  }
+
+  static useManualPlaylistsOnly(): boolean {
+    return localStorage.getItem(STORAGE_KEYS.MANUAL_PLAYLISTS_ONLY) === 'true';
+  }
+
+  private static async clearPersistentPlaylistCatalogs(): Promise<void> {
+    try {
+      const db = await this.getDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction('playlistItems', 'readwrite');
+        tx.objectStore('playlistItems').clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    } catch (error) {
+      console.warn('[StorageService] Catalog cleanup failed:', error);
+    }
+  }
+
   static getDeletedPlaylistIds(): Set<string> {
     try {
       const value = JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS) || '[]');
@@ -327,6 +376,7 @@ export class StorageService {
       });
       localStorage.removeItem(STORAGE_KEYS.PLAYLISTS);
        localStorage.removeItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS);
+       localStorage.removeItem(STORAGE_KEYS.MANUAL_PLAYLISTS_ONLY);
        this.inMemoryPlaylistItems.clear();
       localStorage.removeItem(STORAGE_KEYS.DOWNLOADS);
       localStorage.removeItem(STORAGE_KEYS.FAVORITES);
