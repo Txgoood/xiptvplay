@@ -377,7 +377,6 @@ export class StorageService {
       });
       localStorage.removeItem(STORAGE_KEYS.PLAYLISTS);
        localStorage.removeItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS);
-       localStorage.removeItem(STORAGE_KEYS.MANUAL_PLAYLISTS_ONLY);
        this.inMemoryPlaylistItems.clear();
       localStorage.removeItem(STORAGE_KEYS.DOWNLOADS);
       localStorage.removeItem(STORAGE_KEYS.FAVORITES);
