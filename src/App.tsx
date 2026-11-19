@@ -35,6 +35,9 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { DownloadNotifications } from './services/downloadNotifications';
 
+// Run before React initializes playlists or automatic Drive restore starts.
+if (Capacitor.getPlatform() === 'android') StorageService.prepareEmptyPlaylistInstall();
+
 export default function App() {
   useEffect(()=>{
     const resume=()=>{if(document.visibilityState==='visible')void CloudSyncController.restore();};
