@@ -122,7 +122,7 @@ export class StorageService {
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed.filter((p: Playlist) => !this.isPlaylistDeleted(p.id)) : [];
     } catch (err) {
-      console.error('[StorageService] Failed to load playlists:, err);
+      console.error('[StorageService] Failed to load playlists:', err);
       return [];
     }
   }
