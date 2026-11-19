@@ -36,7 +36,7 @@ export class StorageService {
         if (key?.startsWith('xiptv_catalog_session_')) localStorage.removeItem(key);
       }
       // Remove persisted catalogs only (not download/favorite data).
-      void this.clearPersistentPlaylistCatalogs();
+      void this.clearPersistentPlaylistCatalogs(previous.map(p => p.id));
       localStorage.setItem(STORAGE_KEYS.EMPTY_START_MIGRATION, 'done');
     } catch (err) {
       console.error('[StorageService] Could not prepare empty playlist start:', err);
@@ -47,12 +47,13 @@ export class StorageService {
     return localStorage.getItem(STORAGE_KEYS.MANUAL_PLAYLISTS_ONLY) === 'true';
   }
 
-  private static async clearPersistentPlaylistCatalogs(): Promise<void> {
+  private static async clearPersistentPlaylistCatalogs(ids: string[]): Promise<void> {
+    if (!ids.length) return;
     try {
       const db = await this.getDB();
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction('playlistItems', 'readwrite');
-        tx.objectStore('playlistItems').clear();
+        for (const id of ids) tx.objectStore('playlistItems').delete(id);
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
