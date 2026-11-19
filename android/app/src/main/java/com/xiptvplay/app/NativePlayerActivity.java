@@ -51,6 +51,10 @@ import androidx.media3.common.Player;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.Tracks;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.datasource.DefaultDataSource;
+import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.datasource.HttpDataSource;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.ui.PlayerView;
 import androidx.media3.ui.TrackSelectionDialogBuilder;
@@ -329,7 +333,17 @@ public class NativePlayerActivity extends Activity {
         DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
             .setBufferDurationsMs(minBufferMs, maxBufferMs, Math.min(1500, minBufferMs), Math.min(3000, minBufferMs))
             .build();
-        player = new ExoPlayer.Builder(this).setLoadControl(loadControl).build();
+        // Match the User-Agent used for Xtream catalog requests. Some providers
+        // reject Media3's default ExoPlayer user agent on movie/series endpoints.
+        DefaultHttpDataSource.Factory httpFactory = new DefaultHttpDataSource.Factory()
+            .setUserAgent("IPTVSmartersPro")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(30000);
+        DefaultDataSource.Factory dataSourceFactory = new DefaultDataSource.Factory(this, httpFactory);
+        player = new ExoPlayer.Builder(this)
+            .setMediaSourceFactory(new DefaultMediaSourceFactory(dataSourceFactory))
+            .setLoadControl(loadControl).build();
         // Türkçe izi varsa tercih et; yoksa ExoPlayer varsayılan ses izini seçer.
         player.setTrackSelectionParameters(
             player.getTrackSelectionParameters().buildUpon()
@@ -344,8 +358,22 @@ public class NativePlayerActivity extends Activity {
         player.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(PlaybackException error) {
-                Toast.makeText(NativePlayerActivity.this,
-                    "Oynatma hatası: " + error.getErrorCodeName(), Toast.LENGTH_LONG).show();
+                String message = "Oynatma hatası: " + error.getErrorCodeName();
+                Throwable cause = error;
+                while (cause != null) {
+                    if (cause instanceof HttpDataSource.InvalidResponseCodeException) {
+                        int status = ((HttpDataSource.InvalidResponseCodeException) cause).responseCode;
+                        message = "Oynatma hatası: HTTP " + status;
+                        if (status == 401 || status == 403) message += " (erişim reddedildi)";
+                        else if (status == 404) message += " (video adresi bulunamadı)";
+                        else if (status == 429) message += " (istek sınırı)";
+                        else if (status >= 500) message += " (sunucu hatası)";
+                        break;
+                    }
+                    cause = cause.getCause();
+                }
+                // Never print a credential-bearing stream URL in an error toast.
+                Toast.makeText(NativePlayerActivity.this, message, Toast.LENGTH_LONG).show();
             }
 
             @Override
