@@ -186,6 +186,9 @@ function applyRemote(entries:Event[]){
  const deletedPlaylistIds = StorageService.getDeletedPlaylistIds();
  const playlistMap=new Map(current.playlists.filter(p=>!deletedPlaylistIds.has(p.id)).map(p=>[p.id,p]));
  for(const e of recentPlaylist.values()){
+  // This device explicitly requires manually added connections only. Drive
+  // favorites/history continue syncing, but old IPTV logins never reappear.
+  if(StorageService.useManualPlaylistsOnly()) continue;
   if(deletedPlaylistIds.has(e.mediaId)) continue;
   if(e.playlist && e.playlist.id===e.mediaId){
    const existing=playlistMap.get(e.mediaId);
