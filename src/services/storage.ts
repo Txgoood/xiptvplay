@@ -9,10 +9,54 @@ const STORAGE_KEYS = {
   ACTIVE_PLAYLIST_ID: 'xiptvplay_active_playlist_v1',
   SETTINGS: 'xiptvplay_settings_v3',
   DELETED_PLAYLIST_IDS: 'xiptvplay_deleted_playlist_ids_v1',
+  PLAYLIST_RESET_DONE: 'xiptvplay_playlist_reset_build35_v1',
+  BLOCK_CLOUD_PLAYLIST_IMPORT: 'xiptvplay_block_cloud_playlist_import_v1',
 };
 
 // Safe localStorage wrapper for xiptvplay
 export class StorageService {
+  /**
+   * One-time playlist-only reset for Build 35. Does NOT remove downloads,
+   * favorite items, history, profiles, settings or Drive credentials.
+   * The tombstones protect against queued catalog writes and legacy sync events.
+   */
+  static prepareCleanPlaylistStart(): void {
+    if (localStorage.getItem(STORAGE_KEYS.PLAYLIST_RESET_DONE) === '1') return;
+    const ids = this.getDeletedPlaylistIds();
+    for (const key of [STORAGE_KEYS.PLAYLISTS, 'xiptvplay_playlists_v1', 'xiptv_playlists_v2']) {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+        if (Array.isArray(parsed)) for (const item of parsed) {
+          if (typeof item?.id === 'string') ids.add(item.id);
+        }
+      } catch { /* Bad legacy data must not stop reset. */ }
+    }
+    try {
+      const seen = JSON.parse(localStorage.getItem('xiptvplay_sync_seen_v1') || 'null');
+      if (Array.isArray(seen?.playlists)) for (const item of seen.playlists) {
+        if (typeof item?.id === 'string') ids.add(item.id);
+      }
+    } catch { /* Optional sync snapshot. */ }
+    // Opt out of automatic remote playlist imports on this device.
+    // Manually added playlists and other cloud sync data continue to work.
+    localStorage.setItem(STORAGE_KEYS.BLOCK_CLOUD_PLAYLIST_IMPORT, '1');
+    localStorage.setItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS, JSON.stringify([...ids]));
+    localStorage.setItem(STORAGE_KEYS.PLAYLISTS, '[]');
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_PLAYLIST_ID);
+    localStorage.removeItem('xiptvplay_playlists_v1');
+    localStorage.removeItem('xiptv_playlists_v2');
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith(STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX)) localStorage.removeItem(key);
+    }
+    this.inMemoryPlaylistItems.clear();
+    for (const id of ids) void this.deletePlaylistItemsPersistent(id);
+    localStorage.setItem(STORAGE_KEYS.PLAYLIST_RESET_DONE, '1');
+  }
+
+  static blocksCloudPlaylistImport(): boolean {
+    return localStorage.getItem(STORAGE_KEYS.BLOCK_CLOUD_PLAYLIST_IMPORT) === '1';
+  }
+
   static getDeletedPlaylistIds(): Set<string> {
     try {
       const value = JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS) || '[]');
@@ -72,7 +116,7 @@ export class StorageService {
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed.filter((p: Playlist) => !this.isPlaylistDeleted(p.id)) : [];
     } catch (err) {
-      console.error('[StorageService] Failed to load playlists:, err);
+      console.error('[StorageService] Failed to load playlists:', err);
       return [];
     }
   }
