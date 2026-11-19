@@ -235,7 +235,7 @@ export default function App() {
       setWatchHistory(WatchHistoryService.read(historyProfileId));
       const syncedPlaylists = StorageService.getPlaylists();
       setPlaylists(syncedPlaylists);
-      setActivePlaylist(prev => prev ? (syncedPlaylists.find(p => p.id === prev.id) || prev) : syncedPlaylists[0] || null);
+      setActivePlaylist(prev => prev ? (syncedPlaylists.find(p => p.id === prev.id) || syncedPlaylists[0] || null) : syncedPlaylists[0] || null);
       // Newly imported connections need a local catalog fetch. Process one
       // at a time instead of flooding the IPTV provider with many requests.
       void (async () => {
@@ -448,7 +448,11 @@ export default function App() {
 
   // Permanent Delete Handler
   const handleDeletePlaylist = (id: string) => {
-    StorageService.deletePlaylist(id);
+    if (!StorageService.deletePlaylist(id)) {
+      showToast('Playlist silinemedi. Depolama kaydı başarısız.');
+      return;
+    }
+    autoRefreshAttemptedRef.current.delete(id);
     setPlaylists((prev) => prev.filter((p) => p.id !== id));
     if (activePlaylist?.id === id) {
       setActivePlaylist(null);
@@ -559,6 +563,9 @@ export default function App() {
 
       if(!items.length || (counts.live+counts.movie+counts.series)===0)
         throw Error('IPTV sunucusu boş katalog döndürdü. Eski kanal/film/dizi kayıtları korunuyor.');
+      // The user may have permanently deleted this playlist while its
+      // network refresh was pending. Never restore a stale catalog.
+      if (StorageService.isPlaylistDeleted(id)) return;
       StorageService.savePlaylistItems(id,items);
       setPlaylists(prev=>{
         const updated=prev.map(p=>p.id===id?{
