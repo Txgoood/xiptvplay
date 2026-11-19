@@ -1,16 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 process.env.NODE_ENV='test';
-const {safeIp,normalizeStreams,sourcePath,probeArgs,parseProbePayload,isXtreamAuthorized,validateHost}=await import('./server.mjs');
+const {safeIp,normalizeStreams,sourcePath,probeArgs,parseProbePayload,isXtreamAuthorized,validateHost,compatibilityArgs}=await import('./server.mjs');
 test('blocks loopback, RFC1918 and link-local addresses',()=>{
  for(const ip of ['127.0.0.1','10.0.0.1','172.16.1.1','192.168.2.4','169.254.169.254','::1','fc00::2'])assert.equal(safeIp(ip),false,ip);
  assert.equal(safeIp('1.1.1.1'),true);
 });
 test('normalizes complete audio and subtitle stream indexes',()=>{
  const streams=normalizeStreams({streams:[{index:0,codec_type:'video'},{index:1,codec_type:'audio',codec_name:'aac',tags:{language:'tur'}},{index:2,codec_type:'audio',codec_name:'ac3',tags:{language:'eng'}},{index:3,codec_type:'subtitle',codec_name:'subrip',tags:{language:'tur'}},{index:4,codec_type:'subtitle',codec_name:'hdmv_pgs_subtitle',tags:{language:'eng'}}]});
- assert.deepEqual(streams.map(x=>x.index),[1,2,3,4]);
- assert.equal(streams[2].externalVtt,true);
- assert.equal(streams[3].externalVtt,false);
+ assert.deepEqual(streams.map(x=>x.index),[0,1,2,3,4]);
+ assert.equal(streams[3].externalVtt,true);
+ assert.equal(streams[4].externalVtt,false);
 });
 test('only permitted Xtream paths',()=>{
  assert.match(sourcePath({kind:'series',id:'1234',username:'user',password:'pass',extension:'mkv'},'https://iptv.example'),/\/series\/user\/pass\/1234\.mkv$/);
@@ -69,7 +69,7 @@ test('parses genuine ffprobe stream JSON, including Turkish audio and subtitle',
   {index:3,codec_type:'subtitle',codec_name:'subrip',tags:{language:'tur'}}
  ]})+'\n');
  const tracks=normalizeStreams(data);
- assert.deepEqual(tracks.map(x=>x.language),['eng','tur','tur']);
+ assert.deepEqual(tracks.map(x=>x.language),['und','eng','tur','tur']);
 });
 test('recovers trailing FFprobe output but rejects non-stream JSON',()=>{
  const value=parseProbePayload('notices\n{"streams":[{"index":2,"codec_type":"audio","codec_name":"ac3"}]}\n');
@@ -85,4 +85,13 @@ test('two-pass FFprobe has bounded timeouts and full-stream fallback',()=>{
  assert.ok(second.includes('-show_streams'));
  assert.equal(first.includes('-max_redirects'),false);
  assert.equal(second.at(-1),'https://host.invalid/1.mkv');
+});
+
+test('bounded conversion maps H264 baseline, AAC and MPEGTS to legacy TV',()=>{
+ const args=compatibilityArgs('http://127.0.0.1:1111/ticket',18000,1);
+ assert.equal(args[args.indexOf('-ss')+1],'14400');
+ assert.ok(args.includes('libx264'));assert.ok(args.includes('baseline'));
+ assert.ok(args.includes('yuv420p'));assert.ok(args.includes('aac'));
+ assert.ok(args.includes('mpegts'));assert.ok(!args.includes('copy'));
+ assert.ok(Number(args[args.indexOf('-t')+1])<=300);
 });
