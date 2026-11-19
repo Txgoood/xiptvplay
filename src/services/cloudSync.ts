@@ -183,8 +183,10 @@ function applyRemote(entries:Event[]){
  }
  // Use latest edit per playlist ID, retaining unrelated local playlists.
  // A remote empty list is never treated as a delete request.
- const playlistMap=new Map(current.playlists.map(p=>[p.id,p]));
+ const deletedPlaylistIds = StorageService.getDeletedPlaylistIds();
+ const playlistMap=new Map(current.playlists.filter(p=>!deletedPlaylistIds.has(p.id)).map(p=>[p.id,p]));
  for(const e of recentPlaylist.values()){
+  if(deletedPlaylistIds.has(e.mediaId)) continue;
   if(e.playlist && e.playlist.id===e.mediaId){
    const existing=playlistMap.get(e.mediaId);
    playlistMap.set(e.mediaId,existing
