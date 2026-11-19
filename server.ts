@@ -251,9 +251,11 @@ async function startServer() {
     }
 
     const controller = new AbortController();
-    // Cancel upstream connection if client browser closes socket / seeks
-    req.on('close', () => {
-      controller.abort();
+    // The incoming request can emit 'close' after its body has been read,
+    // even while the outgoing video response is still streaming.
+    // Abort upstream only when the client-facing response closes.
+    res.on('close', () => {
+      if (!res.writableEnded) controller.abort();
     });
 
     try {
