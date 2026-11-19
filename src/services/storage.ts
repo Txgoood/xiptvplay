@@ -8,10 +8,28 @@ const STORAGE_KEYS = {
   FAVORITE_ITEMS: 'xiptvplay_favorite_items_v1',
   ACTIVE_PLAYLIST_ID: 'xiptvplay_active_playlist_v1',
   SETTINGS: 'xiptvplay_settings_v3',
+  DELETED_PLAYLIST_IDS: 'xiptvplay_deleted_playlist_ids_v1',
 };
 
 // Safe localStorage wrapper for xiptvplay
 export class StorageService {
+  static getDeletedPlaylistIds(): Set<string> {
+    try {
+      const value = JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS) || '[]');
+      return new Set(Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []);
+    } catch { return new Set(); }
+  }
+
+  static isPlaylistDeleted(id: string): boolean {
+    return this.getDeletedPlaylistIds().has(id);
+  }
+
+  static restorePlaylistId(id: string): void {
+    const deleted = this.getDeletedPlaylistIds();
+    if (!deleted.delete(id)) return;
+    localStorage.setItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS, JSON.stringify([...deleted]));
+  }
+
   static getActivePlaylistId(): string | null {
     return localStorage.getItem(STORAGE_KEYS.ACTIVE_PLAYLIST_ID);
   }
@@ -52,9 +70,9 @@ export class StorageService {
       const raw = localStorage.getItem(STORAGE_KEYS.PLAYLISTS);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) ? parsed.filter((p: Playlist) => !this.isPlaylistDeleted(p.id)) : [];
     } catch (err) {
-      console.error('[StorageService] Failed to load playlists:', err);
+      console.error('[StorageService] Failed to load playlists:, err);
       return [];
     }
   }
@@ -64,7 +82,8 @@ export class StorageService {
    */
   static savePlaylists(playlists: Playlist[]): boolean {
     try {
-      localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(playlists));
+      const deleted = this.getDeletedPlaylistIds();
+      localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(playlists.filter(p => !deleted.has(p.id))));
       return true;
     } catch (err) {
       console.error('[StorageService] Failed to save playlists:', err);
@@ -76,6 +95,7 @@ export class StorageService {
    * Adds or updates a playlist.
    */
   static upsertPlaylist(playlist: Playlist): boolean {
+    this.restorePlaylistId(playlist.id);
     const list = this.getPlaylists();
     const index = list.findIndex((p) => p.id === playlist.id);
     if (index >= 0) {
@@ -101,6 +121,7 @@ export class StorageService {
   };
 
   static async savePlaylistItemsPersistent(playlistId: string, items: MediaItem[]): Promise<void> {
+    if (this.isPlaylistDeleted(playlistId)) return;
     try {
       const db = await this.getDB();
       const tx = db.transaction('playlistItems', 'readwrite');
@@ -111,6 +132,7 @@ export class StorageService {
   }
 
   static async loadPlaylistItemsPersistent(playlistId: string): Promise<MediaItem[] | null> {
+    if (this.isPlaylistDeleted(playlistId)) return null;
     try {
       const db = await this.getDB();
       return new Promise((resolve) => {
@@ -140,10 +162,17 @@ export class StorageService {
    */
   static deletePlaylist(id: string): boolean {
     try {
+      // Keep a deletion marker before removing the connection. Cloud restores and
+      // in-flight catalog requests must not resurrect a deleted playlist.
+      const deleted = this.getDeletedPlaylistIds();
+      deleted.add(id);
+      localStorage.setItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS, JSON.stringify([...deleted]));
       const list = this.getPlaylists().filter((p) => p.id !== id);
-      this.savePlaylists(list);
+      if (!this.savePlaylists(list)) return false;
+      if (this.getActivePlaylistId() === id) this.setActivePlaylistId(null);
+      this.inMemoryPlaylistItems.delete(id);
       localStorage.removeItem(`${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${id}`);
-      this.deletePlaylistItemsPersistent(id); // Added
+      void this.deletePlaylistItemsPersistent(id);
       return true;
     } catch (err) {
       console.error('[StorageService] Failed to delete playlist:', err);
@@ -157,6 +186,7 @@ export class StorageService {
    * Retrieves cached media items for a specific playlist. Returns empty array if none.
    */
   static getPlaylistItems(playlistId: string): MediaItem[] {
+    if (this.isPlaylistDeleted(playlistId)) return [];
     // 1. Check in-memory session cache first (holds full 72,000+ catalog)
     if (this.inMemoryPlaylistItems.has(playlistId)) {
       return this.inMemoryPlaylistItems.get(playlistId)!;
@@ -182,6 +212,7 @@ export class StorageService {
    * Saves cached media items for a specific playlist.
    */
   static savePlaylistItems(playlistId: string, items: MediaItem[]): boolean {
+    if (this.isPlaylistDeleted(playlistId)) return false;
     // Store complete unfiltered catalog in-memory
     this.inMemoryPlaylistItems.set(playlistId, items);
 
@@ -295,6 +326,8 @@ export class StorageService {
         this.deletePlaylistItemsPersistent(p.id); // Added
       });
       localStorage.removeItem(STORAGE_KEYS.PLAYLISTS);
+       localStorage.removeItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS);
+       this.inMemoryPlaylistItems.clear();
       localStorage.removeItem(STORAGE_KEYS.DOWNLOADS);
       localStorage.removeItem(STORAGE_KEYS.FAVORITES);
       localStorage.removeItem(STORAGE_KEYS.FAVORITE_ITEMS);
