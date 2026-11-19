@@ -35,6 +35,10 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { DownloadNotifications } from './services/downloadNotifications';
 
+// Before React state initialization or automatic Drive restore, make the
+// Build 35 playlist migration visible to every storage reader.
+StorageService.prepareCleanPlaylistStart();
+
 export default function App() {
   useEffect(()=>{
     const resume=()=>{if(document.visibilityState==='visible')void CloudSyncController.restore();};
