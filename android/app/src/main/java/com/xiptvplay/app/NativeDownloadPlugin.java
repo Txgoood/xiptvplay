@@ -187,6 +187,7 @@ public class NativeDownloadPlugin extends Plugin {
                 if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
                 if (target.length() <= 0) throw new Exception("İndirilen dosya boş.");
                 if (total > 0 && target.length() != total) throw new Exception("İndirilen dosyanın boyutu uyuşmuyor.");
+                MediaDownloadValidation.verify(target);
                 DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, target.length(), total > 0 ? total : target.length(), true);
                 JSObject finalEvent = new JSObject();
                 finalEvent.put("id", id);
