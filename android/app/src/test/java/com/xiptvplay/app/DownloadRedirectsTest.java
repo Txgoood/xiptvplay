@@ -9,11 +9,13 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLStreamHandler;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 
 public class DownloadRedirectsTest {
     @Test public void follows302AndPreservesRange() throws Exception {
         AtomicInteger hops = new AtomicInteger();
+        AtomicReference<String> finalRange = new AtomicReference<>();
         URL original = new URL(null, "http://example.invalid/start", new URLStreamHandler() {
             @Override protected URLConnection openConnection(URL url) {
                 return new HttpURLConnection(url) {
@@ -24,6 +26,7 @@ public class DownloadRedirectsTest {
                         if (!connected) {
                             connected = true;
                             hops.incrementAndGet();
+                            if (url.getPath().equals("/final")) finalRange.set(getRequestProperty("Range"));
                         }
                         return url.getPath().equals("/start") ? 302 : 206;
                     }
@@ -40,7 +43,7 @@ public class DownloadRedirectsTest {
         HttpURLConnection response = DownloadRedirects.open(original, "bytes=0-0", null, 500, 500, c -> {});
         try {
             assertEquals(206, response.getResponseCode());
-            assertEquals("bytes=0-0", response.getRequestProperty("Range"));
+            assertEquals("bytes=0-0", finalRange.get());
             assertEquals("/final", response.getURL().getPath());
             assertEquals(2, hops.get());
         } finally { response.disconnect(); }
