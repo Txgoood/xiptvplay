@@ -24,9 +24,9 @@ public class DownloadRedirectsTest {
                     @Override public void connect() { connected = true; }
                     @Override public int getResponseCode() {
                         if (!connected) {
+                            if (url.getPath().equals("/final")) finalRange.set(getRequestProperty("Range"));
                             connected = true;
                             hops.incrementAndGet();
-                            if (url.getPath().equals("/final")) finalRange.set(getRequestProperty("Range"));
                         }
                         return url.getPath().equals("/start") ? 302 : 206;
                     }
