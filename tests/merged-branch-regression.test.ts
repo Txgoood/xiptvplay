@@ -13,7 +13,9 @@ test('single branch retains native pinch-to-zoom', () => {
 
 test('single branch retains retry-resume and real Android storage telemetry', () => {
   const download = read('android/app/src/main/java/com/xiptvplay/app/NativeDownloadPlugin.java');
-  assert.match(download, /setRequestProperty\("Range"/);
+  const redirects = read('android/app/src/main/java/com/xiptvplay/app/DownloadRedirects.java');
+  assert.match(download, /DownloadRedirects\.open/);
+  assert.match(redirects, /setRequestProperty\("Range"/);
   assert.match(download, /for \(int attempt = 0; attempt < 5; attempt\+\+\)/);
   const files = read('android/app/src/main/java/com/xiptvplay/app/DownloadFilesPlugin.java');
   assert.match(files, /getStorageStats\(PluginCall call\)/);
