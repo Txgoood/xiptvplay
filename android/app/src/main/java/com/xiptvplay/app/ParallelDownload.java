@@ -39,14 +39,8 @@ final class ParallelDownload {
     }
 
     private HttpURLConnection connect(URL url, long start, long end, String validator) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connections.add(connection);
-        connection.setConnectTimeout(7000);
-        connection.setReadTimeout(10000);
-        connection.setRequestProperty("Accept-Encoding", "identity");
-        connection.setRequestProperty("Range", "bytes=" + start + "-" + end);
-        if (validator != null) connection.setRequestProperty("If-Range", validator);
-        return connection;
+        return DownloadRedirects.open(url, "bytes=" + start + "-" + end,
+            validator, 7000, 10000, connections::add);
     }
 
     private void close(HttpURLConnection connection) {
