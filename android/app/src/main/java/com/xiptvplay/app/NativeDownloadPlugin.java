@@ -110,14 +110,9 @@ public class NativeDownloadPlugin extends Plugin {
                     if (wifiOnly && !hasActiveTransport(NetworkCapabilities.TRANSPORT_WIFI)) throw new Exception(wifiRequired);
                     HttpURLConnection connection = null;
                     try {
-                        connection = (HttpURLConnection) new URL(url).openConnection();
-                        connections.put(id, connection);
-                        connection.setConnectTimeout(30000);
-                        connection.setReadTimeout(30000);
-                        connection.setInstanceFollowRedirects(true);
-                        connection.setRequestProperty("Accept-Encoding", "identity");
-                        if (received > 0) connection.setRequestProperty("Range", "bytes=" + received + "-");
-                        connection.connect();
+                        connection = DownloadRedirects.open(new URL(url),
+                            received > 0 ? "bytes=" + received + "-" : null,
+                            null, 30000, 30000, active -> connections.put(id, active));
                         int code = connection.getResponseCode();
                         if (code != 200 && code != 206) throw new java.io.IOException("Sunucu HTTP " + code + " yanıtı verdi.");
                         boolean append = received > 0 && code == 206;
