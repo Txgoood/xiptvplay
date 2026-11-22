@@ -21,7 +21,10 @@ public class DownloadRedirectsTest {
                     @Override public boolean usingProxy() { return false; }
                     @Override public void connect() { connected = true; }
                     @Override public int getResponseCode() {
-                        hops.incrementAndGet();
+                        if (!connected) {
+                            connected = true;
+                            hops.incrementAndGet();
+                        }
                         return url.getPath().equals("/start") ? 302 : 206;
                     }
                     @Override public String getHeaderField(String name) {
