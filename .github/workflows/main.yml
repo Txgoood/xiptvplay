@@ -11,6 +11,7 @@ on:
     paths:
       - '.github/workflows/main.yml'
       - 'scripts/android-emulator-smoke.sh'
+      - 'scripts/generate-player-test-video.sh'
       - 'android/**'
       - 'src/**'
       - 'public/**'
