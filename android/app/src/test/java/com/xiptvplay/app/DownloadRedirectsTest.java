@@ -16,6 +16,7 @@ public class DownloadRedirectsTest {
     @Test public void follows302AndPreservesRange() throws Exception {
         AtomicInteger hops = new AtomicInteger();
         AtomicReference<String> finalRange = new AtomicReference<>();
+        AtomicReference<String> finalUserAgent = new AtomicReference<>();
         URL original = new URL(null, "http://example.invalid/start", new URLStreamHandler() {
             @Override protected URLConnection openConnection(URL url) {
                 return new HttpURLConnection(url) {
@@ -24,7 +25,10 @@ public class DownloadRedirectsTest {
                     @Override public void connect() { connected = true; }
                     @Override public int getResponseCode() {
                         if (!connected) {
-                            if (url.getPath().equals("/final")) finalRange.set(getRequestProperty("Range"));
+                            if (url.getPath().equals("/final")) {
+                                finalRange.set(getRequestProperty("Range"));
+                                finalUserAgent.set(getRequestProperty("User-Agent"));
+                            }
                             connected = true;
                             hops.incrementAndGet();
                         }
@@ -44,6 +48,7 @@ public class DownloadRedirectsTest {
         try {
             assertEquals(206, response.getResponseCode());
             assertEquals("bytes=0-0", finalRange.get());
+            assertEquals("IPTVSmartersPro", finalUserAgent.get());
             assertEquals("/final", response.getURL().getPath());
             assertEquals(2, hops.get());
         } finally { response.disconnect(); }
