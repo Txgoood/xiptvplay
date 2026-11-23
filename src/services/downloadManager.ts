@@ -8,7 +8,7 @@ type NativeDownloadBridge = {
   cancelDownload(options: { id: string }): Promise<void>;
   pauseDownload(options: { id: string }): Promise<void>;
   resumeDownload(options: { id: string }): Promise<void>;
-  addListener(eventName: 'downloadProgress', listenerFunc: (event: { id: string; bytes: number; contentLength: number; sampledAtMs: number; percent?: number }) => void): Promise<{ remove: () => Promise<void> }>;
+  addListener(eventName: 'downloadProgress', listenerFunc: (event: { id: string; bytes: number; contentLength: number; sampledAtMs: number; percent?: number; estimatedTotal?: boolean }) => void): Promise<{ remove: () => Promise<void> }>;
 };
 const NativeDownload = registerPlugin<NativeDownloadBridge>('NativeDownload');
 
@@ -48,7 +48,7 @@ function formatEta(totalSeconds: number): string {
 
 async function runSingleDownload(
   item: DownloadItem | MediaItem,
-  onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string, totalSizeGb?: number) => void,
+  onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string, totalSizeGb?: number, totalEstimated?: boolean) => void,
   onDone: (localUrl: string, relativePath?: string, fileUri?: string) => void,
   onError: (error: string) => void
 ) {
@@ -107,7 +107,7 @@ async function runSingleDownload(
       const etaSec = smoothedBytesPerSecond > 0 && remainingBytes > 0 ? remainingBytes / smoothedBytesPerSecond : 0;
       const eta = contentLength <= 0 ? (Number.isFinite(segmentPercent) ? 'HLS parçaları indiriliyor' : 'Boyut bekleniyor') : (etaSec > 0 ? formatEta(etaSec) : (percent >= 100 ? 'Tamamlanıyor' : 'Hesaplanıyor'));
 
-      onProgress(Math.min(percent, 100), downloadedGb, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1_000_000_000 : undefined);
+      onProgress(Math.min(percent, 100), downloadedGb, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1_000_000_000 : undefined, progress.estimatedTotal === true);
     };
 
     let progressListener: any = null;
@@ -189,7 +189,7 @@ async function runSingleDownload(
 type DownloadTask = {
   id: string;
   item: DownloadItem | MediaItem;
-  onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string, totalSizeGb?: number) => void;
+  onProgress: (progress: number, downloadedGb: number, speedMbps: number, eta: string, totalSizeGb?: number, totalEstimated?: boolean) => void;
   onDone: (localUrl: string, relativePath?: string, fileUri?: string) => void;
   onError: (error: string) => void;
   onState?: (status: 'queued' | 'downloading' | 'paused', queueOrder?: number) => void;
