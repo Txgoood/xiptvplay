@@ -166,7 +166,7 @@ public class NativeDownloadPlugin extends Plugin {
                                     if (wifiOnly && !hasActiveTransport(NetworkCapabilities.TRANSPORT_WIFI))
                                         throw new java.io.IOException(wifiRequired);
                                 },
-                                (bytes, percent) -> publishProgress(id, downloadTitle, cancelled, bytes, -1L, percent));
+                                (bytes, percent, estimatedTotal) -> publishProgress(id, downloadTitle, cancelled, bytes, estimatedTotal, percent, percent < 100));
                             received = hlsBytes;
                             total = hlsBytes;
                             responseContentType = "video/mp2t";
@@ -256,12 +256,13 @@ public class NativeDownloadPlugin extends Plugin {
     }
 
     private void publishProgress(String id, String title, AtomicBoolean cancelled, long bytes, long total) {
-        publishProgress(id, title, cancelled, bytes, total, -1);
+        publishProgress(id, title, cancelled, bytes, total, -1, false);
     }
 
-    private void publishProgress(String id, String title, AtomicBoolean cancelled, long bytes, long total, int percent) {
+    private void publishProgress(String id, String title, AtomicBoolean cancelled, long bytes, long total, int percent, boolean estimated) {
         JSObject event = new JSObject();
         if (percent >= 0) event.put("percent", percent);
+        if (percent >= 0) event.put("estimatedTotal", estimated);
         event.put("id", id);
         event.put("bytes", bytes);
         event.put("contentLength", total);
