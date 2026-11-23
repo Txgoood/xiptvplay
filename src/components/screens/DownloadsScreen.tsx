@@ -250,7 +250,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
                   <div className="flex items-center justify-between gap-1 pt-1.5 pl-1 bg-[#201f21]/60 rounded-xl px-2.5 py-1.5 border border-white/5">
                     <div className="flex items-center gap-1 text-[#b9cacb] text-[11px] font-medium">
                       <ShieldCheck className="w-3.5 h-3.5 text-[#4edea3]" />
-                      <span>MD5 Blok Onaylandı</span>
+                      <span>İndirme tamamlandı</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <button
