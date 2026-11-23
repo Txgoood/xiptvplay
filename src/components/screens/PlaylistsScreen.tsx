@@ -33,7 +33,7 @@ interface PlaylistsScreenProps {
   onSelectPlaylist: (playlist: Playlist) => void;
   onRefreshPlaylist: (id: string) => Promise<void>;
   onDeletePlaylist: (id: string) => void;
-  onUpdatePlaylist: (playlist: Playlist) => void;
+  onUpdatePlaylist: (playlist: Playlist) => Promise<boolean>;
 }
 
 export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
@@ -499,9 +499,10 @@ export const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({
         playlist={editingPlaylist}
         isOpen={!!editingPlaylist}
         onClose={() => setEditingPlaylist(null)}
-        onSave={(updated) => {
-          onUpdatePlaylist(updated);
-          setEditingPlaylist(null);
+        onSave={async (updated) => {
+          const success = await onUpdatePlaylist(updated);
+          if (success) setEditingPlaylist(null);
+          return success;
         }}
       />
     </div>
