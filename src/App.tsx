@@ -709,7 +709,7 @@ export default function App() {
     import('./services/downloadManager').then(dm => {
         dm.startDownload(
             newDownload,
-            (progress, downloadedGb, speedMbps, eta, reportedTotalSizeGb) => {
+            (progress, downloadedGb, speedMbps, eta, reportedTotalSizeGb, totalEstimated) => {
                  // Native Android indirme motoru bildirimin tek ilerleme kaynagidir.
                  // Geciken JS olaylari daha eski yuzdeyle bildirimi ezmemeli.
                 setDownloads(prev => prev.map(d => {
@@ -723,6 +723,7 @@ export default function App() {
                     speedMbps,
                     eta,
                     totalSizeGb,
+                    totalSizeEstimated: totalEstimated === true,
                     subtitle: `${item.category} • ${item.resolution} • ${sizeLabel}`,
                   };
                 }));
@@ -741,6 +742,7 @@ export default function App() {
                   setDownloads(prev => prev.map(d => d.id === newDownload.id ? {
                     ...d,
                     status: 'completed',
+                    totalSizeEstimated: false,
                     statusLabel: 'Tamamlandı',
                     localUrl,
                     offlinePath: relativePath,
