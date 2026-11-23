@@ -8,7 +8,7 @@ type NativeDownloadBridge = {
   cancelDownload(options: { id: string }): Promise<void>;
   pauseDownload(options: { id: string }): Promise<void>;
   resumeDownload(options: { id: string }): Promise<void>;
-  addListener(eventName: 'downloadProgress', listenerFunc: (event: { id: string; bytes: number; contentLength: number; sampledAtMs: number }) => void): Promise<{ remove: () => Promise<void> }>;
+  addListener(eventName: 'downloadProgress', listenerFunc: (event: { id: string; bytes: number; contentLength: number; sampledAtMs: number; percent?: number }) => void): Promise<{ remove: () => Promise<void> }>;
 };
 const NativeDownload = registerPlugin<NativeDownloadBridge>('NativeDownload');
 
@@ -81,7 +81,10 @@ async function runSingleDownload(
       const bytes = Number(progress.bytes ?? progress.receivedBytes ?? 0);
       const contentLength = Number(progress.contentLength ?? progress.totalBytes ?? 0);
       // Android bildirimiyle ayni yuzde hesaplama kuralini kullan.
-      const percent = contentLength > 0 ? Math.floor((bytes / contentLength) * 100) : 0;
+      const segmentPercent = Number(progress.percent);
+      const percent = Number.isFinite(segmentPercent) && segmentPercent >= 0
+        ? Math.min(100, Math.floor(segmentPercent))
+        : contentLength > 0 ? Math.floor((bytes / contentLength) * 100) : 0;
       const downloadedGb = bytes / 1e9;
 
       // WebView gecikmesi yerine Android'in baytları aldığı zamanı kullan.
@@ -102,7 +105,7 @@ async function runSingleDownload(
 
       const remainingBytes = contentLength > 0 ? Math.max(0, contentLength - bytes) : 0;
       const etaSec = smoothedBytesPerSecond > 0 && remainingBytes > 0 ? remainingBytes / smoothedBytesPerSecond : 0;
-      const eta = contentLength <= 0 ? 'Boyut bekleniyor' : (etaSec > 0 ? formatEta(etaSec) : (percent >= 100 ? 'Tamamlanıyor' : 'Hesaplanıyor'));
+      const eta = contentLength <= 0 ? (Number.isFinite(segmentPercent) ? 'HLS parçaları indiriliyor' : 'Boyut bekleniyor') : (etaSec > 0 ? formatEta(etaSec) : (percent >= 100 ? 'Tamamlanıyor' : 'Hesaplanıyor'));
 
       onProgress(Math.min(percent, 100), downloadedGb, Math.round(speedMbps * 10) / 10, eta, contentLength > 0 ? contentLength / 1_000_000_000 : undefined);
     };
