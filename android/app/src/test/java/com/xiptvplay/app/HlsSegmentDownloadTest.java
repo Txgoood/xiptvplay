@@ -52,12 +52,14 @@ public class HlsSegmentDownloadTest {
         File target=Files.createTempFile("xiptv-hls-", ".ts").toFile();
         target.delete();
         AtomicInteger lastProgress=new AtomicInteger();
+        java.util.concurrent.atomic.AtomicLong estimatedTotal=new java.util.concurrent.atomic.AtomicLong();
         try {
             long size=HlsSegmentDownload.download(playlist("master.m3u8",true), target,
-                conn->{}, ()->{}, (bytes,percent)->lastProgress.set(percent));
+                conn->{}, ()->{}, (bytes,percent,total)->{lastProgress.set(percent);estimatedTotal.set(total);});
             assertEquals(200000L,size);
             assertEquals(200000L,target.length());
             assertEquals(100,lastProgress.get());
+            assertEquals(200000L,estimatedTotal.get());
             byte[] data=Files.readAllBytes(target.toPath());
             assertEquals(0x47,data[0]&0xff);
             assertEquals(1,data[1]);
@@ -75,7 +77,7 @@ public class HlsSegmentDownloadTest {
         target.delete();
         try {
             try {
-                HlsSegmentDownload.download(playlist("media.m3u8",false),target,conn->{},()->{},(b,p)->{});
+                HlsSegmentDownload.download(playlist("media.m3u8",false),target,conn->{},()->{},(b,p,total)->{});
                 fail("Incomplete HLS stream was accepted");
             } catch(IOException expected) {
                 assertTrue(expected.getMessage().contains("ENDLIST"));
