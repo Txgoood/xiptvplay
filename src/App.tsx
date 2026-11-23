@@ -401,7 +401,8 @@ export default function App() {
     setCatalogItems(cached);
     setIsCatalogLoading(cached.length === 0);
     void StorageService.loadPlaylistItemsPersistent(selectedId).then(persistent => {
-      if(cancelled || activePlaylistRef.current?.id !== selectedId)return;
+      if (cancelled || activePlaylistRef.current?.id !== selectedId ||
+          activePlaylistRef.current.catalogRevision !== activePlaylist.catalogRevision) return;
       const effective = persistent && persistent.length > cached.length ? persistent : cached;
       if(persistent && persistent.length > cached.length)setCatalogItems(persistent);
       if(effective.length) { setIsCatalogLoading(false); return; }
@@ -422,7 +423,7 @@ export default function App() {
       }
     });
     return () => { cancelled = true; };
-  }, [activePlaylist?.id]);
+  }, [activePlaylist?.id, activePlaylist?.catalogRevision]);
 
   // Add Playlist Handler
   const handleOpenAddModal = (type: 'xtream' | 'm3u' = 'xtream') => {
@@ -466,8 +467,13 @@ export default function App() {
 
   // Validate a changed provider and stage its entire catalog BEFORE switching credentials.
   // Never mix a new host with cached old-host stream URLs or modify offline downloads.
+  const isolateProviderItems = (playlist: Playlist, items: MediaItem[]) =>
+    playlist.catalogRevision
+      ? items.map(item => ({ ...item, id: `${item.id}-${playlist.catalogRevision}` }))
+      : items;
+
   const handleUpdatePlaylist = async (updated: Playlist): Promise<boolean> => {
-    const old = playlistsRef.current.find(p => p.id === updated.id);
+    const old = StorageService.getPlaylists().find(p => p.id === updated.id);
     if (!old || refreshingPlaylistIdsRef.current.has(updated.id)) {
       showToast('Playlist şu anda yenileniyor. İşlem tamamlanınca yeniden deneyin.');
       return false;
@@ -484,32 +490,44 @@ export default function App() {
       return true;
     }
     refreshingPlaylistIdsRef.current.add(updated.id);
-    showToast('Yeni sunucu doğrulanıyor; eski katalog korunuyor...');
+    showToast('Yeni sunucu doğrulanıyor. Eski katalog korunuyor.');
+    const previousJob = catalogQueueRef.current;
+    let releaseQueue = () => {};
+    catalogQueueRef.current = new Promise<void>(resolve => { releaseQueue = resolve; });
     try {
       let items: MediaItem[];
       let counts: { live: number; movie: number; series: number };
-      let verified = { ...updated };
+      await previousJob;
+      let verified: Playlist = {
+        ...updated, catalogRevision: crypto.randomUUID(), m3uContent: undefined,
+        activeConnections: undefined, maxConnections: undefined, pingMs: undefined, badge: undefined,
+      };
       if (updated.type === 'xtream') {
         if (!updated.serverUrl || !updated.username || !updated.password)
           throw Error('Yeni Xtream sunucu bilgileri eksik.');
         const check = await XtreamClientService.verifyConnection(updated.serverUrl, updated.username, updated.password);
         if (!check.success) throw Error('Yeni sunucu bağlantısı doğrulanamadı.');
         const result = await XtreamClientService.fetchCatalog(
-          check.effectiveServerUrl || updated.serverUrl, updated.username, updated.password, updated.id
+          check.effectiveServerUrl || updated.serverUrl, updated.username, updated.password, updated.id, undefined, undefined, true
         );
         items = result.items;
         counts = result.counts;
         verified.serverUrl = result.workingServer || check.effectiveServerUrl || updated.serverUrl;
-        verified.expiryDays = check.expiryDays ?? updated.expiryDays;
-        verified.expiryDateStr = check.expiryDateStr ?? updated.expiryDateStr;
+        verified.pingMs = check.pingMs;
+        verified.expiryDays = check.expiryDays ?? 0;
+        verified.expiryDateStr = check.expiryDateStr ?? 'Bilinmiyor';
       } else {
         if (!updated.m3uUrl) throw Error('Yeni M3U bağlantısı eksik.');
         const response = await M3UParserService.fetchM3U(updated.m3uUrl);
         if (!response.success || !response.content) throw Error('Yeni M3U listesi indirilemedi.');
-        const result = M3UParserService.parse(response.content, updated.id);
+        if (!/^\s*#EXTM3U(?:\s|$)/i.test(response.content) || /^#EXT-X-/im.test(response.content)) {
+          throw Error('Sunucu geçerli bir IPTV M3U kataloğu döndürmedi.');
+        }
+        verified.expiryDays = 0;
+        verified.expiryDateStr = 'Bilinmiyor';
+        const result = M3UParserService.parse(response.content, updated.id, response.effectiveUrl || updated.m3uUrl);
         items = result.items;
         counts = result.counts;
-        verified.m3uUrl = response.effectiveUrl || updated.m3uUrl;
         verified.m3uContent = undefined;
       }
       if (!items.length || !(counts.live + counts.movie + counts.series))
@@ -522,10 +540,11 @@ export default function App() {
         liveCount: counts.live, movieCount: counts.movie, seriesCount: counts.series,
         isCached: true, lastSync: 'Şimdi', errorMessage: undefined
       };
-      // Keep the old credentials/cache if the new playlist metadata cannot be persisted.
-      if (!StorageService.upsertPlaylist(verified)) throw Error('Yeni sunucu ayarları kaydedilemedi.');
-      StorageService.savePlaylistItems(updated.id, items);
-      await StorageService.savePlaylistItemsPersistent(updated.id, items);
+      items = isolateProviderItems(verified, items);
+      if (!await StorageService.commitProviderChange(old, verified, items)) {
+        throw Error('Yeni sunucu ayarları kaydedilemedi.');
+      }
+      historyPlayRequestRef.current += 1;
       autoRefreshAttemptedRef.current.delete(updated.id);
       setPlaylists(prev => {
         const next = prev.map(p => p.id === updated.id ? verified : p);
@@ -546,6 +565,7 @@ export default function App() {
       return false;
     } finally {
       refreshingPlaylistIdsRef.current.delete(updated.id);
+      releaseQueue();
     }
   };
 
@@ -585,7 +605,7 @@ export default function App() {
       let counts:{live:number;movie:number;series:number};
       let workingServer=target.serverUrl;
       let expiryDays=target.expiryDays, expiryDateStr=target.expiryDateStr;
-      let pingMs=target.pingMs, newM3uUrl=target.m3uUrl;
+      let pingMs=target.pingMs;
 
       if(target.type==='xtream'){
         if(!target.serverUrl || !target.username || !target.password)
@@ -593,19 +613,21 @@ export default function App() {
         const verify=await withDeadline(XtreamClientService.verifyConnection(target.serverUrl,target.username,target.password),35000);
         if(!verify.success)
           throw Error('IPTV bağlantısı doğrulanamadı: '+(verify.error || 'Sunucu yanıt vermedi.'));
+        const effectiveServer = verify.effectiveServerUrl || target.serverUrl;
+        const redirected = effectiveServer !== XtreamClientService.normalizeServerUrl(target.serverUrl);
         const persistedCatalog = await StorageService.loadPlaylistItemsPersistent(id);
         let retainedCatalog = StorageService.getPlaylistItems(id);
         if(persistedCatalog && persistedCatalog.length > retainedCatalog.length) retainedCatalog = persistedCatalog;
         const result=await XtreamClientService.fetchCatalog(
-          verify.effectiveServerUrl||target.serverUrl,target.username,target.password,target.id,
+          effectiveServer,target.username,target.password,target.id,
           stage => {
             catalogStage = stage;
             setPlaylists(prev=>prev.map(p=>p.id===id?{...p,statusLabel:stage+' alınıyor...'}:p));
           },
-          (type, sectionItems) => {
+          redirected ? undefined : (type, sectionItems) => {
             if(!StorageService.getPlaylists().some(p=>p.id===id))return;
             const previous = retainedCatalog;
-            const merged = [...previous.filter(item=>item.type!==type), ...sectionItems];
+            const merged = [...previous.filter(item=>item.type!==type), ...isolateProviderItems(target, sectionItems)];
             retainedCatalog = merged;
             StorageService.savePlaylistItems(id,merged);
             const sectionCounts = {
@@ -619,8 +641,8 @@ export default function App() {
               setIsCatalogLoading(false);
               setActivePlaylist(prev=>prev?.id===id?{...prev,...sectionCounts,isCached:true}:prev);
             }
-          });
-        items=result.items;counts=result.counts;
+          }, redirected || Boolean(target.catalogRevision));
+        items=isolateProviderItems(target, result.items);counts=result.counts;
         workingServer=result.workingServer || verify.effectiveServerUrl || target.serverUrl;
         expiryDays=verify.expiryDays??expiryDays;
         expiryDateStr=verify.expiryDateStr??expiryDateStr;
@@ -628,16 +650,17 @@ export default function App() {
       }else if(target.type==='m3u'){
         catalogStage = 'M3U listesi';
         let content=target.m3uContent;
+        let effectiveM3uUrl = target.m3uUrl;
         if(target.m3uUrl){
           const fetched=await withDeadline(M3UParserService.fetchM3U(target.m3uUrl),90000);
           if(!fetched.success || !fetched.content)
             throw Error('M3U indirilemedi: '+(fetched.error||'Sunucu boş yanıt verdi.'));
           content=fetched.content;
-          newM3uUrl=fetched.effectiveUrl||target.m3uUrl;
+          effectiveM3uUrl=fetched.effectiveUrl||target.m3uUrl;
         }
         if(!content)throw Error('Bu M3U listesi dosyadan eklenmiş, URL bulunamadı. Büyük M3U dosyaları buluta yüklenmez; kaynak dosyayı bu telefona aktarman gerekiyor.');
-        const parsed=M3UParserService.parse(content,target.id);
-        items=parsed.items;counts=parsed.counts;
+        const parsed=M3UParserService.parse(content,target.id,effectiveM3uUrl);
+        items=isolateProviderItems(target, parsed.items);counts=parsed.counts;
       }else throw Error('Playlist türü desteklenmiyor.');
 
       if(!items.length || (counts.live+counts.movie+counts.series)===0)
@@ -649,7 +672,7 @@ export default function App() {
       setPlaylists(prev=>{
         const updated=prev.map(p=>p.id===id?{
           ...p,status:'active' as const,statusLabel:'Bağlı (Aktif)',
-          serverUrl:workingServer||p.serverUrl,m3uUrl:newM3uUrl,
+          serverUrl:workingServer||p.serverUrl,
           liveCount:counts.live,movieCount:counts.movie,seriesCount:counts.series,
           expiryDays,expiryDateStr,pingMs,lastSync:'Şimdi',errorMessage:undefined,
           isCached:true
@@ -659,7 +682,7 @@ export default function App() {
       });
       if(isSelected()){
         setActivePlaylist(prev => prev?.id===id ? {
-          ...prev,status:'active',statusLabel:'Bağlı (Aktif)',
+          ...prev,status:'active',statusLabel:'Bağlı (Aktif)',serverUrl:workingServer || prev.serverUrl,
           liveCount:counts.live,movieCount:counts.movie,seriesCount:counts.series,
           lastSync:'Şimdi',isCached:true,errorMessage:undefined
         } : prev);

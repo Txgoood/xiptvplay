@@ -11,6 +11,73 @@ export const isNative = (): boolean => {
 
 export const IPTV_UA = 'IPTVSmartersPro';
 
+export function providerUrl(input: string): URL {
+  const value = input.trim();
+  const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(value) ? value : `http://${value}`);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+    throw new Error('Geçerli bir HTTP veya HTTPS sunucu adresi girin.');
+  }
+  url.hash = '';
+  return url;
+}
+
+export function detectProviderInput(input: string, fallback: 'xtream' | 'm3u') {
+  const url = providerUrl(input);
+  const endpoint = url.pathname.replace(/\/+$/, '');
+  if (/\/(?:get\.php|[^/]+\.m3u8?)$/i.test(endpoint)) {
+    return { type: 'm3u' as const, m3uUrl: url.href };
+  }
+  if (/\/player_api\.php$/i.test(endpoint) || fallback === 'xtream') {
+    return {
+      type: 'xtream' as const,
+      serverUrl: url.origin + endpoint.replace(/\/player_api\.php$/i, ''),
+      username: url.searchParams.get('username'),
+      password: url.searchParams.get('password'),
+    };
+  }
+  return { type: 'm3u' as const, m3uUrl: url.href };
+}
+
+export async function getProviderResponse(
+  input: string,
+  timeoutMs = 25000,
+  request: (options: Parameters<typeof CapacitorHttp.get>[0]) => Promise<{
+    status: number; headers: Record<string, string>; data?: unknown;
+  }> = options => CapacitorHttp.get(options)
+) {
+  let url = providerUrl(input);
+  let canUpgrade = url.protocol === 'http:';
+  const deadline = Date.now() + timeoutMs;
+  for (let hop = 0; hop <= 5; hop += 1) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    const response = await request({
+      url: url.href,
+      headers: { 'User-Agent': IPTV_UA, Accept: '*/*' },
+      responseType: 'text',
+      disableRedirects: true,
+      readTimeout: remaining,
+      connectTimeout: Math.min(remaining, 15000),
+    });
+    if (response.status === 404 && canUpgrade && hop === 0) {
+      url.protocol = 'https:';
+      canUpgrade = false;
+      continue;
+    }
+    if (![301, 302, 303, 307, 308].includes(response.status)) {
+      return { ...response, url: url.href };
+    }
+    const location = Object.entries(response.headers).find(([name]) => name.toLowerCase() === 'location')?.[1];
+    if (!location) throw new Error('Sunucu geçersiz yönlendirme döndürdü.');
+    const next = providerUrl(new URL(location, url).href);
+    if (url.protocol === 'https:' && next.protocol !== 'https:') {
+      throw new Error('Sunucu güvenli bağlantıdan HTTP adresine yönlendirdi.');
+    }
+    url = next;
+  }
+  throw new Error('Sunucu yönlendirme veya süre sınırını aştı.');
+}
+
 export async function httpGetText(
   url: string,
   timeoutMs = 25000
@@ -51,32 +118,13 @@ export async function httpGetJson(url: string) {
   }
 }
 
-export async function fetchWithProtocolFallback(url: string) {
-  // Try original URL
-  let result = await httpGetText(url);
-  if (result.status >= 200 && result.status < 300) return result;
-
-  // Try fallback protocol
-  const fallbackUrl = url.startsWith('http://')
-    ? url.replace('http://', 'https://')
-    : url.replace('https://', 'http://');
-
-  return await httpGetText(fallbackUrl);
-}
-
 /** Strict catalog requests report safe errors without exposing URLs or credentials. */
 export async function httpGetCatalogJson(url: string, timeoutMs = 60000): Promise<any> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const result = await Promise.race([
       isNative()
-        ? CapacitorHttp.get({
-            url,
-            headers: { 'User-Agent': IPTV_UA, Accept: '*/*' },
-            responseType: 'text',
-            readTimeout: timeoutMs,
-            connectTimeout: Math.min(timeoutMs, 15000),
-          }).catch((error: any) => {
+        ? getProviderResponse(url, timeoutMs).catch((error: any) => {
             // Native exceptions may contain the credential-bearing URL.
             throw new Error(/timeout|timed out/i.test(String(error?.message))
               ? 'İstek zaman aşımına uğradı.'

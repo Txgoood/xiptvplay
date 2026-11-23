@@ -30,6 +30,7 @@ function portablePlaylist(p:Playlist):Playlist {
  return {
   id:p.id,name:p.name,type:p.type,serverUrl:p.serverUrl,
   username:p.username,password:p.password,m3uUrl:p.m3uUrl,
+  catalogRevision:p.catalogRevision,
   m3uContent:canInline?p.m3uContent:undefined,
   status:'active',statusLabel:'Buluttan aktarıldı',expiryDays:0,
   expiryDateStr:'',liveCount:0,movieCount:0,seriesCount:0,
@@ -40,7 +41,7 @@ function portableSignature(p:Playlist){
  const normalized=portablePlaylist(p);
  return JSON.stringify([normalized.id,normalized.name,normalized.type,
   normalized.serverUrl,normalized.username,normalized.password,
-  normalized.m3uUrl,normalized.m3uContent]);
+  normalized.m3uUrl,normalized.m3uContent,normalized.catalogRevision]);
 }
 function readItems<T>(key:string):T[]{try{const d=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(d)?d:[];}catch{return [];}}
 function snapshots(): Snapshot {
@@ -192,7 +193,9 @@ function applyRemote(entries:Event[]){
   if(deletedPlaylistIds.has(e.mediaId)) continue;
   if(e.playlist && e.playlist.id===e.mediaId){
    const existing=playlistMap.get(e.mediaId);
-   playlistMap.set(e.mediaId,existing
+   const sameCatalog = existing && existing.catalogRevision === e.playlist.catalogRevision;
+   if (existing?.catalogRevision && !e.playlist.catalogRevision) continue;
+   playlistMap.set(e.mediaId,sameCatalog
      ? {...existing,...e.playlist,status:existing.status,statusLabel:existing.statusLabel,
          expiryDays:existing.expiryDays,expiryDateStr:existing.expiryDateStr,
          liveCount:existing.liveCount,movieCount:existing.movieCount,

@@ -10,6 +10,7 @@ export interface Playlist {
   password?: string;
   m3uUrl?: string;
   m3uContent?: string;
+  catalogRevision?: string;
   status: 'active' | 'warning' | 'expired' | 'error';
   statusLabel: string;
   badge?: string;

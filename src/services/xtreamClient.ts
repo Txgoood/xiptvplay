@@ -1,5 +1,5 @@
 import { MediaItem, XtreamUserInfo, XtreamServerInfo, SeriesDetail, SeriesEpisode, SeriesSeason } from '../types';
-import { isNative, httpGetJson, httpGetCatalogJson } from './net';
+import { isNative, httpGetJson, getProviderResponse, providerUrl, httpGetCatalogJson } from './net';
 import { normalizeEpisodeDuration, readXtreamDuration, typicalEpisodeDuration } from './episodeDuration';
 import { catalogTimestamp, catalogRating, catalogReleaseDate } from './catalogDiscovery';
 
@@ -77,9 +77,19 @@ export class XtreamClientService {
     if (isNative()) {
         try {
             const apiUrl = `${cleanUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-            const data = await httpGetJson(apiUrl);
+            const response = await getProviderResponse(apiUrl);
+            if (response.status < 200 || response.status >= 300) {
+                return { success: false, error: `Sunucuya erişilemedi (HTTP ${response.status}).` };
+            }
+            const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+            const endpoint = providerUrl(response.url);
+            const redirectedBase = endpoint.pathname.endsWith('/player_api.php') &&
+                endpoint.searchParams.get('username') === username &&
+                endpoint.searchParams.get('password') === password
+                ? endpoint.origin + endpoint.pathname.slice(0, -'/player_api.php'.length)
+                : cleanUrl;
             
-            if (!data || !data.user_info || data.user_info.auth !== 1) {
+            if (!data || !data.user_info || String(data.user_info.auth) !== '1') {
                 return { success: false, error: 'Kimlik doğrulama başarısız! Kullanıcı adı veya şifre hatalı.' };
             }
             
@@ -94,10 +104,10 @@ export class XtreamClientService {
                 pingMs: 35,
                 expiryDays,
                 expiryDateStr,
-                effectiveServerUrl: cleanUrl,
+                effectiveServerUrl: redirectedBase,
             };
         } catch (err: any) {
-            return { success: false, error: `Doğrudan bağlantı hatası: ${err.message}` };
+            return { success: false, error: 'Xtream sunucusuna erişilemedi veya yanıt okunamadı.' };
         }
     }
 
@@ -159,7 +169,8 @@ export class XtreamClientService {
     password: string,
     playlistId: string,
     onProgress?: (stage: string) => void,
-    onSection?: (type: 'live' | 'movie' | 'series', items: MediaItem[]) => void
+    onSection?: (type: 'live' | 'movie' | 'series', items: MediaItem[]) => void,
+    fresh = false
   ): Promise<XtreamCatalogResult> {
     const cleanUrl = this.normalizeServerUrl(serverUrl);
 
@@ -191,8 +202,8 @@ export class XtreamClientService {
         };
 
         const cacheKey = JSON.stringify([playlistId, cleanUrl, username, password]);
-        const data: Record<string, any> = this.partialCatalogs.get(cacheKey) || {};
-        this.partialCatalogs.set(cacheKey, data);
+        const data: Record<string, any> = (!fresh && this.partialCatalogs.get(cacheKey)) || {};
+        if (!fresh) this.partialCatalogs.set(cacheKey, data);
         const errors: string[] = [];
         const sections = [
           { type: 'live', categories: 'liveCategories', list: 'liveStreams', catAction: 'get_live_categories', action: 'get_live_streams' },
@@ -249,7 +260,7 @@ export class XtreamClientService {
               } else {
                 entries = await fetchNativeAction(section.action);
               }
-              if (!entries.length) throw new Error('Sunucu boş içerik listesi döndürdü; mevcut kayıtlar korundu.');
+              if (!entries.length && !fresh) throw new Error('Sunucu boş içerik listesi döndürdü; mevcut kayıtlar korundu.');
               data[section.categories] = categories;
               data[section.list] = entries;
             }

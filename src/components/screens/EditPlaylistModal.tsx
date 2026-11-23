@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Playlist } from '../../types';
-import { X, Server, User, Lock, Eye, EyeOff, Link2, Check, ShieldCheck } from 'lucide-react';
+import { detectProviderInput } from '../../services/net';
+import { X, Server, User, Lock, Eye, EyeOff, Link2, Check } from 'lucide-react';
 
 interface EditPlaylistModalProps {
   playlist: Playlist | null;
@@ -15,6 +16,7 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const [type, setType] = useState<Playlist['type']>('xtream');
   const [name, setName] = useState('');
   const [serverUrl, setServerUrl] = useState('');
   const [username, setUsername] = useState('');
@@ -26,6 +28,7 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
 
   useEffect(() => {
     if (playlist) {
+      setType(playlist.type);
       setName(playlist.name || '');
       setServerUrl(playlist.serverUrl || '');
       setUsername(playlist.username || '');
@@ -41,14 +44,26 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
     e.preventDefault();
     if (!name.trim() || validating) return;
 
-    const updated: Playlist = {
-      ...playlist,
-      name: name.trim(),
-      serverUrl: playlist.type === 'xtream' ? serverUrl.trim() : undefined,
-      username: playlist.type === 'xtream' ? username.trim() : undefined,
-      password: playlist.type === 'xtream' ? password.trim() : undefined,
-      m3uUrl: playlist.type === 'm3u' ? m3uUrl.trim() : undefined,
-    };
+    let updated: Playlist = { ...playlist, name: name.trim() };
+    try {
+      const input = type === 'xtream' ? serverUrl : m3uUrl;
+      if (input.trim()) {
+        const source = detectProviderInput(input, type);
+        updated = {
+          ...updated,
+          type: source.type,
+          serverUrl: source.type === 'xtream' ? source.serverUrl : undefined,
+          username: source.type === 'xtream' ? source.username ?? username.trim() : undefined,
+          password: source.type === 'xtream' ? source.password ?? password.trim() : undefined,
+          m3uUrl: source.type === 'm3u' ? source.m3uUrl : undefined,
+        };
+      } else if (type !== 'm3u' || playlist.type !== 'm3u' || playlist.m3uUrl) {
+        throw new Error('Missing provider URL');
+      }
+    } catch {
+      setValidationError('Geçerli bir HTTP veya HTTPS sunucu adresi girin.');
+      return;
+    }
 
     setValidating(true);
     setValidationError('');
@@ -107,7 +122,16 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
             />
           </div>
 
-          {playlist.type === 'xtream' ? (
+          <label className="flex flex-col gap-1.5 text-xs text-[#b9cacb]">
+            Bağlantı türü
+            <select value={type} disabled={validating} onChange={e => setType(e.target.value === 'xtream' ? 'xtream' : 'm3u')}
+              className="bg-[#201f21] border border-white/10 rounded-xl p-2.5 text-[#e5e1e4]">
+              <option value="xtream">Xtream Codes</option>
+              <option value="m3u">M3U bağlantısı</option>
+            </select>
+          </label>
+
+          {type === 'xtream' ? (
             <>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs text-[#b9cacb] font-medium">Sunucu URL (Port dahil)</label>
@@ -118,7 +142,6 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
                     value={serverUrl}
                     onChange={(e) => setServerUrl(e.target.value)}
                     placeholder="http://example.com:8080"
-                    required
                     className="w-full bg-[#201f21] border border-white/10 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-[#e5e1e4] font-mono focus:outline-none focus:border-[#00f0ff]/50"
                   />
                 </div>
@@ -133,7 +156,6 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Kullanıcı adı"
-                    required
                     className="w-full bg-[#201f21] border border-white/10 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-[#e5e1e4] font-mono focus:outline-none focus:border-[#00f0ff]/50"
                   />
                 </div>
@@ -148,7 +170,6 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Şifre"
-                    required
                     className="w-full bg-[#201f21] border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-xs text-[#e5e1e4] font-mono focus:outline-none focus:border-[#00f0ff]/50"
                   />
                   <button
@@ -171,7 +192,6 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
                   value={m3uUrl}
                   onChange={(e) => setM3uUrl(e.target.value)}
                   placeholder="https://example.com/playlist.m3u"
-                  required
                   className="w-full bg-[#201f21] border border-white/10 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-[#e5e1e4] font-mono focus:outline-none focus:border-[#00f0ff]/50"
                 />
               </div>

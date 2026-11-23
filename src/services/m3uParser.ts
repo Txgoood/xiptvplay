@@ -1,7 +1,7 @@
 import { normalizeEpisodeDuration } from './episodeDuration';
 import { MediaItem } from '../types';
 import { XtreamClientService } from './xtreamClient';
-import { isNative, httpGetText, fetchWithProtocolFallback } from './net';
+import { isNative, getProviderResponse } from './net';
 
 export interface M3UParseResult {
   items: MediaItem[];
@@ -149,11 +149,15 @@ export class M3UParserService {
     }
 
     if (isNative()) {
-      const res = await fetchWithProtocolFallback(cleanUrl);
-      if (res.status >= 200 && res.status < 300) {
-        return { success: true, content: res.text, effectiveUrl: cleanUrl };
+      try {
+        const res = await getProviderResponse(cleanUrl);
+        if (res.status >= 200 && res.status < 300 && typeof res.data === 'string') {
+          return { success: true, content: res.data, effectiveUrl: res.url };
+        }
+        return { success: false, error: `HTTP ${res.status} hatası veya geçersiz liste.` };
+      } catch {
+        return { success: false, error: 'M3U bağlantısı kurulamadı.' };
       }
-      return { success: false, error: `HTTP ${res.status} hatası.` };
     }
 
     // Web fallback via backend
@@ -195,7 +199,7 @@ export class M3UParserService {
    * - Automatically repairs Turkish character encoding.
    * - Formats stream URLs into safe proxy endpoints.
    */
-  static parse(content: string, playlistId: string): M3UParseResult {
+  static parse(content: string, playlistId: string, sourceUrl?: string): M3UParseResult {
     // Clean raw text with Turkish encoding repair first
     const repairedContent = repairTurkishEncoding(content);
     const lines = repairedContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -254,7 +258,20 @@ export class M3UParserService {
 
       // Check if this line is the URL (non-comment line after #EXTINF)
       if (!line.startsWith('#') && currentExtinf) {
-        const streamLine = line;
+        let streamLine = line;
+        if (sourceUrl) {
+          try {
+            const url = new URL(line, sourceUrl);
+            if (!['http:', 'https:'].includes(url.protocol)) {
+              currentExtinf = null;
+              continue;
+            }
+            streamLine = url.href;
+          } catch {
+            currentExtinf = null;
+            continue;
+          }
+        }
         const itemTitle = currentExtinf.title || 'Bilinmeyen Kanal';
         const resolution: MediaItem['resolution'] = 'HD';
         const group = currentExtinf.groupTitle || 'Genel';

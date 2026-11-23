@@ -170,12 +170,64 @@ export class StorageService {
     });
   };
 
+  private static catalogKey(id: string, revision?: string): string {
+    return revision ? `${id}:${revision}` : id;
+  }
+
+  static async commitProviderChange(previous: Playlist, replacement: Playlist, items: MediaItem[]): Promise<boolean> {
+    if (replacement.id !== previous.id || !replacement.catalogRevision ||
+        replacement.catalogRevision === previous.catalogRevision) return false;
+    const key = this.catalogKey(previous.id, replacement.catalogRevision);
+    let committed = false;
+    try {
+      await this.writePersistentCatalog(key, items);
+      const current = this.getPlaylists();
+      const index = current.findIndex(p => p.id === previous.id);
+      if (index < 0 || JSON.stringify(current[index]) !== JSON.stringify(previous)) return false;
+      current[index] = replacement;
+      if (!this.savePlaylists(current)) return false;
+      committed = true;
+      this.inMemoryPlaylistItems.set(key, items);
+      try {
+        this.removeCatalog(previous.id, previous.catalogRevision);
+      } catch {
+        // A retired cache is no longer reachable through the playlist.
+      }
+      return true;
+    } finally {
+      if (!committed) void this.deletePlaylistItemsPersistent(key);
+    }
+  }
+
+  private static async writePersistentCatalog(key: string, items: MediaItem[]): Promise<void> {
+    const db = await this.getDB();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction('playlistItems', 'readwrite');
+        tx.oncomplete = () => resolve();
+        tx.onabort = () => reject(tx.error);
+        tx.objectStore('playlistItems').put({ playlistId: key, items, savedAt: Date.now() });
+      });
+    } finally {
+      db.close();
+    }
+  }
+
+  private static removeCatalog(id: string, revision?: string) {
+    const key = this.catalogKey(id, revision);
+    this.inMemoryPlaylistItems.delete(key);
+    try {
+      localStorage.removeItem(`${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${key}`);
+    } finally {
+      void this.deletePlaylistItemsPersistent(key);
+    }
+  }
+
   static async savePlaylistItemsPersistent(playlistId: string, items: MediaItem[]): Promise<void> {
     if (this.isPlaylistDeleted(playlistId)) return;
     try {
-      const db = await this.getDB();
-      const tx = db.transaction('playlistItems', 'readwrite');
-      tx.objectStore('playlistItems').put({ playlistId, items, savedAt: Date.now() });
+      const key = this.catalogKey(playlistId, this.getPlaylists().find(p => p.id === playlistId)?.catalogRevision);
+      await this.writePersistentCatalog(key, items);
     } catch (err) {
       console.warn('[StorageService] Persistent storage failed:', err);
     }
@@ -183,13 +235,15 @@ export class StorageService {
 
   static async loadPlaylistItemsPersistent(playlistId: string): Promise<MediaItem[] | null> {
     if (this.isPlaylistDeleted(playlistId)) return null;
+    const key = this.catalogKey(playlistId, this.getPlaylists().find(p => p.id === playlistId)?.catalogRevision);
     try {
       const db = await this.getDB();
       return new Promise((resolve) => {
         const tx = db.transaction('playlistItems', 'readonly');
-        const request = tx.objectStore('playlistItems').get(playlistId);
+        const request = tx.objectStore('playlistItems').get(key);
         request.onsuccess = () => resolve(request.result ? request.result.items : null);
         request.onerror = () => resolve(null);
+        tx.oncomplete = tx.onabort = () => db.close();
       });
     } catch (err) {
       console.warn('[StorageService] Persistent load failed:', err);
@@ -201,6 +255,7 @@ export class StorageService {
     try {
       const db = await this.getDB();
       const tx = db.transaction('playlistItems', 'readwrite');
+      tx.oncomplete = tx.onabort = () => db.close();
       tx.objectStore('playlistItems').delete(playlistId);
     } catch (err) {
       console.warn('[StorageService] Persistent delete failed:', err);
@@ -214,15 +269,14 @@ export class StorageService {
     try {
       // Keep a deletion marker before removing the connection. Cloud restores and
       // in-flight catalog requests must not resurrect a deleted playlist.
+      const revision = this.getPlaylists().find(p => p.id === id)?.catalogRevision;
       const deleted = this.getDeletedPlaylistIds();
       deleted.add(id);
       localStorage.setItem(STORAGE_KEYS.DELETED_PLAYLIST_IDS, JSON.stringify([...deleted]));
       const list = this.getPlaylists().filter((p) => p.id !== id);
       if (!this.savePlaylists(list)) return false;
       if (this.getActivePlaylistId() === id) this.setActivePlaylistId(null);
-      this.inMemoryPlaylistItems.delete(id);
-      localStorage.removeItem(`${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${id}`);
-      void this.deletePlaylistItemsPersistent(id);
+      this.removeCatalog(id, revision);
       return true;
     } catch (err) {
       console.error('[StorageService] Failed to delete playlist:', err);
@@ -237,18 +291,19 @@ export class StorageService {
    */
   static getPlaylistItems(playlistId: string): MediaItem[] {
     if (this.isPlaylistDeleted(playlistId)) return [];
+    const key = this.catalogKey(playlistId, this.getPlaylists().find(p => p.id === playlistId)?.catalogRevision);
     // 1. Check in-memory session cache first (holds full 72,000+ catalog)
-    if (this.inMemoryPlaylistItems.has(playlistId)) {
-      return this.inMemoryPlaylistItems.get(playlistId)!;
+    if (this.inMemoryPlaylistItems.has(key)) {
+      return this.inMemoryPlaylistItems.get(key)!;
     }
 
     // 2. Fallback to localStorage cache
     try {
-      const raw = localStorage.getItem(`${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${playlistId}`);
+      const raw = localStorage.getItem(`${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${key}`);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        this.inMemoryPlaylistItems.set(playlistId, parsed);
+        this.inMemoryPlaylistItems.set(key, parsed);
         return parsed;
       }
       return [];
@@ -263,14 +318,15 @@ export class StorageService {
    */
   static savePlaylistItems(playlistId: string, items: MediaItem[]): boolean {
     if (this.isPlaylistDeleted(playlistId)) return false;
+    const key = this.catalogKey(playlistId, this.getPlaylists().find(p => p.id === playlistId)?.catalogRevision);
     // Store complete unfiltered catalog in-memory
-    this.inMemoryPlaylistItems.set(playlistId, items);
+    this.inMemoryPlaylistItems.set(key, items);
 
     // Persist as many as possible safely in localStorage (compacted)
     try {
       const trimmed = items.slice(0, 3000);
       localStorage.setItem(
-        `${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${playlistId}`,
+        `${STORAGE_KEYS.PLAYLIST_ITEMS_PREFIX}${key}`,
         JSON.stringify(trimmed)
       );
     } catch (err) {
