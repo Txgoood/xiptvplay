@@ -6,7 +6,7 @@ interface EditPlaylistModalProps {
   playlist: Playlist | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (updated: Playlist) => void;
+  onSave: (updated: Playlist) => Promise<boolean>;
 }
 
 export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
@@ -21,6 +21,8 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
   const [password, setPassword] = useState('');
   const [m3uUrl, setM3uUrl] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [validationError, setValidationError] = useState('');
 
   useEffect(() => {
     if (playlist) {
@@ -29,14 +31,15 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
       setUsername(playlist.username || '');
       setPassword(playlist.password || '');
       setM3uUrl(playlist.m3uUrl || '');
+      setValidationError('');
     }
   }, [playlist]);
 
   if (!isOpen || !playlist) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || validating) return;
 
     const updated: Playlist = {
       ...playlist,
@@ -47,8 +50,17 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
       m3uUrl: playlist.type === 'm3u' ? m3uUrl.trim() : undefined,
     };
 
-    onSave(updated);
-    onClose();
+    setValidating(true);
+    setValidationError('');
+    try {
+      const saved = await onSave(updated);
+      if (saved) onClose();
+      else setValidationError('Yeni sunucu doğrulanamadı. Eski bağlantı ve indirilenler korundu.');
+    } catch {
+      setValidationError('Sunucu geçişi başarısız. Eski bağlantı korundu.');
+    } finally {
+      setValidating(false);
+    }
   };
 
   return (
@@ -74,6 +86,7 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            disabled={validating}
             className="w-8 h-8 rounded-full bg-[#2a2a2c] hover:bg-[#353437] flex items-center justify-center text-[#b9cacb] hover:text-[#e5e1e4] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -165,21 +178,25 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({
             </div>
           )}
 
+          {validationError && <p role="alert" className="text-xs text-[#ffb4ab]">{validationError}</p>}
+          <p className="text-[11px] text-[#b9cacb]">Sunucu değiştiğinde önce bağlantı ve yeni katalog kontrol edilir. Başarısız olursa eski bilgiler korunur.</p>
           {/* Actions */}
           <div className="flex items-center gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
+              disabled={validating}
               className="flex-1 py-3 rounded-2xl bg-[#2a2a2c] hover:bg-[#353437] text-xs font-semibold text-[#e5e1e4] transition-colors cursor-pointer"
             >
               İptal
             </button>
             <button
               type="submit"
+              disabled={validating}
               className="flex-1 py-3 rounded-2xl bg-[#00f0ff] hover:bg-[#00d5e2] text-xs font-bold text-[#00363a] shadow-[0_0_16px_rgba(0,240,255,0.4)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
             >
               <Check className="w-4 h-4" />
-              <span>Değişiklikleri Kaydet</span>
+              <span>{validating ? 'Sunucu ve katalog doğrulanıyor...' : 'Güvenli Geçiş / Kaydet'}</span>
             </button>
           </div>
         </form>
