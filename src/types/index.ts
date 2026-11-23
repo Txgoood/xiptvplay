@@ -78,6 +78,7 @@ export interface DownloadItem {
   type: 'movie' | 'series' | 'catchup';
   resolutionBadge: string;
   totalSizeGb: number;
+  totalSizeEstimated?: boolean;
   downloadedGb: number;
   speedMbps: number;
   eta: string;
