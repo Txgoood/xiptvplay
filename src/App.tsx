@@ -767,7 +767,7 @@ export default function App() {
                   return;
                 }
                 void DownloadNotifications.cancel(newDownload.id);
-                setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, status: 'error', statusLabel: 'Hata', errorMessage: error } : d));
+                setDownloads(prev => prev.map(d => d.id === newDownload.id ? { ...d, status: 'error', statusLabel: 'Hata', errorMessage: error, progressPercent: 0, speedMbps: 0, downloadedGb: 0 } : d));
                 showToast(`İndirme hatası: ${error}`);
             },
             (status, queueOrder) => {
