@@ -464,13 +464,89 @@ export default function App() {
     showToast('Playlist kalıcı olarak silindi.');
   };
 
-  const handleUpdatePlaylist = (updated: Playlist) => {
-    StorageService.upsertPlaylist(updated);
-    setPlaylists((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    if (activePlaylist?.id === updated.id) {
-      setActivePlaylist(updated);
+  // Validate a changed provider and stage its entire catalog BEFORE switching credentials.
+  // Never mix a new host with cached old-host stream URLs or modify offline downloads.
+  const handleUpdatePlaylist = async (updated: Playlist): Promise<boolean> => {
+    const old = playlistsRef.current.find(p => p.id === updated.id);
+    if (!old || refreshingPlaylistIdsRef.current.has(updated.id)) {
+      showToast('Playlist şu anda yenileniyor. İşlem tamamlanınca yeniden deneyin.');
+      return false;
     }
-    showToast(`"${updated.name}" başarıyla güncellendi ve kaydedildi.`);
+    const changed = old.type !== updated.type ||
+      (old.type === 'xtream'
+        ? old.serverUrl !== updated.serverUrl || old.username !== updated.username || old.password !== updated.password
+        : old.m3uUrl !== updated.m3uUrl);
+    if (!changed) {
+      if (!StorageService.upsertPlaylist(updated)) return false;
+      setPlaylists(prev => prev.map(p => p.id === updated.id ? updated : p));
+      if (activePlaylistRef.current?.id === updated.id) setActivePlaylist(updated);
+      showToast('Playlist adı kaydedildi.');
+      return true;
+    }
+    refreshingPlaylistIdsRef.current.add(updated.id);
+    showToast('Yeni sunucu doğrulanıyor; eski katalog korunuyor...');
+    try {
+      let items: MediaItem[];
+      let counts: { live: number; movie: number; series: number };
+      let verified = { ...updated };
+      if (updated.type === 'xtream') {
+        if (!updated.serverUrl || !updated.username || !updated.password)
+          throw Error('Yeni Xtream sunucu bilgileri eksik.');
+        const check = await XtreamClientService.verifyConnection(updated.serverUrl, updated.username, updated.password);
+        if (!check.success) throw Error('Yeni sunucu bağlantısı doğrulanamadı.');
+        const result = await XtreamClientService.fetchCatalog(
+          check.effectiveServerUrl || updated.serverUrl, updated.username, updated.password, updated.id
+        );
+        items = result.items;
+        counts = result.counts;
+        verified.serverUrl = result.workingServer || check.effectiveServerUrl || updated.serverUrl;
+        verified.expiryDays = check.expiryDays ?? updated.expiryDays;
+        verified.expiryDateStr = check.expiryDateStr ?? updated.expiryDateStr;
+      } else {
+        if (!updated.m3uUrl) throw Error('Yeni M3U bağlantısı eksik.');
+        const response = await M3UParserService.fetchM3U(updated.m3uUrl);
+        if (!response.success || !response.content) throw Error('Yeni M3U listesi indirilemedi.');
+        const result = M3UParserService.parse(response.content, updated.id);
+        items = result.items;
+        counts = result.counts;
+        verified.m3uUrl = response.effectiveUrl || updated.m3uUrl;
+        verified.m3uContent = undefined;
+      }
+      if (!items.length || !(counts.live + counts.movie + counts.series))
+        throw Error('Yeni sunucu boş katalog döndürdü.');
+      if (StorageService.isPlaylistDeleted(updated.id) ||
+          !StorageService.getPlaylists().some(p => p.id === updated.id))
+        throw Error('Playlist işlem sırasında silindi.');
+      verified = {
+        ...verified, status: 'active', statusLabel: 'Bağlı (Aktif)',
+        liveCount: counts.live, movieCount: counts.movie, seriesCount: counts.series,
+        isCached: true, lastSync: 'Şimdi', errorMessage: undefined
+      };
+      // Keep the old credentials/cache if the new playlist metadata cannot be persisted.
+      if (!StorageService.upsertPlaylist(verified)) throw Error('Yeni sunucu ayarları kaydedilemedi.');
+      StorageService.savePlaylistItems(updated.id, items);
+      await StorageService.savePlaylistItemsPersistent(updated.id, items);
+      autoRefreshAttemptedRef.current.delete(updated.id);
+      setPlaylists(prev => {
+        const next = prev.map(p => p.id === updated.id ? verified : p);
+        playlistsRef.current = next;
+        return next;
+      });
+      if (activePlaylistRef.current?.id === updated.id) {
+        setCatalogItems(items);
+        setActivePlaylist(verified);
+        setIsCatalogLoading(false);
+      }
+      showToast(`Yeni sunucuya geçildi: ${counts.live} canlı, ${counts.movie} film, ${counts.series} dizi.`);
+      return true;
+    } catch (error) {
+      // Avoid displaying source URLs with embedded Xtream credentials.
+      console.warn('[Playlist] Safe provider migration was rejected.');
+      showToast('Yeni sunucuya geçilemedi. Eski bağlantı ve indirmeler korundu.');
+      return false;
+    } finally {
+      refreshingPlaylistIdsRef.current.delete(updated.id);
+    }
   };
 
   // New devices receive connection details from Drive, then rebuild the
