@@ -350,7 +350,8 @@ export class XtreamClientService {
             poster: vod.stream_icon || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&auto=format&fit=crop&q=80',
             streamUrl: this.getSafeStreamUrl(rawStreamUrl),
             rawStreamUrl,
-            fileSizeGb: vod.custom_sid ? parseFloat(vod.custom_sid) : 2.8,
+            // Xtream custom_sid is not a verified byte size; never invent a 2.8 GB total.
+            fileSizeGb: undefined,
             audioTracks: ['Türkçe / Orijinal'],
             subtitles: ['Kapalı'],
             streamId,
