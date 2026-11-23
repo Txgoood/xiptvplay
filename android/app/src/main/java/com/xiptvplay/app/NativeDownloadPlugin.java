@@ -154,7 +154,8 @@ public class NativeDownloadPlugin extends Plugin {
                             input = null;
                             URL manifestUrl = connection.getURL();
                             connection.disconnect();
-                            String tsName = safeName.replaceFirst("\\\\.[^.]+$", "") + ".ts";
+                            int extensionIndex = safeName.lastIndexOf('.');
+                            String tsName = (extensionIndex > 0 ? safeName.substring(0, extensionIndex) : safeName) + ".ts";
                             // A different extension prevents an MPEG-TS file being mislabeled as MP4.
                             target = new File(base, tsName);
                             long hlsBytes = HlsSegmentDownload.download(manifestUrl, target,
