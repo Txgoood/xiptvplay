@@ -86,6 +86,7 @@ public class NativeDownloadPlugin extends Plugin {
                 long total = -1L;
                 long lastEmit = 0L;
                 Exception lastError = null;
+                String responseContentType = null;
                 boolean parallelCompleted = false;
                 if (!wifiOnly && hasActiveTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
                     ParallelDownload transfer = new ParallelDownload();
@@ -114,6 +115,7 @@ public class NativeDownloadPlugin extends Plugin {
                             received > 0 ? "bytes=" + received + "-" : null,
                             null, 30000, 30000, active -> connections.put(id, active));
                         int code = connection.getResponseCode();
+                        responseContentType = connection.getContentType();
                         if (code != 200 && code != 206) throw new java.io.IOException("Sunucu HTTP " + code + " yanıtı verdi.");
                         boolean append = received > 0 && code == 206;
                         if (code == 206) {
@@ -187,7 +189,7 @@ public class NativeDownloadPlugin extends Plugin {
                 if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
                 if (target.length() <= 0) throw new Exception("İndirilen dosya boş.");
                 if (total > 0 && target.length() != total) throw new Exception("İndirilen dosyanın boyutu uyuşmuyor.");
-                MediaDownloadValidation.verify(target);
+                MediaDownloadValidation.verify(target, responseContentType);
                 DownloadForegroundService.updateDownloadProgress(getContext(), id, downloadTitle, target.length(), total > 0 ? total : target.length(), true);
                 JSObject finalEvent = new JSObject();
                 finalEvent.put("id", id);
