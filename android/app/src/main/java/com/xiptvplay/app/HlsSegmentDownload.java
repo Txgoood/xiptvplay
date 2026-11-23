@@ -24,7 +24,7 @@ import javax.crypto.spec.SecretKeySpec;
  * Never claims success for incomplete/live manifests, DRM, fMP4 or separate-audio streams.
  */
 final class HlsSegmentDownload {
-    interface Gate { void check() throws InterruptedException; }
+    interface Gate { void check() throws Exception; }
     interface Progress { void report(long bytes, int percent); }
     static final class Part {
         final URL url;
@@ -68,12 +68,13 @@ final class HlsSegmentDownload {
         }
         return iv;
     }
-    private static String readManifest(URL url, Consumer<HttpURLConnection> onOpen, Gate gate) throws Exception {
+    private static String readManifest(URL url, Consumer<HttpURLConnection> onOpen, Gate gate, URL[] effectiveUrl) throws Exception {
         gate.check();
         HttpURLConnection connection = DownloadRedirects.open(url,null,null,15000,30000,onOpen);
         try {
             int status=connection.getResponseCode();
             if (status != 200) throw new IOException("HLS oynatma listesi HTTP " + status + " yanıtı verdi.");
+            effectiveUrl[0] = connection.getURL();
             try (InputStream in = connection.getInputStream(); ByteArrayOutputStream output=new ByteArrayOutputStream()) {
                 byte[] buffer=new byte[8192];
                 int n;
@@ -87,14 +88,9 @@ final class HlsSegmentDownload {
         } finally { connection.disconnect(); }
     }
     static Playlist resolve(URL original, Consumer<HttpURLConnection> onOpen, Gate gate) throws Exception {
-        URL url=original;
-        for (int level=0;level<4;level++) {
-            String text=readManifest(url,onOpen,gate);
-            // The effective URL matters for relative segment paths when an upstream 302 is involved.
-            // readManifest uses redirect resolution, so here resolve against the actual response URL instead.
-            return resolveFromText(url,text,onOpen,gate,level);
-        }
-        throw new IOException("HLS yönlendirme derinliği aşıldı.");
+        URL[] effectiveUrl=new URL[1];
+        String text=readManifest(original,onOpen,gate,effectiveUrl);
+        return resolveFromText(effectiveUrl[0],text,onOpen,gate,0);
     }
     private static Playlist resolveFromText(URL url, String text, Consumer<HttpURLConnection> onOpen,
                                              Gate gate, int depth) throws Exception {
@@ -169,8 +165,9 @@ final class HlsSegmentDownload {
         }
         if(master) {
             if(bestVariant==null || depth>=3) throw new IOException("HLS kalite listesi çözümlenemedi.");
-            String next=readManifest(bestVariant,onOpen,gate);
-            return resolveFromText(bestVariant,next,onOpen,gate,depth+1);
+            URL[] effectiveUrl=new URL[1];
+            String next=readManifest(bestVariant,onOpen,gate,effectiveUrl);
+            return resolveFromText(effectiveUrl[0],next,onOpen,gate,depth+1);
         }
         if(unsupportedMap) throw new IOException("Bu HLS yayını fMP4 parçaları içeriyor; MPEG-TS birleştirme için uygun değil.");
         if(parts.isEmpty()) throw new IOException("HLS oynatma listesinde video parçası bulunamadı.");
