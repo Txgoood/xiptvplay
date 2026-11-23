@@ -25,7 +25,7 @@ import javax.crypto.spec.SecretKeySpec;
  */
 final class HlsSegmentDownload {
     interface Gate { void check() throws Exception; }
-    interface Progress { void report(long bytes, int percent); }
+    interface Progress { void report(long bytes, int percent, long estimatedTotalBytes); }
     static final class Part {
         final URL url;
         final long rangeStart, rangeLength;
@@ -219,7 +219,11 @@ final class HlsSegmentDownload {
                         if(partBytes==0) throw new IOException("HLS video parçası boş.");
                     }
                 } finally {conn.disconnect();}
-                progress.report(bytes,(i+1)*100/count);
+                // Until the last segment is downloaded, extrapolate the size from real bytes.
+                // Do not present this estimate as an exact total.
+                long estimatedTotal = i == count - 1 ? bytes
+                    : Math.max(bytes, Math.round(((double) bytes * count) / (i + 1)));
+                progress.report(bytes,(i+1)*100/count,estimatedTotal);
             }
             out.flush();
         } catch(Exception e) {
