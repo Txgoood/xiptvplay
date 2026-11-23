@@ -370,7 +370,9 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
 
                     <div className="flex items-center gap-1.5 mt-2 text-[#b9cacb] font-headline text-[11px] flex-wrap">
                       <span className="text-[#7df4ff] font-semibold">
-                        {item.downloadedGb.toFixed(2)} GB / {item.totalSizeGb.toFixed(2)} GB
+                        {item.totalSizeGb > 0 && item.totalSizeGb < 1
+                          ? `${Math.round(item.downloadedGb * 1000)} MB / ${item.totalSizeEstimated ? '≈' : ''}${Math.round(item.totalSizeGb * 1000)} MB`
+                          : `${item.downloadedGb.toFixed(2)} GB / ${item.totalSizeGb > 0 ? (item.totalSizeEstimated ? '≈' : '') + item.totalSizeGb.toFixed(2) + ' GB' : 'Boyut hesaplanıyor'}`}
                       </span>
                       <span className="text-[#849495]">•</span>
                       <span className="text-[#4edea3] flex items-center gap-0.5">
