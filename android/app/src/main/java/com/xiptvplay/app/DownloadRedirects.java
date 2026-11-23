@@ -29,6 +29,10 @@ final class DownloadRedirects {
             connection.setConnectTimeout(connectTimeout);
             connection.setReadTimeout(readTimeout);
             connection.setInstanceFollowRedirects(false);
+            // Use the same identity as NativePlayerActivity's Media3 HTTP data source.
+            // Some Xtream hosts return an error/empty body for Java's default user agent.
+            connection.setRequestProperty("User-Agent", "IPTVSmartersPro");
+            connection.setRequestProperty("Accept", "*/*");
             connection.setRequestProperty("Accept-Encoding", "identity");
             if (range != null) connection.setRequestProperty("Range", range);
             if (ifRange != null) connection.setRequestProperty("If-Range", ifRange);
