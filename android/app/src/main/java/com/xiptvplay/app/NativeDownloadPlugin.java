@@ -136,6 +136,42 @@ public class NativeDownloadPlugin extends Plugin {
                         if (total <= 0 && connection.getContentLengthLong() > 0)
                             total = received + connection.getContentLengthLong();
                         input = new BufferedInputStream(connection.getInputStream(), 256 * 1024);
+                        // Some Xtream .mp4/.mkv endpoints actually serve HLS manifests.
+                        // Detect the body, not only the extension, and save complete TS segments.
+                        BufferedInputStream detectedInput = (BufferedInputStream) input;
+                        detectedInput.mark(4096);
+                        byte[] sniffBytes = new byte[1024];
+                        int sniffCount = detectedInput.read(sniffBytes);
+                        detectedInput.reset();
+                        String sniff = sniffCount > 0
+                            ? new String(sniffBytes, 0, sniffCount, java.nio.charset.StandardCharsets.UTF_8).trim()
+                            : "";
+                        String mime = responseContentType == null ? "" : responseContentType.toLowerCase(java.util.Locale.ROOT);
+                        boolean isHls = sniff.startsWith("#EXTM3U")
+                            || mime.contains("mpegurl");
+                        if (isHls) {
+                            input.close();
+                            input = null;
+                            URL manifestUrl = connection.getURL();
+                            connection.disconnect();
+                            String tsName = safeName.replaceFirst("\\\\.[^.]+$", "") + ".ts";
+                            // A different extension prevents an MPEG-TS file being mislabeled as MP4.
+                            target = new File(base, tsName);
+                            long hlsBytes = HlsSegmentDownload.download(manifestUrl, target,
+                                active -> connections.put(id, active),
+                                () -> {
+                                    pauseGate.awaitResume(cancelled);
+                                    if (cancelled.get()) throw new InterruptedException("İndirme iptal edildi.");
+                                    if (wifiOnly && !hasActiveTransport(NetworkCapabilities.TRANSPORT_WIFI))
+                                        throw new java.io.IOException(wifiRequired);
+                                },
+                                (bytes, percent) -> publishProgress(id, downloadTitle, cancelled, bytes, -1L, percent));
+                            received = hlsBytes;
+                            total = hlsBytes;
+                            responseContentType = "video/mp2t";
+                            lastError = null;
+                            break;
+                        }
                         output = new BufferedOutputStream(new FileOutputStream(target, append), 256 * 1024);
                         byte[] buffer = new byte[256 * 1024];
                         int count;
@@ -198,7 +234,7 @@ public class NativeDownloadPlugin extends Plugin {
                 finalEvent.put("contentLength", total > 0 ? total : target.length());
                 mainHandler.post(() -> notifyListeners("downloadProgress", finalEvent));
                 JSObject result = new JSObject();
-                result.put("path", "downloads/" + safeName);
+                result.put("path", "downloads/" + target.getName());
                 result.put("fileUri", "file://" + target.getAbsolutePath());
                 result.put("bytes", target.length());
                 call.resolve(result);
@@ -219,7 +255,12 @@ public class NativeDownloadPlugin extends Plugin {
     }
 
     private void publishProgress(String id, String title, AtomicBoolean cancelled, long bytes, long total) {
+        publishProgress(id, title, cancelled, bytes, total, -1);
+    }
+
+    private void publishProgress(String id, String title, AtomicBoolean cancelled, long bytes, long total, int percent) {
         JSObject event = new JSObject();
+        if (percent >= 0) event.put("percent", percent);
         event.put("id", id);
         event.put("bytes", bytes);
         event.put("contentLength", total);
