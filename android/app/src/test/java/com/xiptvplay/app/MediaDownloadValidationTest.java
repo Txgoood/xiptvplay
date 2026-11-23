@@ -33,6 +33,32 @@ public class MediaDownloadValidationTest {
         }
     }
 
+    @Test public void classifiesHlsManifestWithoutLeakingUrl() throws Exception {
+        File file = Files.createTempFile("xiptv-manifest-", ".mp4").toFile();
+        try {
+            Files.write(file.toPath(), "#EXTM3U\\n#EXT-X-VERSION:3\\n".getBytes(StandardCharsets.US_ASCII));
+            try {
+                MediaDownloadValidation.verify(file, "application/vnd.apple.mpegurl");
+                fail("HLS manifest was treated as a full video");
+            } catch (IOException expected) {
+                assertTrue(expected.getMessage().contains("HLS"));
+            }
+        } finally { Files.deleteIfExists(file.toPath()); }
+    }
+
+    @Test public void emptyResponseIncludesSafeContentTypeAndByteCount() throws Exception {
+        File file = Files.createTempFile("xiptv-empty-", ".mp4").toFile();
+        try {
+            try {
+                MediaDownloadValidation.verify(file, "application/octet-stream");
+                fail("Empty response was accepted");
+            } catch (IOException expected) {
+                assertTrue(expected.getMessage().contains("0 bayt"));
+                assertTrue(expected.getMessage().contains("application/octet-stream"));
+            }
+        } finally { Files.deleteIfExists(file.toPath()); }
+    }
+
     @Test public void sufficientlyLargeBinaryVideoMayComplete() throws Exception {
         File file = Files.createTempFile("xiptv-valid-media-", ".mp4").toFile();
         try {
