@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { ScreenType, AppMode, Playlist, DownloadItem, MediaItem, SeriesEpisode } from './types';
 import { INITIAL_STATS } from './data/mockData';
 import { StorageService } from './services/storage';
+const isAdultCategory = (name: string) => /(?:^|[^\p{L}\p{N}])(?:xxx+|adults?|18\s*\+|\+\s*18|erotik|erotic|porn(?:o|ography)?|yetişkin|yetiskin|sex|seks)(?=$|[^\p{L}\p{N}])/iu.test((name || '').normalize('NFKC'));
 import { IptvService } from './services/iptvService';
 import { XtreamClientService } from './services/xtreamClient';
 import { M3UParserService } from './services/m3uParser';
@@ -1603,6 +1604,7 @@ export default function App() {
                 </div>
               ) : (
                 catalogItems
+                  .filter(c => !StorageService.getSettings().hideAdultCategories || (!isAdultCategory(c.category) && !isAdultCategory(c.title)))
                   .filter(
                     (c) =>
                       !globalSearchTerm ||
