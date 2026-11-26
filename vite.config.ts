@@ -6,6 +6,8 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     base: './',
+    // TV motorları Android Chrome'dan eski olabilir.
+    build: process.env.VITE_WEBOS_TV === 'true' ? { target: 'chrome79', cssTarget: 'chrome79' } : undefined,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

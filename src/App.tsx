@@ -44,6 +44,25 @@ export default function App() {
   const [selectedSeriesItem, setSelectedSeriesItem] = useState<MediaItem | null>(null);
   const [catalogTargetSeason, setCatalogTargetSeason] = useState<number | undefined>(undefined);
 
+  const [resumeItems, setResumeItems] = useState<{ item: MediaItem; position: number }[]>([]);
+  useEffect(() => {
+    const refresh = () => {
+      const items: { item: MediaItem; position: number; updatedAt: number }[] = [];
+      for (const item of catalogItems) {
+        try {
+          const record = JSON.parse(localStorage.getItem('xiptv-webos-resume:' + String(item.id)) || 'null');
+          if (record && record.position > 15 && record.duration > record.position + 30)
+            items.push({ item, position: record.position, updatedAt: record.updatedAt || 0 });
+        } catch { /* ignore malformed or unavailable storage */ }
+      }
+      items.sort((a, b) => b.updatedAt - a.updatedAt);
+      setResumeItems(items.slice(0, 12));
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, [catalogItems, activePlayerMedia, currentScreen]);
+
   // Cast, Search & Profile Modals
   const [isCastOpen, setIsCastOpen] = useState(false);
   const [isCastConnected, setIsCastConnected] = useState(false);
@@ -778,6 +797,8 @@ export default function App() {
 
             {currentScreen === 'playlists' && (
               <PlaylistsScreen
+                resumeItems={resumeItems}
+                onResume={(item) => setActivePlayerMedia(item)}
                 playlists={playlists}
                 stats={stats}
                 onOpenAddModal={handleOpenAddModal}
