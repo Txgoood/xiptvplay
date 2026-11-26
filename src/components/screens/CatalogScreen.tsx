@@ -101,7 +101,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   const hideAdultCategories = Boolean(appSettings.hideAdultCategories);
   const showOnlyTurkishCategories = Boolean(appSettings.showOnlyTurkishCategories);
   const isTurkishCategory = (name: string) => /^\s*TR\b/i.test(name);
-  const isAdultCategory = (name: string) => /(^|[^a-z])(xxx|adult|adults|18\s*\+|erotik|erotic|porn|porno)([^a-z]|$)/i.test(name) || /❤️|♥️|💗|💖/.test(name) && /xxx|adult|erotik|erotic|porn|porno/i.test(name);
+  const isAdultCategory = (name: string) => /(?:^|[^\p{L}\p{N}])(?:xxx+|adults?|18\s*\+|\+\s*18|erotik|erotic|porn(?:o|ography)?|yetişkin|yetiskin|sex|seks)(?=$|[^\p{L}\p{N}])/iu.test((name || '').normalize('NFKC'));
 
   // 2- İçerik Sayılarının Örtüşmesi (Rozetlerin Gerçek Sunucu Toplamını Göstermesi)
   const serverLiveTotal =
@@ -130,7 +130,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   // Seçili sekmeye (live, movie, series) ait içerikler
   const visibleCatalog = useMemo(() => catalog.filter((item) => {
     const category = (item.category || 'Genel').trim();
-    if (hideAdultCategories && isAdultCategory(category)) return false;
+    if (hideAdultCategories && (isAdultCategory(category) || isAdultCategory(item.title))) return false;
     if (showOnlyTurkishCategories && !isTurkishCategory(category)) return false;
     return true;
   }), [catalog, hideAdultCategories, showOnlyTurkishCategories]);
