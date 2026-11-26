@@ -1,5 +1,5 @@
 name: Build Android APK
-run-name: XIPTV Play Android v1.4.35 (43) • ${{ github.event_name }} • ${{ github.sha }}
+run-name: XIPTV Play Android v1.4.36 (44) • ${{ github.event_name }} • ${{ github.sha }}
 # Stable signing verification after GitHub repository secret registration.
 
 on:
@@ -8,6 +8,7 @@ on:
     branches:
       - tek-dal-birlestirme-xiptvplay-android
       - fix/android-clean-playlist-start-20261119
+      - fix/android-live-adult-filter-build44
     paths:
       - '.github/workflows/main.yml'
       - 'scripts/android-emulator-smoke.sh'
