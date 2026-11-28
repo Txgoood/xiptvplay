@@ -1,3 +1,4 @@
+import {readCategoryFavorites,toggleCategoryFavorite,type CategoryFavorite} from '../../services/categoryFavorites';
 import React, {useState} from 'react';
 import {readCatalogPreferences,saveCatalogPreferences,VIEW_OPTIONS,type CatalogView} from '../../services/catalogDiscovery';
 import { MovieCollectionBadge } from '../MovieCollectionBadge';
@@ -11,6 +12,7 @@ interface FavoritesScreenProps {
   onPlayMedia: (item: MediaItem) => void;
   onRemoveFavorite: (id: string) => void;
   onOpenCatalog: () => void;
+  onOpenCategory?: (category:CategoryFavorite)=>void;
 }
 
 export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
@@ -20,7 +22,11 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
   onPlayMedia,
   onRemoveFavorite,
   onOpenCatalog,
+  onOpenCategory,
 }) => {
+  const [categories,setCategories]=useState(()=>readCategoryFavorites(profileId));
+  const [kind,setKind]=useState('all');
+  const filtered=favorites.filter(item=>kind==='all'||item.type===kind);
   const [view,setView]=useState<CatalogView>(()=>readCatalogPreferences(profileId+'_favorites').view);
   return (
     <div className="flex flex-col w-full max-w-none mx-auto px-4 pt-2 pb-28 gap-4 select-none">
@@ -34,8 +40,10 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
         </span>
       </div>
 
+      {onOpenCategory&&categories.length>0&&<section className="rounded-xl bg-[#1c1b1d] p-3"><h3 className="font-bold mb-2">Favori kategoriler</h3>{categories.map(row=><div key={JSON.stringify(row)} className="flex gap-2 mb-2"><button className="flex-1 text-left bg-white/5 rounded-lg p-3" onClick={()=>onOpenCategory(row)}>{row.name} · {row.tab==='live'?'Canlı TV':row.tab==='movie'?'Film':row.tab==='series'?'Dizi':'Tümü'}</button><button className="p-3 text-[#ffb4ab]" onClick={()=>setCategories(toggleCategoryFavorite(profileId,row))} aria-label="Kategoriyi kaldır"><Heart size={16} fill="currentColor"/></button></div>)}</section>}
+      <div className="flex gap-2">{[['all','Tümü'],['live','Canlı TV'],['movie','Film'],['series','Dizi']].map(([value,label])=><button key={value} onClick={()=>setKind(value)} className={kind===value?'p-2 rounded-lg bg-[#0566d9]':'p-2 rounded-lg bg-white/10'}>{label}</button>)}</div>
       <label className="self-end text-xs text-[#b9cacb]">Görünüm <select aria-label="Favori görünümü" value={view} onChange={e=>{const value=e.target.value as CatalogView;setView(value);saveCatalogPreferences(profileId+'_favorites',{sort:'added-desc',view:value});}} className="min-h-11 rounded-xl bg-[#28282b] p-2">{VIEW_OPTIONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-      {favorites.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-8 bg-[#1c1b1d] rounded-2xl border border-white/5 text-center my-6">
           <div className="w-14 h-14 rounded-full bg-[#2a2a2c] flex items-center justify-center text-[#849495] mb-3">
             <Heart className="w-7 h-7 text-[#849495]" />
@@ -53,7 +61,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
         </div>
       ) : (
         <div className={`catalog-grid catalog-grid--${view}`}>
-          {favorites.map((item) => (
+          {filtered.map((item) => (
             <div
               key={item.id}
               className={`catalog-card catalog-card--${view} relative rounded-2xl bg-[#1c1b1d] border border-white/5 p-2 gap-2`}
