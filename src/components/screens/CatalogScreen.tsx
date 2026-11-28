@@ -23,6 +23,7 @@ import {
   ArrowDownUp,
   LayoutGrid,
   Check,
+  Heart,
 } from 'lucide-react';
 
 interface CatalogScreenProps {
@@ -84,6 +85,8 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_CHUNK);
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
+  const [categorySearchOpen,setCategorySearchOpen]=useState(false);
+  const [categorySortOpen,setCategorySortOpen]=useState(false);
   const [categorySort, setCategorySort] = useState<'az' | 'za' | 'oldest' | 'newest'>('az');
   const [preferences, setPreferences] = useState(() => readCatalogPreferences(profileId, activeTab));
   const [openTools, setOpenTools] = useState<'sort' | 'view' | null>(null);
@@ -347,7 +350,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
       {/* Kategori çipleri ve tüm alt kategorileri açan menü */}
       {categoriesForTab.length > 0 && (
         <div className="flex items-center gap-2 min-w-0">
-          <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+          <div data-tv-category-row="true" className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
             {categoriesForTab.map((cat) => (
               <button
                 key={cat.name}
@@ -359,11 +362,11 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
               </button>
             ))}
           </div>
-          <button type="button" onClick={() => { setIsCategoryMenuOpen(true); setCategorySearch(''); }} aria-label="Alt kategorileri listele" title="Alt kategorileri listele" className="shrink-0 w-10 h-10 rounded-xl bg-[#201f21] border border-white/10 text-[#00f0ff] flex items-center justify-center hover:bg-[#2a2a2c]">
+          <button type="button" onClick={() => { setIsCategoryMenuOpen(true); setCategorySearch(''); setCategorySearchOpen(false);setCategorySortOpen(false); }} data-tv-category-tool="true" aria-label="Alt kategorileri listele" title="Alt kategorileri listele" className="shrink-0 w-10 h-10 rounded-xl bg-[#201f21] border border-white/10 text-[#00f0ff] flex items-center justify-center hover:bg-[#2a2a2c]">
             <ListFilter className="w-5 h-5" />
           </button>
-          {sortable && <button type="button" onClick={() => setOpenTools(openTools === 'sort' ? null : 'sort')} aria-label="İçerikleri sırala" aria-expanded={openTools === 'sort'} title="İçerikleri sırala" className="shrink-0 min-h-10 px-2 rounded-xl bg-[#201f21] border border-[#00f0ff]/30 text-[#00f0ff] flex items-center gap-1.5 text-xs font-bold"><ArrowDownUp size={18}/><span className="hidden min-[400px]:inline">Sırala</span></button>}
-          <button type="button" onClick={() => setOpenTools(openTools === 'view' ? null : 'view')} aria-label="Katalog görünümü" aria-expanded={openTools === 'view'} title="Katalog görünümü" className="shrink-0 w-10 h-10 rounded-xl bg-[#201f21] border border-white/10 text-[#00f0ff] flex items-center justify-center"><LayoutGrid size={18}/></button>
+          {sortable && <button type="button" onClick={() => setOpenTools(openTools === 'sort' ? null : 'sort')} data-tv-category-tool="true" aria-label="İçerikleri sırala" aria-expanded={openTools === 'sort'} title="İçerikleri sırala" className="shrink-0 min-h-10 px-2 rounded-xl bg-[#201f21] border border-[#00f0ff]/30 text-[#00f0ff] flex items-center gap-1.5 text-xs font-bold"><ArrowDownUp size={18}/><span className="hidden min-[400px]:inline">Sırala</span></button>}
+          <button type="button" onClick={() => setOpenTools(openTools === 'view' ? null : 'view')} data-tv-category-tool="true" aria-label="Katalog görünümü" aria-expanded={openTools === 'view'} title="Katalog görünümü" className="shrink-0 w-10 h-10 rounded-xl bg-[#201f21] border border-white/10 text-[#00f0ff] flex items-center justify-center"><LayoutGrid size={18}/></button>
         </div>
       )}
       {sortable && <p className="text-[11px] text-[#849495] -mt-1" aria-live="polite">
@@ -390,17 +393,17 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
           <section role="dialog" aria-modal="true" aria-label="Alt kategoriler" onClick={(e) => e.stopPropagation()} className="w-full max-w-xl max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#151517] border border-white/10 shadow-2xl overflow-hidden">
             <div className="p-4 border-b border-white/10 flex items-center justify-between gap-3">
               <div className="min-w-0"><h2 className="text-base font-bold text-[#e5e1e4]">Alt Kategoriler</h2><p className="text-xs text-[#849495] mt-1">{activeTab === 'all' ? 'Tüm içerikler' : activeTab === 'live' ? 'Canlı TV' : activeTab === 'movie' ? 'Filmler' : 'Diziler'} · {searchedCategories.length.toLocaleString('tr-TR')} kategori</p></div>
-              <button type="button" onClick={() => setIsCategoryMenuOpen(false)} className="w-9 h-9 rounded-full bg-[#252527] text-[#e5e1e4] flex items-center justify-center" aria-label="Menüyü kapat"><X className="w-5 h-5" /></button>
+              <div className="flex items-center gap-2">{isTvMode()&&<><button type="button" aria-label="Alt kategori ara" onClick={()=>setCategorySearchOpen(v=>!v)} className="w-9 h-9 rounded-full bg-[#252527] flex items-center justify-center"><Search size={17}/></button><button type="button" aria-label="Alt kategorileri sırala" onClick={()=>setCategorySortOpen(v=>!v)} className="w-9 h-9 rounded-full bg-[#252527] flex items-center justify-center"><ArrowDownUp size={17}/></button></>}<button type="button" onClick={() => setIsCategoryMenuOpen(false)} className="w-9 h-9 rounded-full bg-[#252527] text-[#e5e1e4] flex items-center justify-center" aria-label="Menüyü kapat"><X className="w-5 h-5" /></button></div>
             </div>
-            <div className="p-4 flex flex-col gap-3">
-              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#849495]" /><input value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} placeholder="Alt kategori ara..." className="w-full bg-[#222224] border border-white/10 rounded-xl py-3 pl-10 pr-3 text-sm text-[#e5e1e4] outline-none focus:border-[#00f0ff]/50" /></div>
-              <label className="text-xs text-[#b9cacb] flex flex-col gap-1.5">Sıralama
+            {(!isTvMode()||categorySearchOpen||categorySortOpen)&&<div className="p-4 flex flex-col gap-3">
+              {(!isTvMode()||categorySearchOpen)&&<div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#849495]" /><input autoFocus={isTvMode()&&categorySearchOpen} value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} placeholder="Alt kategori ara..." className="w-full bg-[#222224] border border-white/10 rounded-xl py-3 pl-10 pr-3 text-sm text-[#e5e1e4] outline-none focus:border-[#00f0ff]/50" /></div>}
+              {(!isTvMode()||categorySortOpen)&&<label className="text-xs text-[#b9cacb] flex flex-col gap-1.5">Sıralama
                 <select value={categorySort} onChange={(e) => setCategorySort(e.target.value as typeof categorySort)} className="w-full bg-[#222224] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-[#e5e1e4] outline-none">
                   <option value="az">Alfabetik (A–Z)</option><option value="za">Alfabetik (Z–A)</option><option value="oldest">En eski içerik önce</option><option value="newest">En yeni içerik önce</option>
                 </select>
-              </label>
-            </div>
-            <div className="overflow-y-auto px-4 pb-5 min-h-0">
+              </label>}
+            </div>}
+            <div className="overflow-y-auto px-4 pt-2 pb-5 min-h-0">
               {searchedCategories.length ? searchedCategories.map((cat) => (
                 <button key={cat.name} type="button" onClick={() => { handleCategorySelect(cat.name); setIsCategoryMenuOpen(false); }} className={`w-full flex items-center justify-between gap-3 px-3 py-3 mb-1 rounded-xl text-left border ${selectedCategory === cat.name ? 'bg-[#00f0ff]/10 border-[#00f0ff]/40 text-[#00f0ff]' : 'bg-[#202022] border-white/5 text-[#e5e1e4]'}`}>
                   <span className="text-sm break-words">{cat.name}</span><span className="shrink-0 text-xs font-mono text-[#849495]">{cat.count.toLocaleString('tr-TR')}</span>
