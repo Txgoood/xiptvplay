@@ -1,3 +1,5 @@
+import {isTvMode} from '../../services/tvNavigation';
+import {CatalogPoster} from '../CatalogPoster';
 import {readCategoryFavorites,toggleCategoryFavorite,type CategoryFavorite} from '../../services/categoryFavorites';
 import React, {useState} from 'react';
 import {readCatalogPreferences,saveCatalogPreferences,VIEW_OPTIONS,type CatalogView} from '../../services/catalogDiscovery';
@@ -26,10 +28,13 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
 }) => {
   const [categories,setCategories]=useState(()=>readCategoryFavorites(profileId));
   const [kind,setKind]=useState('all');
+  const tv=isTvMode();
+  const [selected,setSelected]=useState<MediaItem|null>(null);
+  React.useEffect(()=>{if(!selected)return;const close=(e:Event)=>{e.stopImmediatePropagation();setSelected(null);};window.addEventListener('xiptv-tv-back',close,true);return()=>window.removeEventListener('xiptv-tv-back',close,true);},[selected]);
   const filtered=favorites.filter(item=>kind==='all'||item.type===kind);
   const [view,setView]=useState<CatalogView>(()=>readCatalogPreferences(profileId+'_favorites').view);
   return (
-    <div className="flex flex-col w-full max-w-none mx-auto px-4 pt-2 pb-28 gap-4 select-none">
+    <div className="tv-favorites-screen flex flex-col w-full max-w-none mx-auto px-4 pt-2 pb-28 gap-4 select-none">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Heart className="w-5 h-5 fill-[#ffb4ab] text-[#ffb4ab]" />
@@ -40,8 +45,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
         </span>
       </div>
 
-      {onOpenCategory&&categories.length>0&&<section className="rounded-xl bg-[#1c1b1d] p-3"><h3 className="font-bold mb-2">Favori kategoriler</h3>{categories.map(row=><div key={JSON.stringify(row)} className="flex gap-2 mb-2"><button className="flex-1 text-left bg-white/5 rounded-lg p-3" onClick={()=>onOpenCategory(row)}>{row.name} · {row.tab==='live'?'Canlı TV':row.tab==='movie'?'Film':row.tab==='series'?'Dizi':'Tümü'}</button><button className="p-3 text-[#ffb4ab]" onClick={()=>setCategories(toggleCategoryFavorite(profileId,row))} aria-label="Kategoriyi kaldır"><Heart size={16} fill="currentColor"/></button></div>)}</section>}
-      <div className="flex gap-2">{[['all','Tümü'],['live','Canlı TV'],['movie','Film'],['series','Dizi']].map(([value,label])=><button key={value} onClick={()=>setKind(value)} className={kind===value?'p-2 rounded-lg bg-[#0566d9]':'p-2 rounded-lg bg-white/10'}>{label}</button>)}</div>
+      {onOpenCategory&&categories.length>0&&<section className="tv-favorite-categories rounded-xl bg-[#1c1b1d] p-3"><h3 className="font-bold mb-2">Favori kategoriler</h3>{categories.map(row=><div key={JSON.stringify(row)} className="flex gap-2 mb-2"><button className="flex-1 text-left bg-white/5 rounded-lg p-3" onClick={()=>onOpenCategory(row)}>{row.name} · {row.tab==='live'?'Canlı TV':row.tab==='movie'?'Film':row.tab==='series'?'Dizi':'Tümü'}</button><button className="p-3 text-[#ffb4ab]" onClick={()=>setCategories(toggleCategoryFavorite(profileId,row))} aria-label="Kategoriyi kaldır"><Heart size={16} fill="currentColor"/></button></div>)}</section>}
+      <div className="tv-management-tabs flex gap-2">{[['all','Tümü'],['live','Canlı TV'],['movie','Film'],['series','Dizi']].map(([value,label])=><button key={value} onClick={()=>setKind(value)} aria-pressed={kind===value} className={kind===value?'p-2 rounded-lg bg-[#0566d9]':'p-2 rounded-lg bg-white/10'}>{label}</button>)}</div>
       <label className="self-end text-xs text-[#b9cacb]">Görünüm <select aria-label="Favori görünümü" value={view} onChange={e=>{const value=e.target.value as CatalogView;setView(value);saveCatalogPreferences(profileId+'_favorites',{sort:'added-desc',view:value});}} className="min-h-11 rounded-xl bg-[#28282b] p-2">{VIEW_OPTIONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-8 bg-[#1c1b1d] rounded-2xl border border-white/5 text-center my-6">
@@ -59,6 +64,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
             Kataloğa Git
           </button>
         </div>
+      ) : tv ? (
+        <div className={`catalog-grid catalog-grid--${view} tv-favorite-grid`}>{filtered.map(item=><article key={item.id} className={`tv-simple-card tv-simple-card--${view} ${item.type==='live'?'tv-simple-live':''}`}><button className="tv-simple-target" onClick={()=>setSelected(item)} aria-label={item.title+' seçenekleri'}><div className="tv-simple-art"><CatalogPoster media={item} className={`w-full h-full ${item.type==='live'?'object-contain p-3':'object-cover'}`}/><Heart className="tv-simple-heart" size={15} fill="currentColor"/></div><div className="tv-simple-meta"><span className="tv-simple-title">{item.title}</span></div></button></article>)}</div>
       ) : (
         <div className={`catalog-grid catalog-grid--${view}`}>
           {filtered.map((item) => (
@@ -107,6 +114,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
           ))}
         </div>
       )}
+      {tv&&selected&&<div role="dialog" aria-modal="true" className="fixed inset-0 z-[130] bg-black/80 flex items-center justify-center"><div className="tv-simple-menu"><strong>{selected.title}</strong><button onClick={()=>{setSelected(null);onPlayMedia(selected);}}>{selected.type==='series'?'Bölümler':'İzle'}</button>{onOpenInfo&&<button onClick={()=>{setSelected(null);onOpenInfo(selected);}}>Bilgiler</button>}<button onClick={()=>{onRemoveFavorite(selected.id);setSelected(null);}}>Favorilerden kaldır</button><button onClick={()=>setSelected(null)}>Kapat</button></div></div>}
     </div>
   );
 };
