@@ -37,11 +37,25 @@ export function installTvNavigation() {
   document.addEventListener('focusin',e=>{
     const m=modal();if(m&&e.target instanceof Node&&!m.contains(e.target)) focus(targets(m)[0]);
   });
+  let lastHorizontal = 0, lastDirection = '', lastChip: HTMLElement | undefined;
   window.addEventListener('keydown',e=>{
     if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))return;
     reconcile();
     const root=last||document;
     const list=targets(root), active=document.activeElement as HTMLElement;
+    const row=active?.closest('[data-tv-category-row]');
+    const tool=active?.closest('[data-tv-category-tool]');
+    if(!last && (row||tool) && ['ArrowLeft','ArrowRight'].includes(e.key)){
+      const now=performance.now(), double=!e.repeat&&lastDirection===e.key&&now-lastHorizontal<280;
+      lastHorizontal=now;lastDirection=e.key;
+      const chips=Array.from(document.querySelectorAll<HTMLElement>('[data-tv-category-row] button'));
+      const tools=Array.from(document.querySelectorAll<HTMLElement>('[data-tv-category-tool]'));
+      let next:HTMLElement|undefined;
+      if(row){lastChip=active; const i=chips.indexOf(active);
+        next=double&&e.key==='ArrowRight'?tools[0]:chips[i+(e.key==='ArrowRight'?1:-1)]||(e.key==='ArrowRight'?tools[0]:undefined);
+      }else{const i=tools.indexOf(active);next=double&&e.key==='ArrowLeft'?(lastChip?.isConnected?lastChip:chips[0]):tools[i+(e.key==='ArrowRight'?1:-1)]||(e.key==='ArrowLeft'?(lastChip?.isConnected?lastChip:chips[chips.length-1]):undefined);}
+      e.preventDefault();e.stopImmediatePropagation();focus(next);return;
+    }
     if(active instanceof HTMLSelectElement && (e.key==='ArrowLeft'||e.key==='ArrowRight'))return;
     if(active instanceof HTMLInputElement && active.type==='range' && (e.key==='ArrowLeft'||e.key==='ArrowRight'))return;
     if(active instanceof HTMLInputElement && !['range','checkbox','radio','button'].includes(active.type) && (e.key==='ArrowLeft'||e.key==='ArrowRight'))return;
