@@ -121,8 +121,8 @@ export default function App() {
     if (!completed.length) return;
     const resolved = await Promise.all(completed.map(async job => {
       try {
-        const stat = await Filesystem.stat({ path: job.path!, directory: Directory.Data });
-        const uri = await Filesystem.getUri({ path: job.path!, directory: Directory.Data });
+        const stat = await Filesystem.stat(job.path!.startsWith('file://') ? {path:job.path!} : { path: job.path!, directory: Directory.Data });
+        const uri = job.path!.startsWith('file://') ? {uri:job.path!} : await Filesystem.getUri({ path: job.path!, directory: Directory.Data });
         return { job, bytes: Number(stat.size || job.bytes || 0), fileUri: uri.uri };
       } catch { return null; }
     }));
@@ -329,7 +329,7 @@ export default function App() {
           void (async () => {
             for (const directory of [Directory.Data, Directory.Documents]) {
               try {
-                await Filesystem.deleteFile({ path: target.offlinePath!, directory });
+                await Filesystem.deleteFile(target.offlinePath!.startsWith('file://') ? {path:target.offlinePath!} : { path: target.offlinePath!, directory });
                 break;
               } catch { /* dosya diger dizinde olabilir veya zaten silinmis olabilir */ }
             }
@@ -847,7 +847,7 @@ export default function App() {
                   let actualSizeGb = 0;
                   try {
                     if (relativePath) {
-                      const info = await Filesystem.stat({ path: relativePath, directory: Directory.Data });
+                      const info = await Filesystem.stat(relativePath.startsWith('file://') ? {path:relativePath} : { path: relativePath, directory: Directory.Data });
                       actualSizeGb = Number(info.size || 0) / 1_000_000_000;
                     }
                   } catch (sizeError) {
@@ -1118,9 +1118,9 @@ export default function App() {
         } catch {
           // Eski sürümde Documents klasörüne kaydedilmiş dosyalarla geriye dönük uyumluluk.
           directory = Directory.Documents;
-          await Filesystem.stat({ path: relativePath, directory });
+          await Filesystem.stat(relativePath.startsWith('file://') ? {path:relativePath} : { path: relativePath, directory });
         }
-        const uriResult = await Filesystem.getUri({ path: relativePath, directory });
+        const uriResult = (relativePath.startsWith('file://') ? {uri:relativePath} : await Filesystem.getUri({ path: relativePath, directory }));
         const localFileUri = uriResult.uri;
         const localUrl = Capacitor.convertFileSrc(localFileUri);
         const fileInfo = await Filesystem.stat({ path: relativePath, directory });
@@ -1148,12 +1148,12 @@ export default function App() {
             try {
               let nextDirectory = Directory.Data;
               try {
-                await Filesystem.stat({ path: next.offlinePath!, directory: nextDirectory });
+                await Filesystem.stat(next.offlinePath!.startsWith('file://') ? {path:next.offlinePath!} : { path: next.offlinePath!, directory: nextDirectory });
               } catch {
                 nextDirectory = Directory.Documents;
-                await Filesystem.stat({ path: next.offlinePath!, directory: nextDirectory });
+                await Filesystem.stat(next.offlinePath!.startsWith('file://') ? {path:next.offlinePath!} : { path: next.offlinePath!, directory: nextDirectory });
               }
-              const found = await Filesystem.getUri({ path: next.offlinePath!, directory: nextDirectory });
+              const found = (next.offlinePath!.startsWith('file://') ? {uri:next.offlinePath!} : await Filesystem.getUri({ path: next.offlinePath!, directory: nextDirectory }));
               if (!found.uri?.startsWith('file://')) break;
               offlineNext.push({ uri: found.uri, media: { ...next, fileUri: found.uri, localUrl: Capacitor.convertFileSrc(found.uri) } });
               expectedEpisode++;
@@ -1176,6 +1176,7 @@ export default function App() {
       }
     }
 
+    if(relativePath?.startsWith('file://')) { showToast('USB dosyası erişilemiyor. Belleği yeniden takın.'); return; }
     // Dosya silinmişse, varsa kayıtlı akış adresiyle çevrimiçi oynat.
     const { localUrl: _localUrl, fileUri: _fileUri, offlinePath: _offlinePath, ...onlineItem } = item;
     setActivePlayerMedia(onlineItem);
@@ -1238,7 +1239,7 @@ export default function App() {
       let deleted = false;
       for (const directory of [Directory.Data, Directory.Documents]) {
         try {
-          await Filesystem.deleteFile({ path: item.offlinePath, directory });
+          await Filesystem.deleteFile(item.offlinePath.startsWith('file://') ? {path:item.offlinePath} : { path: item.offlinePath, directory });
           deleted = true;
           break;
         } catch {
