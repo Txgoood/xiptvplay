@@ -457,7 +457,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         <>
           <div ref={gridStart} className="scroll-mt-20"><h2 className="text-sm font-bold mb-2">{sortable ? `Katalog · ${sortPresentation.label}` : 'İçerikler'}</h2>
           <VirtualCatalogGrid items={orderedItems} view={preferences.view} getKey={item => item.id} render={item => <CatalogMediaCard item={item} view={preferences.view} isChildMode={isChildMode}
-              onPlay={onPlayMedia} onSeries={onOpenSeriesDetail} onInfo={onOpenTmdbInfo} onEpg={onOpenEpgGuide}
+              onPlay={item => { if(item.type==='live') { const list=orderedItems.filter(x=>x.type==='live'); const index=list.findIndex(x=>x.id===item.id); const start=Math.max(0,index-100); onPlayMedia({...item,nativeLiveQueue:list.slice(start,start+201).map(x=>({id:x.id,title:x.title,streamUrl:x.streamUrl})),nativeLiveIndex:index-start} as MediaItem); } else onPlayMedia(item); }} onSeries={onOpenSeriesDetail} onInfo={onOpenTmdbInfo} onEpg={onOpenEpgGuide}
               onDownload={onDownloadMedia} onSchedule={onScheduleMedia} onFavorite={onToggleFavorite}/>}/>
           </div>
           <p className="text-center text-xs text-[#849495] py-3">{orderedItems.length.toLocaleString('tr-TR')} içerik · Kaydırarak keşfet</p>
