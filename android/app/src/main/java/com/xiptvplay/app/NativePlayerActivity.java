@@ -159,6 +159,10 @@ public class NativePlayerActivity extends Activity {
     private int offlineEpisodeIndex = 0;
     private final Handler controlsHandler = new Handler(Looper.getMainLooper());
     private boolean controlsVisible = true;
+    private JSONArray liveQueue;
+    private int liveIndex;
+    private boolean isLive;
+    private int consumedRemoteKey = -1;
     private final Runnable showControlsAfterTap = () -> {
         firstTapTime = -1L;
         if (root != null) root.performClick();
@@ -238,7 +242,11 @@ public class NativePlayerActivity extends Activity {
         gestureSurface.setOnTouchListener((view, event) -> handlePlayerTouch(event));
         videoContainer.addView(gestureSurface, new FrameLayout.LayoutParams(-1, -1));
 
+        isLive = getIntent().getBooleanExtra("isLive", false);
+        liveIndex = getIntent().getIntExtra("liveIndex", 0);
+        try { liveQueue = new JSONArray(getIntent().getStringExtra("liveQueue")); } catch(Exception ignored) {}
         buildCustomControls();
+        if (isTvDevice()) { root.setFocusableInTouchMode(true); playerView.setFocusable(false); videoContainer.setFocusable(false); root.requestFocus(); }
         gestureFeedback = new TextView(this);
         gestureFeedback.setTextColor(Color.WHITE);
         gestureFeedback.setTextSize(16);
@@ -269,7 +277,7 @@ public class NativePlayerActivity extends Activity {
             if (!controlsVisible) showControlsTemporarily();
             else {
                 controlsHandler.removeCallbacks(hideControlsRunnable);
-                controlsHandler.postDelayed(hideControlsRunnable, 3500);
+                controlsHandler.postDelayed(hideControlsRunnable, isTvDevice()?5000:3500);
             }
         });
         videoContainer.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom) -> {
@@ -538,12 +546,12 @@ public class NativePlayerActivity extends Activity {
         ImageButton volumeButton = makeIconButton("volume", "Ses seviyesi", false);
         volumeButton.setContentDescription("Ses seviyesi");
         volumeButton.setOnClickListener(v -> showVolumeDialog());
-        addCompactButton(actionButtons, volumeButton);
+        if (!isTvDevice()) addCompactButton(actionButtons, volumeButton);
 
         ImageButton brightnessButton = makeIconButton("brightness", "Parlaklık", false);
         brightnessButton.setContentDescription("Parlaklık");
         brightnessButton.setOnClickListener(v -> showBrightnessDialog());
-        addCompactButton(actionButtons, brightnessButton);
+        if (!isTvDevice()) addCompactButton(actionButtons, brightnessButton);
 
         playPauseButton = makeIconButton("play", "Oynat", true);
         playPauseButton.setOnClickListener(v -> togglePlayback());
@@ -558,7 +566,7 @@ public class NativePlayerActivity extends Activity {
         nextButton.setContentDescription("Sonraki bölüm");
         nextButton.setOnClickListener(v -> playNextEpisode());
         addCompactButton(actionButtons, nextButton);
-        addCompactButton(actionButtons, fullscreenButton);
+        if (!isTvDevice()) addCompactButton(actionButtons, fullscreenButton);
     }
 
     private Button makeButton(String label) {return styleButton(new Button(this), label);}
@@ -632,6 +640,7 @@ public class NativePlayerActivity extends Activity {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1f);
         params.setMargins(dp(2), 0, dp(2), 0);
         row.addView(button, params);
+        if(isTvDevice()){button.setFocusable(true);button.setOnFocusChangeListener((v,focused)->{v.setScaleX(focused?1.08f:1f);v.setScaleY(focused?1.08f:1f);v.setAlpha(focused?1f:0.8f);});}
     }
 
     private int dp(float value) {
@@ -757,15 +766,58 @@ public class NativePlayerActivity extends Activity {
             }
             return true;
         }
-        if (!controlsVisible && (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+        if (event.getAction() == KeyEvent.ACTION_UP && key == consumedRemoteKey) { consumedRemoteKey = -1; return true; }
+        if (controlDialogOpen) return super.dispatchKeyEvent(event);
+        if (!controlsVisible && (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN || key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER || key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT)) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                if (key == KeyEvent.KEYCODE_DPAD_UP) showControlsTemporarily();
-                else if (key == KeyEvent.KEYCODE_DPAD_CENTER) togglePlayback();
+                consumedRemoteKey = key;
+                if (key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER) { showControlsTemporarily(); if(playPauseButton!=null)playPauseButton.requestFocus(); }
+                else if(isLive && (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN)) { if(event.getRepeatCount()==0) changeLiveChannel(key == KeyEvent.KEYCODE_DPAD_UP ? 1 : -1); }
+                else if(isLive && key == KeyEvent.KEYCODE_DPAD_LEFT) showLiveChannels();
+                else if(isLive && key == KeyEvent.KEYCODE_DPAD_RIGHT) showGestureFeedback(currentEpisodeTitleView.getText().toString());
+                else if(key == KeyEvent.KEYCODE_DPAD_UP) showControlsTemporarily();
+                else if(key == KeyEvent.KEYCODE_DPAD_DOWN) showGestureFeedback(currentEpisodeTitleView.getText().toString());
                 else seekByTenSeconds(key == KeyEvent.KEYCODE_DPAD_RIGHT);
             }
             return true;
         }
+        if (controlsVisible && event.getAction()==KeyEvent.ACTION_DOWN && (key==KeyEvent.KEYCODE_DPAD_UP||key==KeyEvent.KEYCODE_DPAD_DOWN||key==KeyEvent.KEYCODE_DPAD_LEFT||key==KeyEvent.KEYCODE_DPAD_RIGHT||key==KeyEvent.KEYCODE_DPAD_CENTER||key==KeyEvent.KEYCODE_ENTER)) {
+            showControlsTemporarily();
+            View current=getCurrentFocus();
+            if(current==null||current==root){playPauseButton.requestFocus();consumedRemoteKey=key;return true;}
+            if(key==KeyEvent.KEYCODE_DPAD_UP||key==KeyEvent.KEYCODE_DPAD_DOWN||key==KeyEvent.KEYCODE_DPAD_LEFT||key==KeyEvent.KEYCODE_DPAD_RIGHT){
+                if(current==timeBar&&(key==KeyEvent.KEYCODE_DPAD_LEFT||key==KeyEvent.KEYCODE_DPAD_RIGHT))return super.dispatchKeyEvent(event);
+                int direction=key==KeyEvent.KEYCODE_DPAD_UP?View.FOCUS_UP:key==KeyEvent.KEYCODE_DPAD_DOWN?View.FOCUS_DOWN:key==KeyEvent.KEYCODE_DPAD_LEFT?View.FOCUS_LEFT:View.FOCUS_RIGHT;
+                View next=current.focusSearch(direction);
+                if(next!=null&&next!=root&&next!=playerView&&next!=videoContainer)next.requestFocus();
+                consumedRemoteKey=key;return true;
+            }
+        }
         return super.dispatchKeyEvent(event);
+    }
+
+    private void changeLiveChannel(int delta) {
+        if(liveQueue==null||liveQueue.length()<2){showGestureFeedback("Kanal listesi bulunamadı");return;}
+        switchLiveChannel((liveIndex+delta+liveQueue.length())%liveQueue.length());
+    }
+    private void switchLiveChannel(int index) {
+        if(player==null||liveQueue==null||index==liveIndex)return;
+        JSONObject entry=liveQueue.optJSONObject(index);
+        if(entry==null)return;
+        String url=entry.optString("streamUrl"), title=entry.optString("title","Canlı TV");
+        if(url.isEmpty())return;
+        liveIndex=index;currentUrl=url;
+        progressPreferenceKey="native_player_position_"+Integer.toHexString(url.hashCode());
+        player.setMediaItem(new MediaItem.Builder().setUri(Uri.parse(url)).setMediaId(title).build());
+        player.prepare();player.play();
+        if(currentEpisodeTitleView!=null)currentEpisodeTitleView.setText(title);
+        setControlsVisible(false);showGestureFeedback(title);
+    }
+    private void showLiveChannels() {
+        if(liveQueue==null||liveQueue.length()==0){showGestureFeedback("Kanal listesi bulunamadı");return;}
+        String[] titles=new String[liveQueue.length()];
+        for(int i=0;i<titles.length;i++){JSONObject item=liveQueue.optJSONObject(i);titles[i]=item==null?"":item.optString("title");}
+        new AlertDialog.Builder(this).setTitle("Kanal listesi").setSingleChoiceItems(titles,liveIndex,(d,i)->{d.dismiss();switchLiveChannel(i);}).setNegativeButton("Kapat",null).show();
     }
 
     @Override
@@ -964,6 +1016,7 @@ public class NativePlayerActivity extends Activity {
             // INVISIBLE ölçüyü korur; gizlenirken video SurfaceView yeniden boyutlanmaz.
             bar.setVisibility(visible?View.VISIBLE:View.INVISIBLE);
         }
+        if(isTvDevice()&&!visible&&root!=null)root.requestFocus();
         if(visible&&!scrubbing)updateProgressLabels();
         restartProgressUpdates();
     }
