@@ -1321,10 +1321,8 @@ export default function App() {
   const continueWatching = useMemo(()=>watchHistory.filter(e=>trFilter(e.media)&&e.media.type!=='live'&&e.durationSeconds>0&&e.positionSeconds>0&&!e.completed&&(!isChildProfile||FamilyProfilesService.allows(activeFamilyProfile,e.media as MediaItem))),[watchHistory,isChildProfile,activeFamilyProfile,trFilter]);
   const [followEpisode,setFollowEpisode]=useState<number|undefined>();
   const allFavoritesList = useMemo(() => {
-    return isChildProfile
-      ? activeFavoriteItems.filter(item => FamilyProfilesService.allows(activeFamilyProfile, item))
-      : activeFavoriteItems;
-  }, [isChildProfile, activeFavoriteItems, familyConfiguration]);
+    return activeFavoriteItems.filter(item => trFilter(item) && (!isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, item)));
+  }, [isChildProfile, activeFavoriteItems, familyConfiguration,trFilter]);
   const activeDownloadsCount = downloads.filter(
     (d) => d.status === 'downloading' || d.status === 'queued'
   ).length;
@@ -1490,7 +1488,7 @@ export default function App() {
 
             {currentScreen === 'history' && (
               <WatchHistoryScreen
-                entries={watchHistory.filter(e => !isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, e.media as MediaItem))}
+                entries={watchHistory.filter(e => trFilter(e.media) && (!isChildProfile || FamilyProfilesService.allows(activeFamilyProfile, e.media as MediaItem)))}
                 isChildMode={Boolean(isChildProfile)}
                 onPlay={(item) => { void handlePlayFromHistory(item); }}
                 onRemove={(id) => setWatchHistory(WatchHistoryService.remove(historyProfileId, id))}
