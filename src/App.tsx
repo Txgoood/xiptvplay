@@ -1,3 +1,4 @@
+import { createContentFilter } from './services/smartTrFilter';
 import { isTvMode } from './services/tvNavigation';
 import { CastModal } from './components/screens/CastModal';
 import { NativeCast, EMPTY_CAST, supportsNativeCast, castMediaRequest, stopLocalPlayback, type CastState } from './services/nativeCast';
@@ -7,7 +8,6 @@ import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { ScreenType, AppMode, Playlist, DownloadItem, MediaItem, SeriesEpisode } from './types';
 import { INITIAL_STATS } from './data/mockData';
 import { StorageService } from './services/storage';
-const isAdultCategory = (name: string) => /(?:^|[^\p{L}\p{N}])(?:xxx+|adults?|18\s*\+|\+\s*18|erotik|erotic|porn(?:o|ography)?|yetişkin|yetiskin|sex|seks)(?=$|[^\p{L}\p{N}])/iu.test((name || '').normalize('NFKC'));
 import { IptvService } from './services/iptvService';
 import { XtreamClientService } from './services/xtreamClient';
 import { M3UParserService } from './services/m3uParser';
@@ -1316,7 +1316,9 @@ export default function App() {
     const favorites = new Set(activeFavoriteItems.map(item=>item.id));
     return childVisibleCatalog.map(item=>({...item,isFavorite:favorites.has(item.id)}));
   },[childVisibleCatalog,activeFavoriteItems]);
-  const continueWatching = useMemo(()=>watchHistory.filter(e=>e.media.type!=='live'&&e.durationSeconds>0&&e.positionSeconds>0&&!e.completed&&(!isChildProfile||FamilyProfilesService.allows(activeFamilyProfile,e.media as MediaItem))),[watchHistory,isChildProfile,activeFamilyProfile]);
+  const trFilterKey = JSON.stringify(StorageService.getSettings());
+  const trFilter = useMemo(() => createContentFilter(JSON.parse(trFilterKey)), [trFilterKey]);
+  const continueWatching = useMemo(()=>watchHistory.filter(e=>trFilter(e.media)&&e.media.type!=='live'&&e.durationSeconds>0&&e.positionSeconds>0&&!e.completed&&(!isChildProfile||FamilyProfilesService.allows(activeFamilyProfile,e.media as MediaItem))),[watchHistory,isChildProfile,activeFamilyProfile,trFilter]);
   const [followEpisode,setFollowEpisode]=useState<number|undefined>();
   const allFavoritesList = useMemo(() => {
     return isChildProfile
@@ -1499,6 +1501,7 @@ export default function App() {
             )}
             {isAdminProfile && currentScreen === 'settings' && (
               <SettingsScreen
+                catalog={catalogItems}
                 stats={stats}
                 onClearCache={handleClearCache}
                 onResetApp={handleResetApp}
@@ -1638,7 +1641,7 @@ export default function App() {
                 </div>
               ) : (
                 catalogItems
-                  .filter(c => !StorageService.getSettings().hideAdultCategories || (!isAdultCategory(c.category) && !isAdultCategory(c.title)))
+                  .filter(trFilter)
                   .filter(
                     (c) =>
                       !globalSearchTerm ||
