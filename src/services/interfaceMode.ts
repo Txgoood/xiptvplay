@@ -6,5 +6,6 @@ export function detectInterfaceMode(): InterfaceMode {
 export function readInterfaceMode(): InterfaceMode | null {
   try { const value=localStorage.getItem(KEY); return value==='tv'||value==='phone'?value:null; } catch { return null; }
 }
-export function getInterfaceMode(): InterfaceMode { return readInterfaceMode() || detectInterfaceMode(); }
-export function saveInterfaceMode(mode:InterfaceMode):void { localStorage.setItem(KEY,mode); }
+let cachedMode:InterfaceMode|undefined;
+export function getInterfaceMode(): InterfaceMode { return cachedMode ?? (cachedMode=readInterfaceMode() || detectInterfaceMode()); }
+export function saveInterfaceMode(mode:InterfaceMode):void { localStorage.setItem(KEY,mode); cachedMode=mode; }
