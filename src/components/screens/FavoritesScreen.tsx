@@ -64,7 +64,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
           {filtered.map((item) => (
             <div
               key={item.id}
-              className={`catalog-card catalog-card--${view} relative rounded-2xl bg-[#1c1b1d] border border-white/5 p-2 gap-2`}
+              className={`catalog-card catalog-card--${view} catalog-favorite-card relative rounded-2xl bg-[#1c1b1d] border border-white/5 p-2 gap-2`}
             >
               <div className="catalog-card-poster relative rounded-xl bg-[#2a2a2c] overflow-hidden">
                 <img
@@ -90,14 +90,14 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
                 </button>
               </div>
               <div className="catalog-card-body flex flex-col min-w-0 flex-1 gap-2">
-                <h4 className="font-headline text-sm font-bold text-[#e5e1e4] truncate">
+                <h4 className="catalog-card-title font-headline text-sm font-bold text-[#e5e1e4] truncate">
                   {item.title}
                 </h4>
-                <span className="text-[11px] text-[#b9cacb] truncate">{item.category}</span>
+                <span className="catalog-card-category text-[11px] text-[#b9cacb] truncate">{item.category}</span>
               <button type="button" onClick={()=>onOpenInfo?.(item)} className="text-left min-h-10 text-xs text-[#00f0ff]">Bilgileri aç</button>
               <button
                 onClick={() => onPlayMedia(item)}
-                className="w-full h-9 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.35)] active:scale-95 cursor-pointer mt-1"
+                className="catalog-favorite-play w-full h-9 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.35)] active:scale-95 cursor-pointer mt-1"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Şimdi İzle</span>
