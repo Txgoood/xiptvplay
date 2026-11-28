@@ -139,7 +139,7 @@ async function runSingleDownload(
           const message = String(downloadError?.message || downloadError || '');
           const transient = /unable to resolve host|no address associated with hostname|unknownhostexception|connection abort|connection reset|software caused connection abort|timeout|timed out|network|failed to connect|unexpected end|(?:HTTP\s*|response code\s*|server returned\s*)?(?:429|500|502|503|504)/i.test(message);
           if (cancelledDownloadIds.has(item.id) || attempt >= 2 || !transient) throw downloadError;
-          try { await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data }); } catch {}
+          // Native downloader owns partial-file cleanup; never delete a different volume's file.
           const waitMs = 1200 * (attempt + 1);
           console.warn(`[DownloadManager] Temporary network error; retrying in ${waitMs}ms: `, message);
           await new Promise(resolve => setTimeout(resolve, waitMs));
@@ -151,7 +151,7 @@ async function runSingleDownload(
       if (!result) throw new Error('İndirme tamamlanamadı; bağlantı hatası sonrası tekrar denendi.');
       if (progressListener) { try { await progressListener.remove(); } catch {} }
       const savedPath = result.path || fullPath;
-      const fileInfo = await Filesystem.stat({ path: savedPath, directory: Directory.Data });
+      const fileInfo = await Filesystem.stat(savedPath.startsWith('file://') ? {path:savedPath} : { path: savedPath, directory: Directory.Data });
       const actualBytes = Number(fileInfo.size || result.bytes || 0);
       if (!Number.isFinite(actualBytes) || actualBytes <= 0) throw new Error('İndirilen dosya boş görünüyor; dosya doğrulanamadı.');
       const uri = result.fileUri ? { uri: result.fileUri } : await Filesystem.getUri({ path: savedPath, directory: Directory.Data });
@@ -165,7 +165,7 @@ async function runSingleDownload(
       if (progressListener) { try { await progressListener.remove(); } catch {} }
       const message = String(err?.message || err || 'İndirme başarısız');
       if (/cancel(?:led|ed)?|canceled|user.?abort|aborted by user|iptal/i.test(message) || cancelledDownloadIds.has(item.id)) {
-        try { await Filesystem.deleteFile({ path: fullPath, directory: Directory.Data }); } catch {}
+        // Native downloader owns partial-file cleanup; never delete a different volume's file.
         onError('İndirme iptal edildi.');
         return;
       }
