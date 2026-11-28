@@ -1,3 +1,4 @@
+import { isTvMode } from '../services/tvNavigation';
 import React from 'react';
 import { ScreenType } from '../types';
 import { Tv, Film, Download, Heart, History, Settings } from 'lucide-react';
@@ -42,8 +43,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 pb-safe bg-[#0e0e10]/95 backdrop-blur-xl border-t border-white/5 shadow-[0_-4px_24px_rgba(0,0,0,0.8)]">
       <div className="flex justify-around items-center h-16 sm:h-18 px-1 max-w-lg mx-auto">
-        {navItems.map((item) => {
-          const isActive = currentScreen === item.id;
+        {navItems.filter(item => !isTvMode() || item.id !== 'playlists').map((item) => {
+          const isActive = currentScreen === item.id || (isTvMode() && currentScreen === 'playlists' && item.id === 'settings');
           return (
             <button
               key={item.id}
