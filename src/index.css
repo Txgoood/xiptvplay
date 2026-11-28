@@ -232,3 +232,14 @@ input[type="range"] {
 .xiptv-tv .catalog-card--list .catalog-card-body,.xiptv-tv .catalog-card--details .catalog-card-body{height:auto;flex:1;min-width:0;gap:4px}
 .xiptv-tv .catalog-card--list .catalog-card-actions .catalog-primary,.xiptv-tv .catalog-card--details .catalog-card-actions .catalog-primary{flex:0 1 140px}
 .xiptv-tv .catalog-card--list .catalog-card-actions,.xiptv-tv .catalog-card--details .catalog-card-actions{margin-top:auto}
+
+.interface-setup{min-height:100dvh;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 15%,#123443,#101117 65%);padding:24px;color:#f4f8fa}
+.interface-setup-panel{width:min(760px,100%);text-align:center;display:flex;flex-direction:column;gap:18px}
+.interface-setup h1{font-size:clamp(28px,4vw,54px);font-weight:800}.interface-setup h1 span{color:#00f0ff}
+.interface-setup h2{font-size:clamp(20px,2.5vw,32px);font-weight:700}.interface-setup p{color:#b9cacb;font-size:clamp(12px,1.3vw,17px)}
+.interface-setup-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.interface-setup-options button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:180px;padding:18px;border-radius:18px;background:#19212b;border:2px solid #34434b}
+.interface-setup-options button[aria-pressed=true]{border-color:#00f0ff;background:#123b44}.interface-setup button:focus-visible{outline:3px solid white;outline-offset:5px}
+.interface-setup-options strong{font-size:clamp(15px,2vw,23px)}.interface-setup-options small{color:#b9cacb}
+.interface-setup-confirm{align-self:center;background:#00f0ff;color:#00363a;font-weight:800;padding:14px 42px;border-radius:12px}
+@media(max-width:420px){.interface-setup{padding:16px}.interface-setup-options{gap:10px}.interface-setup-options button{padding:10px;min-height:150px}}
