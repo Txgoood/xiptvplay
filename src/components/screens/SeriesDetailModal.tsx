@@ -1,3 +1,4 @@
+import { isTvMode } from '../../services/tvNavigation';
 import React, { useState, useEffect } from 'react';
 import { MediaItem, Playlist, SeriesDetail, SeriesEpisode } from '../../types';
 import { FollowButton } from './FollowingShelf';
@@ -48,6 +49,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   initialEpisode,
   profileId = 'parent',
 }) => {
+  const tv = isTvMode();
   const [verifiedDetail,setVerifiedDetail]=useState<SeriesDetail | undefined>();
   const [typicalRuntime, setTypicalRuntime] = useState<number>();
   const [, updatePlayedDurations] = useState(0);
@@ -123,20 +125,21 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto landscape:overflow-hidden">
-      <div className="relative w-full max-w-2xl landscape:max-w-6xl bg-[#131315] border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl my-auto text-[#e5e1e4] flex flex-col landscape:flex-row max-h-[94dvh] landscape:max-h-[96dvh] overflow-hidden">
+    <div role="dialog" aria-modal="true" aria-label={seriesItem.title} className={`fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto landscape:overflow-hidden ${tv ? "tv-series-overlay" : ""}`}>
+      <div className={`relative w-full max-w-2xl landscape:max-w-6xl bg-[#131315] border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl my-auto text-[#e5e1e4] flex flex-col landscape:flex-row max-h-[94dvh] landscape:max-h-[96dvh] overflow-hidden ${tv ? "tv-series-shell" : ""}`}>
+        {tv && <div className="tv-series-ambient" aria-hidden="true"><img src={seriesDetail?.backdrop || seriesDetail?.cover || seriesItem.poster} alt="" onError={e=>{if(e.currentTarget.getAttribute("src")!==seriesItem.poster)e.currentTarget.src=seriesItem.poster;else e.currentTarget.style.visibility="hidden";}}/><div/></div>}
         {/* Banner with Poster and Meta */}
-        <div className="relative h-48 sm:h-60 landscape:h-auto landscape:w-[36%] landscape:min-w-[250px] landscape:max-w-[380px] w-full overflow-hidden shrink-0 bg-[#1c1b1d]">
+        <div className={`relative h-48 sm:h-60 landscape:h-auto landscape:w-[36%] landscape:min-w-[250px] landscape:max-w-[380px] w-full overflow-hidden shrink-0 bg-[#1c1b1d] ${tv?"tv-series-hero":""}`}>
           {/* Backdrop Image */}
           <img
             src={seriesDetail?.backdrop || seriesDetail?.cover || seriesItem.poster}
             alt={seriesItem.title}
-            className="w-full h-full object-cover opacity-35 blur-xs scale-105"
+            className={`w-full h-full object-cover opacity-35 blur-xs scale-105 ${tv?"tv-series-hero-image":""}`}
             onError={(e) => {
               (e.target as HTMLImageElement).src = seriesItem.poster;
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#131315] via-[#131315]/70 to-transparent"></div>
+          <div className={`absolute inset-0 bg-gradient-to-t from-[#131315] via-[#131315]/70 to-transparent ${tv?"tv-series-hero-shade":""}`}></div>
 
           {/* Close Button */}
           <button
@@ -148,9 +151,9 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
           </button>
 
           {/* Header Content Overlay */}
-          <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 flex gap-3 sm:gap-4 items-end z-10">
+          <div className={`absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 flex gap-3 sm:gap-4 items-end z-10 ${tv?"tv-series-meta":""}`}>
             {/* Poster Card */}
-            <div className="w-16 sm:w-24 landscape:w-20 aspect-[2/3] rounded-xl sm:rounded-2xl overflow-hidden shrink-0 shadow-2xl border border-white/15 bg-[#201f21]">
+            <div className="tv-series-poster w-16 sm:w-24 landscape:w-20 aspect-[2/3] rounded-xl sm:rounded-2xl overflow-hidden shrink-0 shadow-2xl border border-white/15 bg-[#201f21]">
               <img
                 src={seriesDetail?.cover || seriesItem.poster}
                 alt={seriesItem.title}
@@ -182,11 +185,11 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                 )}
               </div>
 
-              <h2 className="font-headline text-lg sm:text-2xl font-bold text-white truncate leading-tight">
+              <h2 className={`font-headline text-lg sm:text-2xl font-bold text-white leading-tight ${tv?"tv-series-title":"truncate"}`}>
                 {seriesDetail?.name || seriesItem.title}
               </h2>
 
-              <p className="text-[11px] text-[#b9cacb] mt-1 line-clamp-2 leading-relaxed">
+              <p className={`text-[11px] text-[#b9cacb] mt-1 leading-relaxed ${tv?"tv-series-plot":"line-clamp-2"}`}>
                 {seriesDetail?.plot || 'Bölüm listesi ve sezon detayları aşağıda listelenmiştir.'}
               </p>
 
@@ -195,21 +198,27 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                   Tür: {seriesDetail.genre}
                 </span>
               )}
+              {tv && <div className="tv-series-extra">
+                {seriesDetail?.director && <p><strong>Yönetmen:</strong> {seriesDetail.director}</p>}
+                {seriesDetail?.cast && <p><strong>Oyuncular:</strong> {seriesDetail.cast}</p>}
+                {!!seriesDetail?.seasons.length && <p><strong>Sezon:</strong> {seriesDetail.seasons.length} · <strong>Bölüm:</strong> {Object.values(seriesDetail.episodes).reduce((n,eps)=>n+eps.length,0)}</p>}
+              </div>}
             </div>
           </div>
+          {tv && <div className="tv-series-left-actions"><button type="button" disabled={!currentEpisodes.length} onClick={()=>{const first=document.getElementById(`follow-episode-${currentEpisodes[0]?.seasonNum}-${currentEpisodes[0]?.episodeNum}`);first?.querySelector<HTMLElement>('button:last-of-type')?.focus();first?.scrollIntoView({block:'nearest'});}} className="rounded-xl bg-[#00f0ff] text-[#00363a] px-4 py-2 font-bold flex items-center gap-2"><Play size={16}/> Bölümleri İzle</button></div>}
         </div>
 
         {/* Batch download toast notification */}
         {batchDownloadSuccess && (
-          <div className="mx-4 mt-3 p-2.5 rounded-xl bg-[#65f2b5]/20 border border-[#65f2b5]/30 text-[#4edea3] text-xs font-semibold flex items-center gap-2 shrink-0">
+          <div className="tv-series-toast mx-4 mt-3 p-2.5 rounded-xl bg-[#65f2b5]/20 border border-[#65f2b5]/30 text-[#4edea3] text-xs font-semibold flex items-center gap-2 shrink-0">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{batchDownloadSuccess}</span>
           </div>
         )}
 
         {/* Modal Body / Episodes Section */}
-        <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain p-3 sm:p-5 landscape:p-3 flex flex-col gap-3 sm:gap-4 no-scrollbar">
-          <FollowButton key={seriesItem.id} profile={profileId} item={seriesItem} detail={verifiedDetail}/>
+        <div className={`flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain p-3 sm:p-5 landscape:p-3 flex flex-col gap-3 sm:gap-4 no-scrollbar ${tv?"tv-series-episodes":""}`}>
+          <div className={tv?"tv-series-toolbar":""}><FollowButton key={seriesItem.id} profile={profileId} item={seriesItem} detail={verifiedDetail}/>{tv&&currentEpisodes.length>0&&<div className="tv-series-batch"><button type="button" onClick={()=>onScheduleEpisodes(currentEpisodes,seriesItem)} title="Sezonu Zamanla" aria-label={`Sezon ${selectedSeason} zamanla`}><Calendar size={19}/></button><button type="button" onClick={handleDownloadAllSeason} title="Sezonu İndir" aria-label={`Sezon ${selectedSeason} indir`}><Download size={19}/></button></div>}</div>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
               <Loader2 className="w-8 h-8 text-[#00f0ff] animate-spin" />
@@ -263,6 +272,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                   )}
                 </div>
 
+                {!tv && <>{/* Mobile batch actions */}
                 {/* Batch Download Button */}
                 {currentEpisodes.length > 0 && (
                   <div className="flex flex-wrap gap-2">
@@ -281,6 +291,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                   ><Calendar className="w-3.5 h-3.5"/> Sezonu Zamanla</button>
                   </div>
                 )}
+                </>}
               </div>
 
               {/* Episodes List */}
@@ -314,7 +325,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                       <div
                         key={episode.id}
                         id={`follow-episode-${episode.seasonNum}-${episode.episodeNum}`}
-                        className="group flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-2xl bg-[#1c1b1d] hover:bg-[#201f21] border border-white/5 hover:border-[#00f0ff]/30 transition-all gap-3"
+                        className="tv-series-episode-row group flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-2xl bg-[#1c1b1d] hover:bg-[#201f21] border border-white/5 hover:border-[#00f0ff]/30 transition-all gap-3"
                       >
                         {/* Episode Info */}
                         <div className="flex items-start gap-3 min-w-0 flex-1">
