@@ -1,3 +1,4 @@
+import { isTvMode } from './services/tvNavigation';
 import { CastModal } from './components/screens/CastModal';
 import { NativeCast, EMPTY_CAST, supportsNativeCast, castMediaRequest, stopLocalPlayback, type CastState } from './services/nativeCast';
 import { CloudSyncController } from './services/cloudSync';
@@ -53,6 +54,15 @@ export default function App() {
     const id=DeviceProfileAccess.startup(config);
     return config?.profiles.find(p=>p.id===id)?.kind==='child'?'catalog':'playlists';
   });
+  const tvHistory = useRef<ScreenType[]>([]);
+  const tvPrevious = useRef(currentScreen);
+  const tvReturning = useRef(false);
+  useEffect(() => {
+    if (!isTvMode() || tvPrevious.current === currentScreen) return;
+    if (!tvReturning.current) tvHistory.current.push(tvPrevious.current);
+    tvReturning.current = false;
+    tvPrevious.current = currentScreen;
+  }, [currentScreen]);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Persistent Application Data States (Clean Empty Initial States)
@@ -1317,6 +1327,30 @@ export default function App() {
     (d) => d.status === 'downloading' || d.status === 'queued'
   ).length;
 
+  useEffect(() => {
+    if (!isTvMode()) return;
+    const back = () => {
+      if (activePlayerMedia) { setActivePlayerMedia(null); return; }
+      if (isSearchOpen) { setIsSearchOpen(false); return; }
+      if (familyDialogMode) { setFamilyDialogMode(null); return; }
+      if (isCloudBackupOpen) { setIsCloudBackupOpen(false); return; }
+      if (isCastOpen) { setIsCastOpen(false); return; }
+      if (isProfileOpen) { setIsProfileOpen(false); return; }
+      if (scheduleSelection.length) { setScheduleSelection([]); return; }
+      if (tmdbInfoItem) { setTmdbInfoItem(null); return; }
+      if (epgGuideItem) { setEpgGuideItem(null); return; }
+      if (selectedSeriesItem) { setSelectedSeriesItem(null); setCatalogTargetSeason(undefined); setFollowEpisode(undefined); return; }
+      if (isAddModalOpen) { setIsAddModalOpen(false); return; }
+      if (appMode !== 'app') { setAppMode('app'); return; }
+      const previous = tvHistory.current.pop();
+      if (previous && previous !== currentScreen && (!isChildProfile || ['catalog','history'].includes(previous))) {
+        tvReturning.current = true; setCurrentScreen(previous); return;
+      }
+      showToast('Çıkmak için geri tuşunu 2 saniye basılı tutun.');
+    };
+    window.addEventListener('xiptv-tv-back', back);
+    return () => window.removeEventListener('xiptv-tv-back', back);
+  });
   if (familyConfiguration && currentProfileId === null) {
     return <FamilyProfilesModal
       mode="choose"
