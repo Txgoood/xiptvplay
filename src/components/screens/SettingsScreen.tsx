@@ -1,3 +1,4 @@
+import {getInterfaceMode,saveInterfaceMode,type InterfaceMode} from '../../services/interfaceMode';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import React, { useState } from 'react';
 import { categoryKey, classifyTr, createContentFilter } from '../../services/smartTrFilter';
@@ -20,6 +21,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onClearCache,
   onResetApp,
 }) => {
+  const [interfaceMode,setInterfaceMode]=useState<InterfaceMode>(getInterfaceMode);
   const disk=React.useMemo(()=>registerPlugin<{getDownloadTarget():Promise<any>;setDownloadTarget(options:{target:string}):Promise<any>}>('DownloadFiles'),[]);
   const [target,setTarget]=useState<any>(null);
   const refreshTarget=()=>disk.getDownloadTarget().then(setTarget).catch(()=>{});
@@ -79,6 +81,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
       {onOpenPlaylists && <button type="button" onClick={onOpenPlaylists} className="w-full flex items-center justify-between rounded-2xl bg-[#1c1b1d] border border-white/10 p-4 text-left"><span><strong>Playlist ve Sunucu Yönetimi</strong><br/><span className="text-xs text-[#b9cacb]">Sunucu ekle, düzenle, doğrula ve senkronize et</span></span><span>›</span></button>}
       {target&&<section className="flex flex-col gap-2 rounded-2xl bg-[#1c1b1d] p-4"><strong>İndirme ve Depolama Konumu</strong><label>Varsayılan hedef <select className="bg-[#29292c] rounded-lg p-2" value={target.target} onChange={e=>disk.setDownloadTarget({target:e.target.value}).then(setTarget).catch(err=>showToast(String(err.message||err)))}><option value="internal">Dahili hafıza</option><option value="usb">Harici USB bellek</option></select></label><span>Dahili boş/toplam: {(target.internalFree/1e9).toFixed(1)} / {(target.internalTotal/1e9).toFixed(1)} GB</span><span>{target.usbAvailable?'USB boş/toplam: '+(target.usbFree/1e9).toFixed(1)+' / '+(target.usbTotal/1e9).toFixed(1)+' GB':'USB bağlı değil veya erişilemiyor'}</span><button className="p-2 rounded-lg bg-white/10" onClick={refreshTarget}>Depolamayı yenile</button><p className="text-xs">Yeni indirmeler seçili konuma kaydedilir. Eski dosyalar taşınmaz.</p></section>}
+      <section className="flex flex-col gap-3 p-4 rounded-2xl bg-[#1c1b1d] border border-white/5">
+        <strong>Arayüz ve Cihaz Deneyimi</strong>
+        <p className="text-xs text-[#b9cacb]">Telefon veya Android TV görünümünü seçin. Uygulama yeniden açılır; kayıtlı veriler silinmez.</p>
+        <div className="flex gap-2 flex-wrap">{(['phone','tv'] as const).map(mode=><button key={mode} type="button" aria-pressed={interfaceMode===mode} onClick={()=>setInterfaceMode(mode)} className={interfaceMode===mode?'rounded-xl bg-[#00f0ff] text-[#00363a] p-3 font-bold':'rounded-xl bg-white/10 p-3'}>{mode==='phone'?'Telefon':'TV / Android TV'}</button>)}</div>
+        <button type="button" disabled={interfaceMode===getInterfaceMode()} className="rounded-xl bg-[#0566d9] p-3 disabled:opacity-40" onClick={()=>{saveInterfaceMode(interfaceMode);window.location.reload();}}>Arayüzü uygula</button>
+      </section>
       {/* Content privacy settings */}
       <div className="flex flex-col gap-3 p-4 rounded-2xl bg-[#1c1b1d] border border-white/5">
         <div className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#ffb4ab]" /><span className="font-headline text-xs text-[#ffb4ab] uppercase tracking-wider font-bold">İçerik Gizliliği</span></div>
