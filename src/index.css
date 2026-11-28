@@ -154,3 +154,11 @@ input[type="range"] {
 .catalog-card--six .catalog-primary span,.catalog-card--eight .catalog-primary span { display:none; }
 .virtual-catalog-cell .catalog-card--six .catalog-card-body,.virtual-catalog-cell .catalog-card--eight .catalog-card-body { height: 160px; }
 @media(max-width:599px){.catalog-grid--six{grid-template-columns:repeat(3,minmax(0,1fr))}.catalog-grid--eight{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+.xiptv-tv .xiptv-header { position:sticky; top:0; }
+.xiptv-tv .xiptv-header-row { height:48px; }
+.xiptv-tv .xiptv-brand-icon { width:26px; height:26px; }
+.xiptv-tv .xiptv-brand-text { font-size:14px; }
+.xiptv-tv .xiptv-header + main { padding-top:8px; }
+.xiptv-tv .xiptv-catalog-search { scroll-margin-top:60px; scroll-margin-bottom:85px; }
+.xiptv-tv main button, .xiptv-tv main input { scroll-margin-top:60px; scroll-margin-bottom:85px; }
