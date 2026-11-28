@@ -6,12 +6,15 @@ export function installTvNavigation() {
   document.documentElement.classList.toggle('xiptv-tv-reduced-motion',isTvMode()&&localStorage.getItem('xiptv_tv_reduced_motion')==='1');
   if (!isTvMode() && detectInterfaceMode()!=='tv') return;
   const visible = (e: HTMLElement) => {
+    if(e.closest('[hidden]'))return false;
+    const closed=e.closest('details:not([open])');if(closed&&closed.querySelector('summary')!==e)return false;
     const r=e.getBoundingClientRect(), s=getComputedStyle(e);
     return r.width>0 && r.height>0 && s.visibility!=='hidden' && s.display!=='none' && !e.closest('[inert],[aria-hidden="true"]');
   };
   const modal = () => {
     const items=Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"],[class*="fixed"][class*="inset-0"]')).filter(e=>visible(e)&&e.querySelector(selector));
-    return items.sort((a,b)=>(Number(getComputedStyle(a).zIndex)||0)-(Number(getComputedStyle(b).zIndex)||0)).pop() || null;
+    const layer=(e:HTMLElement)=>{let z=0;for(let p:HTMLElement|null=e;p;p=p.parentElement){const n=Number(getComputedStyle(p).zIndex);if(Number.isFinite(n))z=Math.max(z,n);}return z;};
+    return items.sort((a,b)=>(layer(a))-(layer(b))).pop() || null;
   };
   const targets=(root: ParentNode)=>Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(e=>visible(e)&&e.tabIndex>=0);
   const focus=(e?:HTMLElement)=>{ if(e){ e.focus({preventScroll:true}); e.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'}); }};
@@ -75,6 +78,7 @@ export function installTvNavigation() {
   let lastHorizontal = 0, lastDirection = '', lastChip: HTMLElement | undefined;
   window.addEventListener('keydown',e=>{
     if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))return;
+    if(document.querySelector('.interface-setup'))return;
     reconcile();
     if(e.repeat){const now=performance.now();if(now-lastRepeat<75){e.preventDefault();e.stopImmediatePropagation();return;}lastRepeat=now;}
     if(!last&&isTvMode()){
