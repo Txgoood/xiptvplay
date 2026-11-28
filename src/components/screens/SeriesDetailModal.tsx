@@ -205,7 +205,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
               </div>}
             </div>
           </div>
-          {tv && <div className="tv-series-left-actions"><button type="button" disabled={!currentEpisodes.length} onClick={()=>{const first=document.getElementById(`follow-episode-${currentEpisodes[0]?.seasonNum}-${currentEpisodes[0]?.episodeNum}`);first?.querySelector<HTMLElement>('button:last-of-type')?.focus();first?.scrollIntoView({block:'nearest'});}} className="rounded-xl bg-[#00f0ff] text-[#00363a] px-4 py-2 font-bold flex items-center gap-2"><Play size={16}/> Bölümleri İzle</button></div>}
+          {tv && <div className="tv-series-left-actions"><button type="button" disabled={!currentEpisodes.length} onClick={()=>{const episode=currentEpisodes.find(ep=>ep.episodeNum===initialEpisode)||currentEpisodes[0];const first=document.getElementById(`follow-episode-${episode?.seasonNum}-${episode?.episodeNum}`);first?.querySelector<HTMLElement>('button:last-of-type')?.focus();first?.scrollIntoView({block:'nearest'});}} className="rounded-xl bg-[#00f0ff] text-[#00363a] px-4 py-2 font-bold flex items-center gap-2"><Play size={16}/> Bölümleri İzle</button></div>}
         </div>
 
         {/* Batch download toast notification */}
@@ -295,7 +295,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
               </div>
 
               {/* Episodes List */}
-              <div className="flex flex-col gap-2.5">
+              <div className={`flex flex-col gap-2.5 ${tv?"tv-episode-list":""}`}>
                 <div className="flex items-center justify-between">
                   <span className="font-headline text-xs font-bold text-[#b9cacb] uppercase tracking-wider">
                     Sezon {selectedSeason} Bölümleri ({currentEpisodes.length} Bölüm)
@@ -330,7 +330,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                         {/* Episode Info */}
                         <div className="flex items-start gap-3 min-w-0 flex-1">
                           {/* Episode thumbnail */}
-                          <div className="relative w-20 h-14 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 border border-white/5">
+                          <div className="tv-episode-thumb relative w-20 h-14 rounded-xl bg-[#2a2a2c] overflow-hidden shrink-0 border border-white/5">
                             <img
                               src={episode.image || seriesDetail?.cover || seriesItem.poster}
                               alt={episode.title}
@@ -350,13 +350,13 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                               <span className="px-1.5 py-0.2 rounded bg-[#0566d9]/25 text-[#7df4ff] font-mono text-[10px] font-bold">
                                 {episodeCode}
                               </span>
-                              <h4 className="font-headline text-xs sm:text-sm font-bold text-white truncate">
+                              <h4 className="tv-episode-title font-headline text-xs sm:text-sm font-bold text-white truncate">
                                 {episode.title}
                               </h4>
                             </div>
 
                             {episode.plot && (
-                              <p className="text-[11px] text-[#b9cacb] mt-0.5 line-clamp-1 leading-snug">
+                              <p className="tv-episode-plot text-[11px] text-[#b9cacb] mt-0.5 line-clamp-1 leading-snug">
                                 {episode.plot}
                               </p>
                             )}
@@ -402,7 +402,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                               }
                               onPlayEpisode(episode, seriesItem, remaining);
                             }}
-                            className="h-8 px-4 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                            className="tv-episode-play h-8 px-4 rounded-full bg-[#00f0ff] text-[#00363a] font-headline text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.4)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
                             <span>İzle</span>
