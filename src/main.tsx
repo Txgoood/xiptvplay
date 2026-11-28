@@ -8,10 +8,11 @@ import {Smartphone,Tv,Check} from 'lucide-react';
 
 function InterfaceSetup(){
   const [selected,setSelected]=useState<InterfaceMode>(detectInterfaceMode);
+  const confirm=useRef<HTMLButtonElement>(null);
   const first=useRef<HTMLButtonElement>(null);
   const second=useRef<HTMLButtonElement>(null);
   useEffect(()=>{(detectInterfaceMode()==='tv'?second:first).current?.focus();},[]);
-  return <main className="interface-setup" onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();(e.key==='ArrowLeft'?first:second).current?.focus();}}}>
+  return <main className="interface-setup" onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'||e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();if(e.key==='ArrowDown')confirm.current?.focus();else (e.key==='ArrowLeft'?first:e.key==='ArrowRight'?second:selected==='tv'?second:first).current?.focus();}}}>
     <div className="interface-setup-panel">
       <h1>XIPTV <span>Play</span></h1>
       <h2>Uygulama arayüzünü seçin</h2>
@@ -20,7 +21,7 @@ function InterfaceSetup(){
         <button ref={first} type="button" aria-pressed={selected==='phone'} onClick={()=>setSelected('phone')}><Smartphone size={46}/><strong>Telefon</strong><small>Dokunmatik kullanım</small>{selected==='phone'&&<Check/>}</button>
         <button ref={second} type="button" aria-pressed={selected==='tv'} onClick={()=>setSelected('tv')}><Tv size={46}/><strong>TV / Android TV</strong><small>Kumanda ve geniş ekran</small>{selected==='tv'&&<Check/>}</button>
       </div>
-      <button type="button" className="interface-setup-confirm" onClick={()=>{saveInterfaceMode(selected);window.location.reload();}}>Devam Et</button>
+      <button type="button" ref={confirm} className="interface-setup-confirm" onClick={()=>{saveInterfaceMode(selected);window.location.reload();}}>Devam Et</button>
       <p>Playlistleriniz, favorileriniz ve indirmeleriniz korunur.</p>
     </div>
   </main>;
