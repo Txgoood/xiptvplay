@@ -243,3 +243,10 @@ input[type="range"] {
 .interface-setup-options strong{font-size:clamp(15px,2vw,23px)}.interface-setup-options small{color:#b9cacb}
 .interface-setup-confirm{align-self:center;background:#00f0ff;color:#00363a;font-weight:800;padding:14px 42px;border-radius:12px}
 @media(max-width:420px){.interface-setup{padding:16px}.interface-setup-options{gap:10px}.interface-setup-options button{padding:10px;min-height:150px}}
+
+.xiptv-tv .tv-experience-nav{position:sticky;top:48px;z-index:39;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 16px;background:#101319;border-bottom:1px solid #ffffff16;overflow-x:auto;scrollbar-width:none}
+.xiptv-tv .tv-experience-nav button{flex:1 0 auto;white-space:nowrap;padding:9px 12px;border-radius:9px;color:#c8d3d9;font-size:clamp(12px,1.35vw,19px);font-weight:700}
+.xiptv-tv .tv-experience-nav button[aria-current=page]{background:#00e6ef;color:#00363a}
+.xiptv-tv .tv-catalog-tabs-replaced{display:none}
+.xiptv-tv .tv-experience-nav+main{padding-top:10px}
+.xiptv-tv .tv-experience-nav~main button,.xiptv-tv .tv-experience-nav~main input{scroll-margin-top:110px}
