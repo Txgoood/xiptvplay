@@ -1,5 +1,5 @@
 name: Build Android APK
-run-name: XIPTV Play Android TV BOX UPDATE SMART TR FILTER v1.4.38 (46) • ${{ github.event_name }} • ${{ github.sha }}
+run-name: XIPTV Play Android TV BOX UPDATE SMART PLAYER v1.4.39 (47) • ${{ github.event_name }} • ${{ github.sha }}
 # Stable signing verification after GitHub repository secret registration.
 
 on:
@@ -11,6 +11,7 @@ on:
       - fix/android-live-adult-filter-build44
       - feat/android-tv-box-update-build45
       - feat/android-tv-box-smart-tr-filter-build46
+      - feat/android-tv-box-smart-player-build47
     paths:
       - '.github/workflows/main.yml'
       - 'scripts/android-emulator-smoke.sh'
@@ -119,7 +120,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: XIPTV-Play-v1.4.38-Build46-TV-BOX-SMART-TR-FILTER
+          name: XIPTV-Play-v1.4.39-Build47-TV-BOX-SMART-PLAYER
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
@@ -150,7 +151,7 @@ jobs:
       - name: Download APK produced by build job
         uses: actions/download-artifact@v4
         with:
-          name: XIPTV-Play-v1.4.38-Build46-TV-BOX-SMART-TR-FILTER
+          name: XIPTV-Play-v1.4.39-Build47-TV-BOX-SMART-PLAYER
           path: emulator-apk
 
       - name: Download player controls test APK
