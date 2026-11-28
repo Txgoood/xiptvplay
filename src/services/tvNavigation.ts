@@ -3,6 +3,7 @@ const selector = 'summary,button:not(:disabled),a[href],input:not(:disabled):not
 export const isTvMode = () => getInterfaceMode()==='tv';
 export function installTvNavigation() {
   document.documentElement.classList.toggle('xiptv-tv',isTvMode());
+  document.documentElement.classList.toggle('xiptv-tv-reduced-motion',isTvMode()&&localStorage.getItem('xiptv_tv_reduced_motion')==='1');
   if (!isTvMode() && detectInterfaceMode()!=='tv') return;
   const visible = (e: HTMLElement) => {
     const r=e.getBoundingClientRect(), s=getComputedStyle(e);
