@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 
 interface CatalogScreenProps {
+  tvTabRequest?: {tab:'all'|'live'|'movie'|'series';seq:number}|null;
+  onTvTabChange?: (tab:'all'|'live'|'movie'|'series')=>void;
   catalog: MediaItem[];
   profileId?: string;
   watchHistory?: WatchHistoryEntry[];
@@ -51,6 +53,8 @@ interface CatalogScreenProps {
 const PAGE_CHUNK = 60;
 
 export const CatalogScreen: React.FC<CatalogScreenProps> = ({
+  tvTabRequest,
+  onTvTabChange,
   catalog,
   profileId = 'parent',
   watchHistory = [],
@@ -197,6 +201,8 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
     setVisibleCount(PAGE_CHUNK);
   };
 
+  useEffect(()=>{if(tvTabRequest&&isTvMode()){handleTabChange(tvTabRequest.tab);}},[tvTabRequest]);
+  useEffect(()=>{onTvTabChange?.(activeTab);},[activeTab,onTvTabChange]);
   // Kategori tıklandığında sayfa limitini sıfırla
   const handleCategorySelect = (categoryName: string) => {
     setSelectedCategory(categoryName);
@@ -282,7 +288,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         </section>
       )}
       {/* Media Type Tabs with Real Server Totals */}
-      <div className="catalog-type-tabs flex items-center gap-1.5 p-1 rounded-full bg-[#1c1b1d] border border-white/5">
+      <div className={`catalog-type-tabs flex items-center gap-1.5 p-1 rounded-full bg-[#1c1b1d] border border-white/5 ${isTvMode()&&!isChildMode?"tv-catalog-tabs-replaced":""}`}>
         <button
           onClick={() => handleTabChange('all')}
           className={`flex-1 py-1.5 px-2 rounded-full font-headline text-xs font-bold transition-all cursor-pointer truncate ${
