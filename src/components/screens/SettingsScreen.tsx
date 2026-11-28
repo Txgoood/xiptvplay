@@ -67,6 +67,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <div className="flex items-center gap-2">
         <Settings className="w-5 h-5 text-[#00f0ff]" />
         <h2 className="font-headline text-lg font-bold text-[#e5e1e4]">Uygulama &amp; Motor Ayarları</h2>
+
+      </div>
+
+      {/* Content privacy settings */}
+      <div className="flex flex-col gap-3 p-4 rounded-2xl bg-[#1c1b1d] border border-white/5">
+        <div className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#ffb4ab]" /><span className="font-headline text-xs text-[#ffb4ab] uppercase tracking-wider font-bold">İçerik Gizliliği</span></div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col pr-2 gap-1"><span className="text-xs font-semibold text-[#e5e1e4]">Yetişkin kategorilerini gizle</span><span className="text-[11px] text-[#b9cacb]">Canlı TV, film ve dizilerde yetişkin kategori ve içerik adlarını katalogdan ve arama sonuçlarından gizler.</span></div>
+          <button type="button" role="switch" aria-checked={hideAdultCategories} onClick={() => { const next = !hideAdultCategories; setHideAdultCategories(next); saveTr({hideAdultCategories: next}); showToast(next ? 'Yetişkin kategorileri gizlendi' : 'Yetişkin kategorileri gösteriliyor'); }} className={`w-11 h-6 rounded-full transition-colors duration-200 p-0.5 flex items-center shrink-0 ${hideAdultCategories ? 'bg-[#0566d9]' : 'bg-[#2a2a2c]'}`}><span className={`w-5 h-5 rounded-full transition-transform duration-200 shadow-md ${hideAdultCategories ? 'translate-x-5 bg-[#00f0ff]' : 'translate-x-0 bg-[#849495]'}`}></span></button>
+        </div>
+        <p className="text-[10px] text-[#849495]">Bu ayar uygulama arayüzünde gizleme yapar; tek başına ebeveyn kilidi veya içerik erişim koruması değildir.</p>
+        <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/5">
+          <div className="flex flex-col pr-2 gap-1"><span className="text-xs font-semibold text-[#e5e1e4]">Akıllı Türkiye filtresi</span><span className="text-[11px] text-[#b9cacb]">TR, [TR], Türkçe kategorileri ve Türk kanallarını tanır. Yabancı ülke kategorilerini gizler.</span></div>
+          <button type="button" role="switch" aria-checked={showOnlyTurkishCategories} onClick={() => { const next = !showOnlyTurkishCategories; setShowOnlyTurkishCategories(next); saveTr({showOnlyTurkishCategories: next}); showToast(next ? 'Yalnızca TR kategorileri gösteriliyor' : 'Tüm ülke kategorileri gösteriliyor'); }} className={`w-11 h-6 rounded-full transition-colors duration-200 p-0.5 flex items-center shrink-0 ${showOnlyTurkishCategories ? 'bg-[#0566d9]' : 'bg-[#2a2a2c]'}`}><span className={`w-5 h-5 rounded-full transition-transform duration-200 shadow-md ${showOnlyTurkishCategories ? 'translate-x-5 bg-[#00f0ff]' : 'translate-x-0 bg-[#849495]'}`}></span></button>
+        </div>
+
         {showOnlyTurkishCategories && <div className="flex flex-col gap-3 border-t border-white/10 pt-3">
           {([['trLive','Canlı TV Türkiye filtresi'],['trMovie','Film Türkçe filtresi'],['trSeries','Dizi Türkçe filtresi'],['trUnknown','Tanımlanamayan içerikleri göster']] as const).map(([key,label])=>{
             const enabled=key==='trUnknown'?trSettings[key]===true:trSettings[key]!==false;
@@ -84,21 +100,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
           </div>}
         </div>}
-      </div>
-
-      {/* Content privacy settings */}
-      <div className="flex flex-col gap-3 p-4 rounded-2xl bg-[#1c1b1d] border border-white/5">
-        <div className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#ffb4ab]" /><span className="font-headline text-xs text-[#ffb4ab] uppercase tracking-wider font-bold">İçerik Gizliliği</span></div>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-col pr-2 gap-1"><span className="text-xs font-semibold text-[#e5e1e4]">Yetişkin kategorilerini gizle</span><span className="text-[11px] text-[#b9cacb]">Canlı TV, film ve dizilerde yetişkin kategori ve içerik adlarını katalogdan ve arama sonuçlarından gizler.</span></div>
-          <button type="button" role="switch" aria-checked={hideAdultCategories} onClick={() => { const next = !hideAdultCategories; setHideAdultCategories(next); StorageService.saveSettings({ ...StorageService.getSettings(), hideAdultCategories: next }); showToast(next ? 'Yetişkin kategorileri gizlendi' : 'Yetişkin kategorileri gösteriliyor'); }} className={`w-11 h-6 rounded-full transition-colors duration-200 p-0.5 flex items-center shrink-0 ${hideAdultCategories ? 'bg-[#0566d9]' : 'bg-[#2a2a2c]'}`}><span className={`w-5 h-5 rounded-full transition-transform duration-200 shadow-md ${hideAdultCategories ? 'translate-x-5 bg-[#00f0ff]' : 'translate-x-0 bg-[#849495]'}`}></span></button>
-        </div>
-        <p className="text-[10px] text-[#849495]">Bu ayar uygulama arayüzünde gizleme yapar; tek başına ebeveyn kilidi veya içerik erişim koruması değildir.</p>
-        <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/5">
-          <div className="flex flex-col pr-2 gap-1"><span className="text-xs font-semibold text-[#e5e1e4]">Akıllı Türkiye filtresi</span><span className="text-[11px] text-[#b9cacb]">TR, [TR], Türkçe kategorileri ve Türk kanallarını tanır. Yabancı ülke kategorilerini gizler.</span></div>
-          <button type="button" role="switch" aria-checked={showOnlyTurkishCategories} onClick={() => { const next = !showOnlyTurkishCategories; setShowOnlyTurkishCategories(next); saveTr({showOnlyTurkishCategories: next}); showToast(next ? 'Yalnızca TR kategorileri gösteriliyor' : 'Tüm ülke kategorileri gösteriliyor'); }} className={`w-11 h-6 rounded-full transition-colors duration-200 p-0.5 flex items-center shrink-0 ${showOnlyTurkishCategories ? 'bg-[#0566d9]' : 'bg-[#2a2a2c]'}`}><span className={`w-5 h-5 rounded-full transition-transform duration-200 shadow-md ${showOnlyTurkishCategories ? 'translate-x-5 bg-[#00f0ff]' : 'translate-x-0 bg-[#849495]'}`}></span></button>
-        </div>
-
       </div>
 
       {/* Video & Playback Settings */}
