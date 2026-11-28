@@ -1628,7 +1628,9 @@ export default function App() {
 
       {/* Real Video Player Modal */}
       {activePlayerMedia && <Suspense fallback={<div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center text-[#00f0ff]">Oynatıcı hazırlanıyor…</div>}><VideoPlayerModal
+        key={activePlayerMedia.id}
         media={activePlayerMedia}
+        initialPosition={watchHistory.find(entry => entry.id === activePlayerMedia.id && !entry.completed)?.positionSeconds}
         isOpen={!!activePlayerMedia}
         onClose={() => setActivePlayerMedia(null)}
         onProgress={(media, positionSeconds, durationSeconds, completed) => {

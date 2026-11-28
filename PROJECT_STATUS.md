@@ -109,3 +109,10 @@
 ## 17 Kasım 2026 — Geçmişten devam ve bölüm kuyruğu
 - İzleme Geçmişi ve İzlemeye Devam Et, dizinin kendi listesinden sonraki bölümleri bulup oynatıcıya kimlikleriyle verir. Bölüm listesi alınamazsa mevcut bölüm açılır.
 - v1.4.24 (32), commit `0d92416`. Tür denetimi, otomatik testler, Android derlemesi, imza ve genel emülatör testleri geçti. Geçmişten devam akışında eski kimlik, sezon geçişi ve liste alınamadığında mevcut bölümün açılması örnek verilerle kontrol edildi. Fold 7 üzerinde fiziksel kontrol yapılmadı. [Derleme #329](https://github.com/Txgoood/xiptvplay/actions/runs/43971424998) · [APK paketi](https://github.com/Txgoood/xiptvplay/actions/runs/43971424998/artifacts/14279800661).
+
+## TV Experience 2.0 — v1.5.9 (Build 62)
+
+- Build 61'in `feat/tv-experience-2.0` dalındaki HTML5 oynatıcı, geçmişteki konumu video bilgileri yüklendiğinde geri alır ve kapatırken son oynatma konumunu kaydeder.
+- M3U bölüm ayrıştırması `S01E01` biçimindeki başlıkları yeniden tanır.
+- Yerel kontrollerde TypeScript, Vite derlemesi ve 59 regresyon testi başarılı. Playwright Edge ile gerçek MP4 üzerinde film ve Xtream bölüm geçmişi, yenileme sonrası devam etme ve M3U bölüm listesi doğrulandı.
+- İmzalı APK için [Android derlemeleri](https://github.com/Txgoood/xiptvplay/actions/workflows/main.yml). Fiziksel TV Box ve USB kontrolleri bekliyor.

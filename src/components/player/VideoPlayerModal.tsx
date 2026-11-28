@@ -34,6 +34,7 @@ import {
 interface VideoPlayerModalProps {
   media: MediaItem | DownloadItem | null;
   isOpen: boolean;
+  initialPosition?: number;
   onClose: () => void;
   onProgress?: (media: MediaItem | DownloadItem, positionSeconds: number, durationSeconds: number, completed?: boolean) => void;
 }
@@ -56,6 +57,7 @@ export type FallbackStage = 'proxy-hls' | 'proxy-native' | 'direct' | 'sample' |
 export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   media,
   isOpen,
+  initialPosition = 0,
   onClose,
   onProgress,
 }) => {
@@ -64,10 +66,11 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const nativeLaunchKeyRef = useRef<string | null>(null);
-  const nativeResumePositionRef = useRef(0);
+  const pendingPositionRef = useRef(initialPosition);
   const lastHistorySaveRef = useRef(0);
 
   const handleClosePlayer = () => {
+    savePlaybackPosition();
     if (Capacitor.getPlatform() === 'android') {
       NativeMediaPlayer.stop().catch((error) => {
         console.warn('[NativeMediaPlayer] Could not stop native playback:', error);
@@ -391,7 +394,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           onProgress?.(watched, position, duration, checkpoint.completed);
         }
         if (result?.returnedToInline && result.sameMedia) {
-          nativeResumePositionRef.current = Math.max(0, Number(result.positionMs || 0) / 1000);
+          pendingPositionRef.current = Math.max(0, Number(result.positionMs || 0) / 1000);
           setNativePlayerUnavailable(true);
           triggerNotice('Uygulama içi oynatıcıya dönüldü.');
         } else {
@@ -485,10 +488,6 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             setHlsLevels(lvls);
           }
           videoElement.playbackRate = playbackSpeed;
-          if (nativeResumePositionRef.current > 0 && Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
-            videoElement.currentTime = Math.min(nativeResumePositionRef.current, Math.max(0, videoElement.duration - 1));
-            nativeResumePositionRef.current = 0;
-          }
           videoElement
             .play()
             .then(() => setIsPlaying(true))
@@ -580,15 +579,6 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       // Native HTML5 Video (206 Range MP4/MKV partial content streams)
       videoElement.src = currentUrl;
       videoElement.playbackRate = playbackSpeed;
-      if (nativeResumePositionRef.current > 0) {
-        const restorePosition = () => {
-          if (Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
-            videoElement.currentTime = Math.min(nativeResumePositionRef.current, Math.max(0, videoElement.duration - 1));
-            nativeResumePositionRef.current = 0;
-          }
-        };
-        videoElement.addEventListener('loadedmetadata', restorePosition, { once: true });
-      }
       videoElement.load();
       videoElement
         .play()
@@ -633,6 +623,26 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     };
   }, [customSubtitleUrl]);
 
+  const savePlaybackPosition = useCallback(() => {
+    const video = videoRef.current;
+    if (!onProgress || !media || media.type === 'live' || fallbackStage === 'sample' ||
+        !video || video.ended || pendingPositionRef.current > 0 ||
+        !Number.isFinite(video.currentTime) || video.currentTime <= 0 ||
+        !Number.isFinite(video.duration) || video.duration <= 0) return;
+    lastHistorySaveRef.current = Date.now();
+    onProgress(media, video.currentTime, video.duration);
+  }, [fallbackStage, media, onProgress]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener('pagehide', savePlaybackPosition);
+    window.addEventListener('xiptv-tv-back', savePlaybackPosition, true);
+    return () => {
+      window.removeEventListener('pagehide', savePlaybackPosition);
+      window.removeEventListener('xiptv-tv-back', savePlaybackPosition, true);
+    };
+  }, [isOpen, savePlaybackPosition]);
+
   if (!isOpen || !media) return null;
 
   const togglePlay = () => {
@@ -652,12 +662,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
-      const now = Date.now();
-      if (onProgress && media && media.type !== 'live' && now - lastHistorySaveRef.current >= 7000
-          && Number.isFinite(videoRef.current.currentTime) && videoRef.current.currentTime > 0) {
-        lastHistorySaveRef.current = now;
-        onProgress(media, videoRef.current.currentTime, Number.isFinite(videoRef.current.duration) ? videoRef.current.duration : 0);
-      }
+      if (Date.now() - lastHistorySaveRef.current >= 7000) savePlaybackPosition();
       if (videoRef.current.duration && !isNaN(videoRef.current.duration)) {
         setDuration(videoRef.current.duration);
       }
@@ -870,11 +875,18 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           ref={videoRef}
           key={`${media.id}-${fallbackStage}`}
           poster={media.poster}
-          onLoadedMetadata={event => { if (media) rememberPlayedDuration(media, event.currentTarget.duration); }}
+          onLoadedMetadata={({ currentTarget: video }) => {
+            if (fallbackStage === 'sample') return;
+            rememberPlayedDuration(media, video.duration);
+            if (!isLive && pendingPositionRef.current > 0 && Number.isFinite(video.duration) && video.duration > 0) {
+              video.currentTime = Math.min(pendingPositionRef.current, Math.max(0, video.duration - 1));
+              pendingPositionRef.current = 0;
+            }
+          }}
           onTimeUpdate={handleTimeUpdate}
           onEnded={() => {
             setIsPlaying(false);
-            if (onProgress && media && media.type !== 'live') onProgress(media, videoRef.current?.duration || 0, videoRef.current?.duration || 0, true);
+            if (fallbackStage !== 'sample' && onProgress && !isLive) onProgress(media, videoRef.current?.duration || 0, videoRef.current?.duration || 0, true);
           }}
           onError={(e) => {
             if (hlsRef.current || !e.currentTarget.currentSrc) return;

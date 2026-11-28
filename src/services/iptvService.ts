@@ -96,14 +96,14 @@ export class IptvService {
       const allItems = StorageService.getPlaylistItems(activePlaylist.id);
       const parseEpisode = (item: MediaItem) => {
         const title = item.title || '';
-        const match = title.match(/^(.*?)[\\s._-]*(?:S(\\d{1,2})[\\s._-]*E(\\d{1,3})|(?:sezon|season)[\\s._-]*(\\d{1,2})[\\s._-]*(?:bölüm|bolum|episode|ep)[\\s._-]*(\\d{1,3}))/i);
+        const match = title.match(/^(.*?)[\s._-]*(?:S(\d{1,2})[\s._-]*E(\d{1,3})|(?:sezon|season)[\s._-]*(\d{1,2})[\s._-]*(?:bölüm|bolum|episode|ep)[\s._-]*(\d{1,3}))/i);
         if (!match) return null;
-        const name = match[1].replace(/[\\s._|:-]+$/g, '').replace(/\\s*\\(\\d{4}\\)\\s*$/, '').trim();
+        const name = match[1].replace(/[\s._|:-]+$/g, '').replace(/\s*\(\d{4}\)\s*$/, '').trim();
         return { name, season: Number(match[2] || match[4]), episode: Number(match[3] || match[5]) };
       };
       const normalize = (value: string) => value.toLocaleLowerCase('tr-TR').replace(/[^a-z0-9çğıöşü]/g, '');
       const selectedParsed = parseEpisode(seriesItem);
-      const baseName = selectedParsed?.name || seriesItem.title.replace(/\\s*\\(\\d{4}\\).*$/, '').trim();
+      const baseName = selectedParsed?.name || seriesItem.title.replace(/\s*\(\d{4}\).*$/, '').trim();
       const matches = allItems.map((item) => ({ item, parsed: parseEpisode(item) }))
         .filter((entry) => entry.item.type === 'series' && entry.parsed &&
           normalize(entry.parsed.name) === normalize(baseName));
