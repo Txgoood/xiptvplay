@@ -1,5 +1,7 @@
+import { useState } from 'react';
+import { isTvMode } from '../../services/tvNavigation';
 import { CatalogPoster } from '../CatalogPoster';
-import { CalendarDays, Download, Heart, Info, Layers, Play } from 'lucide-react';
+import { CalendarDays, Download, Heart, Info, Layers, Play, MoreHorizontal, X } from 'lucide-react';
 import { MovieCollectionBadge } from '../MovieCollectionBadge';
 import type { MediaItem } from '../../types';
 import type { CatalogView } from '../../services/catalogDiscovery';
@@ -18,6 +20,8 @@ interface Props {
   onFavorite: (id: string) => void;
 }
 export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, onInfo, onEpg, onDownload, onSchedule, onFavorite }: Props) {
+  const [actions,setActions]=useState(false);
+  const tv=isTvMode();
   const live = item.type === 'live', series = item.type === 'series';
   const list = view === 'list' || view === 'details';
   const open = () => live ? onPlay(item) : onInfo(item);
@@ -32,10 +36,12 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
       <span className="absolute bottom-2 left-2 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-[#00f0ff] pointer-events-none">{live ? 'CANLI' : series ? 'DİZİ' : 'FİLM'}</span>
       {rating && <span className="absolute bottom-2 right-2 rounded bg-black/70 text-amber-300 px-1.5 py-0.5 text-[11px] pointer-events-none" title="Sağlayıcı puanı / 10">★ {rating}</span>}
       <button onClick={() => onFavorite(item.id)} aria-label={item.isFavorite ? `${item.title} favorilerden çıkar` : `${item.title} favorilere ekle`} aria-pressed={Boolean(item.isFavorite)}
-        className="absolute top-1 right-1 min-w-10 min-h-10 rounded-full bg-black/65 text-[#ffb4ab] flex items-center justify-center">
+        className={`absolute top-1 right-1 ${tv ? "w-7 h-7" : "min-w-10 min-h-10"} rounded-full bg-black/65 text-[#ffb4ab] flex items-center justify-center`}>
         <Heart className={`w-4 h-4 ${item.isFavorite ? 'fill-current' : ''}`} />
       </button>
+      {tv && !live && <button type="button" aria-label="İçerik seçenekleri" onClick={()=>setActions(true)} className="absolute top-1 right-9 w-7 h-7 rounded-full bg-black/65 flex items-center justify-center text-white"><MoreHorizontal size={16}/></button>}
     </div>
+    {actions && <div role="dialog" aria-modal="true" className="fixed inset-0 z-[130] bg-black/75 flex items-center justify-center"><div className="w-full max-w-sm rounded-2xl bg-[#202022] p-4 flex flex-col gap-2"><div className="flex justify-between gap-2"><strong>{item.title}</strong><button onClick={()=>setActions(false)} aria-label="Kapat"><X size={20}/></button></div><button className="p-3 rounded-xl bg-white/10 text-left" onClick={()=>{setActions(false);onInfo(item);}}>Bilgiler</button>{!isChildMode&&<button className="p-3 rounded-xl bg-white/10 text-left" onClick={()=>{setActions(false);series?onSeries(item):onDownload(item);}}>İndir</button>}{!isChildMode&&<button className="p-3 rounded-xl bg-white/10 text-left" onClick={()=>{setActions(false);series?onSeries(item):onSchedule(item);}}>İndirmeyi zamanla</button>}</div></div>}
     <div className="catalog-card-body flex flex-col min-w-0 p-2.5 gap-2">
       <button type="button" className="text-left min-w-0" onClick={open}>
         <h3 className="font-bold text-[13px] leading-snug line-clamp-2 text-[#e5e1e4]" title={item.title}>{item.title}</h3>
@@ -53,11 +59,11 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
           onClick={() => series ? onSeries(item) : onPlay(item)} aria-label={series ? `${item.title} sezonlar ve bölümler` : `${item.title} oynat`}>
           {series ? <Layers size={15} className="shrink-0" /> : <Play size={15} className="shrink-0" />}<span>{series ? 'Bölümler' : 'İzle'}</span>
         </button>
-        <button type="button" onClick={() => live ? onEpg(item) : onInfo(item)} className="min-h-10 min-w-10 rounded-xl bg-[#29292c] flex items-center justify-center text-[#00f0ff]" aria-label={`${item.title} ${live ? 'yayın rehberi' : 'bilgileri'}`}>
+        {!tv && <button type="button" onClick={() => live ? onEpg(item) : onInfo(item)} className="min-h-10 min-w-10 rounded-xl bg-[#29292c] flex items-center justify-center text-[#00f0ff]" aria-label={`${item.title} ${live ? 'yayın rehberi' : 'bilgileri'}`}>
           {live ? <CalendarDays size={16}/> : <Info size={16}/>}
-        </button>
-        {!isChildMode && !live && <button type="button" onClick={() => series ? onSeries(item) : onDownload(item)} className="min-h-10 min-w-10 rounded-xl bg-[#29292c] text-[#00f0ff] flex items-center justify-center" aria-label={`${item.title} indir`}><Download size={16}/></button>}
-        {!isChildMode && !live && !series && <button type="button" onClick={() => onSchedule(item)} className="catalog-schedule min-h-10 min-w-10 rounded-xl bg-[#29292c] text-[#00f0ff] flex items-center justify-center" aria-label={`${item.title} indirmeyi zamanla`}><CalendarDays size={16}/></button>}
+        </button>}
+        {!tv && !isChildMode && !live && <button type="button" onClick={() => series ? onSeries(item) : onDownload(item)} className="min-h-10 min-w-10 rounded-xl bg-[#29292c] text-[#00f0ff] flex items-center justify-center" aria-label={`${item.title} indir`}><Download size={16}/></button>}
+        {!tv && !isChildMode && !live && !series && <button type="button" onClick={() => onSchedule(item)} className="catalog-schedule min-h-10 min-w-10 rounded-xl bg-[#29292c] text-[#00f0ff] flex items-center justify-center" aria-label={`${item.title} indirmeyi zamanla`}><CalendarDays size={16}/></button>}
       </div>
     </div>
   </article>;
