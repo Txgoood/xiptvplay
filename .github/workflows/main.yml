@@ -1,5 +1,5 @@
 name: Build Android APK
-run-name: XIPTV Play Android v1.4.36 (44) • ${{ github.event_name }} • ${{ github.sha }}
+run-name: XIPTV Play Android TV BOX UPDATE v1.4.37 (45) • ${{ github.event_name }} • ${{ github.sha }}
 # Stable signing verification after GitHub repository secret registration.
 
 on:
@@ -9,6 +9,7 @@ on:
       - tek-dal-birlestirme-xiptvplay-android
       - fix/android-clean-playlist-start-20261119
       - fix/android-live-adult-filter-build44
+      - feat/android-tv-box-update-build45
     paths:
       - '.github/workflows/main.yml'
       - 'scripts/android-emulator-smoke.sh'
@@ -117,7 +118,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: XIPTV-Play-v1.4.37-Build45-TV-BOX-UPDATE
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
@@ -148,7 +149,7 @@ jobs:
       - name: Download APK produced by build job
         uses: actions/download-artifact@v4
         with:
-          name: app-debug
+          name: XIPTV-Play-v1.4.37-Build45-TV-BOX-UPDATE
           path: emulator-apk
 
       - name: Download player controls test APK
