@@ -27,6 +27,20 @@ import java.io.OutputStream;
 public class DownloadFilesPlugin extends Plugin {
     private static final String FOLDER = "Movies/XIPTVPlay/";
 
+    @PluginMethod
+    public void getDownloadTarget(PluginCall call) {
+        JSObject result=new JSObject();result.put("target",DownloadStorage.selected(getContext()));
+        File usb=DownloadStorage.usb(getContext());result.put("usbAvailable",usb!=null);
+        if(usb!=null){result.put("usbTotal",usb.getTotalSpace());result.put("usbFree",usb.getUsableSpace());}
+        result.put("internalTotal",getContext().getFilesDir().getTotalSpace());result.put("internalFree",getContext().getFilesDir().getUsableSpace());call.resolve(result);
+    }
+    @PluginMethod
+    public void setDownloadTarget(PluginCall call) {
+        String target=call.getString("target","internal");
+        if(!"internal".equals(target)&&!"usb".equals(target)){call.reject("Geçersiz konum");return;}
+        if("usb".equals(target)&&DownloadStorage.usb(getContext())==null){call.reject("USB erişilebilir değil");return;}
+        DownloadStorage.select(getContext(),target);getDownloadTarget(call);
+    }
     // Read real internal user-data partition capacity; never use mock storage totals.
     @PluginMethod
     public void getStorageStats(PluginCall call) {
@@ -54,7 +68,8 @@ public class DownloadFilesPlugin extends Plugin {
         new Thread(() -> {
             try {
                 String fileName = new File(path).getName();
-                File source = new File(new File(getContext().getFilesDir(), "downloads"), fileName);
+                File source = path.startsWith("file://") ? new File(Uri.parse(path).getPath()) : new File(new File(getContext().getFilesDir(), "downloads"), fileName);
+                if(path.startsWith("file://")) { File usb=DownloadStorage.usb(getContext()); if(usb==null || !source.getCanonicalPath().startsWith(new File(usb,"downloads").getCanonicalPath()+File.separator))throw new Exception("USB dosyası erişilebilir değil"); }
                 if (!source.isFile()) throw new Exception("İndirilen dosya bulunamadı.");
                 if (Build.VERSION.SDK_INT < 29) {
                     // Eski Android surumlerinde sistem dosya secicisi ile klasor secimi sun.
