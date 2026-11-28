@@ -1,3 +1,4 @@
+import {readCategoryFavorites,toggleCategoryFavorite} from '../../services/categoryFavorites';
 import { isTvMode } from '../../services/tvNavigation';
 import { createContentFilter } from '../../services/smartTrFilter';
 import { CatalogPoster } from '../CatalogPoster';
@@ -85,6 +86,8 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_CHUNK);
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
+  const [categoryFavorites,setCategoryFavorites]=useState(()=>readCategoryFavorites(profileId));
+  const favoriteCategory=(name:string)=>categoryFavorites.some(r=>r.playlistId===activePlaylist?.id&&r.tab===activeTab&&r.name===name);
   const [categorySearchOpen,setCategorySearchOpen]=useState(false);
   const [categorySortOpen,setCategorySortOpen]=useState(false);
   const [categorySort, setCategorySort] = useState<'az' | 'za' | 'oldest' | 'newest'>('az');
@@ -405,9 +408,9 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
             </div>}
             <div className="overflow-y-auto px-4 pt-2 pb-5 min-h-0">
               {searchedCategories.length ? searchedCategories.map((cat) => (
-                <button key={cat.name} type="button" onClick={() => { handleCategorySelect(cat.name); setIsCategoryMenuOpen(false); }} className={`w-full flex items-center justify-between gap-3 px-3 py-3 mb-1 rounded-xl text-left border ${selectedCategory === cat.name ? 'bg-[#00f0ff]/10 border-[#00f0ff]/40 text-[#00f0ff]' : 'bg-[#202022] border-white/5 text-[#e5e1e4]'}`}>
+                <div key={cat.name} className="flex items-center gap-2"><button type="button" onClick={() => { handleCategorySelect(cat.name); setIsCategoryMenuOpen(false); }} className={`w-full flex items-center justify-between gap-3 px-3 py-3 mb-1 rounded-xl text-left border ${selectedCategory === cat.name ? 'bg-[#00f0ff]/10 border-[#00f0ff]/40 text-[#00f0ff]' : 'bg-[#202022] border-white/5 text-[#e5e1e4]'}`}>
                   <span className="text-sm break-words">{cat.name}</span><span className="shrink-0 text-xs font-mono text-[#849495]">{cat.count.toLocaleString('tr-TR')}</span>
-                </button>
+                </button>{!isChildMode&&activePlaylist&&cat.name!=="Tümü"&&<button type="button" aria-label={favoriteCategory(cat.name)?"Favori kategoriden çıkar":"Favori kategoriye ekle"} aria-pressed={favoriteCategory(cat.name)} onClick={()=>setCategoryFavorites(toggleCategoryFavorite(profileId,{playlistId:activePlaylist.id,tab:activeTab,name:cat.name}))} className="shrink-0 w-9 h-9 rounded-full bg-[#252527] flex items-center justify-center text-[#ffb4ab]"><Heart size={15} fill={favoriteCategory(cat.name)?"currentColor":"none"}/></button>}</div>
               )) : <p className="text-center text-sm text-[#849495] py-8">Aramanla eşleşen kategori bulunamadı.</p>}
             </div>
           </section>
