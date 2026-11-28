@@ -275,3 +275,26 @@ input[type="range"] {
 .xiptv-tv [data-catalog-tab="all"] .tv-simple-live .tv-simple-art img{object-fit:contain}
 .xiptv-tv [data-catalog-tab] .tv-simple-card--details .tv-simple-meta{height:140px;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
 .xiptv-tv [data-catalog-tab] .tv-simple-card--list .tv-simple-meta{height:80px;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+
+/* TV EXPERIENCE 2.0 cinematic details: keep the existing phone layout untouched. */
+.xiptv-tv .tv-movie-detail{width:97vw;max-width:1800px;padding:clamp(16px,2vw,32px);grid-template-columns:minmax(120px,22%) minmax(0,1fr);gap:clamp(14px,2vw,30px)}
+.xiptv-tv .tv-movie-ambient img,.xiptv-tv .tv-series-ambient img{filter:blur(8px);opacity:.58;transform:scale(1.04)}
+.xiptv-tv .tv-movie-ambient>div{background:linear-gradient(90deg,#10121bd9,#10121b9c 60%,#10121b55),linear-gradient(0deg,#10121b 4%,transparent 90%)}
+.xiptv-tv .tv-movie-meta h2{font-size:clamp(24px,3.2vw,48px)}
+.xiptv-tv .tv-detail-actions{gap:10px;margin:8px 0}
+.xiptv-tv .tv-detail-actions button,.xiptv-tv .tv-detail-actions a{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 18px;border-radius:10px;font-size:clamp(13px,1.2vw,19px);font-weight:700;background:#303744}
+.xiptv-tv .tv-detail-actions button:first-child{background:#00e6ef;color:#00363a}
+.xiptv-tv .tv-detail-actions button[aria-pressed=true]{color:#ff9aaa}
+.xiptv-tv .tv-cast-card{width:clamp(80px,8vw,130px)}
+.xiptv-tv .tv-cast-card>div{height:auto;aspect-ratio:3/4}
+.xiptv-tv .tv-series-shell{max-width:1800px}
+.xiptv-tv .tv-series-meta{display:block;top:52px;bottom:65px;padding:10px}
+.xiptv-tv .tv-series-poster{float:left;margin:0 14px 10px 0;width:clamp(80px,10vw,160px)}
+.xiptv-tv .tv-series-title{font-size:clamp(22px,2.5vw,38px)}
+.xiptv-tv .tv-series-plot{font-size:clamp(13px,1.25vw,19px)}
+.xiptv-tv .tv-series-extra{clear:both;font-size:clamp(12px,1.1vw,17px)}
+.xiptv-tv .tv-series-episode-row{min-height:100px;padding:10px 12px;border-radius:12px}
+.xiptv-tv .tv-episode-thumb{width:clamp(96px,12vw,190px);height:auto;aspect-ratio:16/9}
+.xiptv-tv .tv-episode-title{font-size:clamp(14px,1.4vw,21px)}
+.xiptv-tv .tv-episode-plot{font-size:clamp(12px,1.1vw,16px);-webkit-line-clamp:2}
+.xiptv-tv .tv-episode-play{min-height:40px;border-radius:10px}
