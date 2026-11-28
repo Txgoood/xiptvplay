@@ -35,7 +35,7 @@ export function installTvNavigation() {
   };
   const requestTile=(grid:HTMLElement,index:number)=>{
     const tile=findTile(grid,index);
-    if(tile){focus(tile);return;}
+    if(tile){pending=null;focus(tile);return;}
     pending={grid,index,attempts:0};
     grid.dispatchEvent(new CustomEvent('xiptv-grid-jump',{detail:index}));
     const retry=()=>{
@@ -57,7 +57,7 @@ export function installTvNavigation() {
       }
       const previous=last;last=m;
       const restore=previous?saved.get(previous):undefined;
-      if(previous&&!previous.isConnected) saved.delete(previous);
+      for(const dialog of saved.keys())if(!dialog.isConnected)saved.delete(dialog);
       if(restore?.isConnected&&(!m||m.contains(restore))&&(!m||!m.contains(document.activeElement))) focus(restore);
       else if(!m && previous && !restore?.isConnected) { restoreTile(); }
       else if(m&&!m.contains(document.activeElement)) {
@@ -94,7 +94,8 @@ export function installTvNavigation() {
       if(!pending&&active===document.body&&restoreTile()){e.preventDefault();e.stopImmediatePropagation();return;}
     }
     const root=last||document;
-    const list=targets(root), active=document.activeElement as HTMLElement;
+    const active=document.activeElement as HTMLElement;
+    const list=targets(root);
     const row=active?.closest('[data-tv-category-row]');
     const tool=active?.closest('[data-tv-category-tool]');
     if(!last && (row||tool) && ['ArrowLeft','ArrowRight'].includes(e.key)){
