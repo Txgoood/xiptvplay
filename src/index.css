@@ -298,3 +298,23 @@ input[type="range"] {
 .xiptv-tv .tv-episode-title{font-size:clamp(14px,1.4vw,21px)}
 .xiptv-tv .tv-episode-plot{font-size:clamp(12px,1.1vw,16px);-webkit-line-clamp:2}
 .xiptv-tv .tv-episode-play{min-height:40px;border-radius:10px}
+
+.xiptv-tv .tv-favorites-screen,.xiptv-tv .tv-history-screen,.xiptv-tv .tv-download-screen{max-width:1500px;padding:16px 24px 32px}
+.xiptv-tv .tv-management-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.xiptv-tv .tv-management-tabs button{flex:1 0 auto;min-height:42px;padding:8px 14px;border-radius:9px;background:#242a33;font-size:15px;color:#d7e2e6}
+.xiptv-tv .tv-management-tabs button[aria-pressed=true]{background:#00e6ef;color:#00363a;font-weight:700}
+.xiptv-tv .tv-favorite-categories{display:flex;flex-wrap:wrap;gap:8px}
+.xiptv-tv .tv-favorite-categories h3{flex-basis:100%}
+.xiptv-tv .tv-favorite-grid .tv-simple-art{aspect-ratio:2/3}
+.xiptv-tv .tv-history-resume button{width:clamp(150px,19vw,280px)}
+.xiptv-tv .tv-history-resume img{height:auto;aspect-ratio:16/9}
+.xiptv-tv .tv-history-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.xiptv-tv .tv-history-grid>*{margin:0}
+.xiptv-tv .tv-history-card img{width:110px;height:132px}
+.xiptv-tv .tv-history-card button{min-height:36px;padding:8px 12px}
+.xiptv-tv .tv-history-card h3,.xiptv-tv .tv-download-screen h4{font-size:17px}
+.xiptv-tv .tv-download-screen button,.xiptv-tv .tv-download-screen summary{min-height:38px}
+.xiptv-tv .tv-download-screen [hidden]{display:none!important}
+.xiptv-tv .tv-disk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.xiptv-tv .tv-disk-grid>div{display:flex;flex-direction:column;gap:8px;padding:15px;background:#1c232c;border-radius:12px}
+.xiptv-tv .tv-disk-grid span{color:#b9cacb}
