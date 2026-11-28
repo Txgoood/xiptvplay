@@ -241,7 +241,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
 
 
   return (
-    <div className="flex flex-col w-full max-w-none mx-auto px-3 sm:px-4 lg:px-6 pt-2 pb-28 gap-3.5 select-none">
+    <div data-catalog-tab={activeTab} className="flex flex-col w-full max-w-none mx-auto px-3 sm:px-4 lg:px-6 pt-2 pb-28 gap-3.5 select-none">
       {/* Search Input Bar */}
       <div className="xiptv-catalog-search relative flex items-center rounded-2xl bg-[#1c1b1d] border border-white/5 focus-within:border-[#00f0ff]/40 shadow-md">
         <div className="absolute left-3.5 flex items-center pointer-events-none text-[#b9cacb]">
