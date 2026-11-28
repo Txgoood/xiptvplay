@@ -15,6 +15,33 @@ export function installTvNavigation() {
   const targets=(root: ParentNode)=>Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(e=>visible(e)&&e.tabIndex>=0);
   const focus=(e?:HTMLElement)=>{ if(e){ e.focus({preventScroll:true}); e.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'}); }};
   let last:HTMLElement|null=null;
+  let remembered:{scope:string;id:string;index:number}|null=null;
+  let pending:{grid:HTMLElement;index:number;attempts:number}|null=null;
+  let lastRepeat=0;
+  const gridScope=(grid:HTMLElement)=>grid.closest('[data-catalog-tab]')?.getAttribute('data-catalog-tab')||'';
+  const findTile=(grid:HTMLElement,index:number)=>grid.querySelector<HTMLElement>('[data-grid-index="'+index+'"] [data-tv-poster]');
+  const restoreTile=()=>{
+    if(!isTvMode()||last||!remembered)return false;
+    const grid=document.querySelector<HTMLElement>('[data-testid="catalog-grid"]');
+    if(!grid||gridScope(grid)!==remembered.scope)return false;
+    const tile=Array.from(grid.querySelectorAll<HTMLElement>('[data-media-id]')).find(x=>x.dataset.mediaId===remembered?.id)?.querySelector<HTMLElement>('[data-tv-poster]');
+    if(tile){focus(tile);return true;}
+    return false;
+  };
+  const requestTile=(grid:HTMLElement,index:number)=>{
+    const tile=findTile(grid,index);
+    if(tile){focus(tile);return;}
+    pending={grid,index,attempts:0};
+    grid.dispatchEvent(new CustomEvent('xiptv-grid-jump',{detail:index}));
+    const retry=()=>{
+      if(!pending||pending.grid!==grid||pending.index!==index)return;
+      if(!grid.isConnected||last){pending=null;return;}
+      const target=findTile(grid,index);
+      if(target){pending=null;focus(target);return;}
+      if(++pending.attempts<20)requestAnimationFrame(retry);else pending=null;
+    };
+    requestAnimationFrame(retry);
+  };
   const saved=new Map<HTMLElement,HTMLElement>();
   function reconcile(){
     const m=modal();
@@ -27,6 +54,7 @@ export function installTvNavigation() {
       const restore=previous?saved.get(previous):undefined;
       if(previous&&!previous.isConnected) saved.delete(previous);
       if(restore?.isConnected&&(!m||m.contains(restore))&&(!m||!m.contains(document.activeElement))) focus(restore);
+      else if(!m && previous && !restore?.isConnected) { restoreTile(); }
       else if(m&&!m.contains(document.activeElement)) {
         const list=targets(m);focus(list.find(e=>e.matches('input:not([type=checkbox]):not([type=range])'))||list[0]);
       }
@@ -36,12 +64,30 @@ export function installTvNavigation() {
   const observer=new MutationObserver(()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;reconcile();});});
   observer.observe(document.body,{childList:true,subtree:true});
   document.addEventListener('focusin',e=>{
-    const m=modal();if(m&&e.target instanceof Node&&!m.contains(e.target)) focus(targets(m)[0]);
+    const m=modal();if(m&&e.target instanceof Node&&!m.contains(e.target)) {focus(targets(m)[0]);return;}
+    if(!m&&e.target instanceof HTMLElement&&e.target.matches('[data-tv-poster]')){const grid=e.target.closest<HTMLElement>('[data-testid="catalog-grid"]'),card=e.target.closest<HTMLElement>('[data-media-id]'),cell=e.target.closest<HTMLElement>('[data-grid-index]');if(grid&&card&&cell)remembered={scope:gridScope(grid),id:card.dataset.mediaId||'',index:Number(cell.dataset.gridIndex)};}
   });
   let lastHorizontal = 0, lastDirection = '', lastChip: HTMLElement | undefined;
   window.addEventListener('keydown',e=>{
     if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))return;
     reconcile();
+    if(e.repeat){const now=performance.now();if(now-lastRepeat<75){e.preventDefault();e.stopImmediatePropagation();return;}lastRepeat=now;}
+    if(!last&&isTvMode()){
+      const active=document.activeElement as HTMLElement;
+      const grid=active?.closest<HTMLElement>('[data-testid="catalog-grid"]');
+      const cell=active?.closest<HTMLElement>('[data-grid-index]');
+      if(grid&&cell&&active.matches('[data-tv-poster]')){
+        const columns=Number(grid.dataset.tvColumns)||1,total=Number(grid.dataset.total)||0,index=pending?.grid===grid?pending.index:Number(cell.dataset.gridIndex);
+        let next=index;
+        if(e.key==='ArrowLeft'&&index%columns>0)next=index-1;
+        if(e.key==='ArrowRight'&&index%columns<columns-1)next=index+1;
+        if(e.key==='ArrowDown')next=Math.min(total-1,index+columns);
+        if(e.key==='ArrowUp'&&index>=columns)next=index-columns;
+        if(next!==index&&next>=0&&next<total){e.preventDefault();e.stopImmediatePropagation();requestTile(grid,next);return;}
+        if(e.key!=='ArrowUp'||index>=columns){e.preventDefault();e.stopImmediatePropagation();return;}
+      }
+      if(active===document.body&&restoreTile()){e.preventDefault();e.stopImmediatePropagation();return;}
+    }
     const root=last||document;
     const list=targets(root), active=document.activeElement as HTMLElement;
     const row=active?.closest('[data-tv-category-row]');
