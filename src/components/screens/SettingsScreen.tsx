@@ -6,6 +6,7 @@ import { Settings, Tv, Sliders, Trash2, Volume2, HardDrive, ShieldCheck } from '
 
 interface SettingsScreenProps {
   stats: SystemStats;
+  onOpenPlaylists?: () => void;
   catalog: MediaItem[];
   onClearCache: () => void;
   onResetApp: () => void;
@@ -13,6 +14,7 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   stats,
+  onOpenPlaylists,
   catalog,
   onClearCache,
   onResetApp,
@@ -70,6 +72,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
       </div>
 
+      {onOpenPlaylists && <button type="button" onClick={onOpenPlaylists} className="w-full flex items-center justify-between rounded-2xl bg-[#1c1b1d] border border-white/10 p-4 text-left"><span><strong>Playlist ve Sunucu Yönetimi</strong><br/><span className="text-xs text-[#b9cacb]">Sunucu ekle, düzenle, doğrula ve senkronize et</span></span><span>›</span></button>}
       {/* Content privacy settings */}
       <div className="flex flex-col gap-3 p-4 rounded-2xl bg-[#1c1b1d] border border-white/5">
         <div className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#ffb4ab]" /><span className="font-headline text-xs text-[#ffb4ab] uppercase tracking-wider font-bold">İçerik Gizliliği</span></div>
