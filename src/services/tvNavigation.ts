@@ -1,5 +1,5 @@
 import {getInterfaceMode,detectInterfaceMode} from './interfaceMode';
-const selector = 'button:not(:disabled),a[href],input:not(:disabled):not([type=hidden]):not([type=file]),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])';
+const selector = 'summary,button:not(:disabled),a[href],input:not(:disabled):not([type=hidden]):not([type=file]),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])';
 export const isTvMode = () => getInterfaceMode()==='tv';
 export function installTvNavigation() {
   document.documentElement.classList.toggle('xiptv-tv',isTvMode());
