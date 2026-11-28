@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { isTvMode } from '../../services/tvNavigation';
 import { CatalogPoster } from '../CatalogPoster';
 import { CalendarDays, Download, Heart, Info, Layers, Play, MoreHorizontal, X } from 'lucide-react';
@@ -21,6 +21,7 @@ interface Props {
 }
 export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, onInfo, onEpg, onDownload, onSchedule, onFavorite }: Props) {
   const [actions,setActions]=useState(false);
+  useEffect(()=>{if(!actions)return;const back=(e:Event)=>{e.stopImmediatePropagation();setActions(false);};window.addEventListener('xiptv-tv-back',back,true);return()=>window.removeEventListener('xiptv-tv-back',back,true);},[actions]);
   const tv=isTvMode();
   const live = item.type === 'live', series = item.type === 'series';
   const list = view === 'list' || view === 'details';
