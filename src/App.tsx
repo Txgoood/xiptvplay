@@ -52,8 +52,10 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>(() => {
     const config=FamilyProfilesService.get();
     const id=DeviceProfileAccess.startup(config);
-    return config?.profiles.find(p=>p.id===id)?.kind==='child'?'catalog':'playlists';
+    return config?.profiles.find(p=>p.id===id)?.kind==='child'||(isTvMode()&&StorageService.getPlaylists().length>0)?'catalog':'playlists';
   });
+  const tvRecovery = useRef<ScreenType|null>(null);
+  const tvStartupChecked = useRef(new Set<string>());
   const tvHistory = useRef<ScreenType[]>([]);
   const tvPrevious = useRef(currentScreen);
   const tvReturning = useRef(false);
@@ -287,7 +289,7 @@ export default function App() {
     setIsAddModalOpen(false);
     setIsProfileOpen(false);
     setAppMode('app');
-    setCurrentScreen(profile.kind === 'child' ? 'catalog' : 'playlists');
+    setCurrentScreen(profile.kind === 'child' || (isTvMode() && playlists.length>0) ? 'catalog' : 'playlists');
     if(familyConfiguration)DeviceProfileAccess.remember(profile,familyConfiguration);
     if(profile.kind==='child'&&supportsNativeCast()){void NativeCast.disconnect().catch(()=>{});setCastCandidate(null);}
     setCurrentProfileId(profile.id);
@@ -450,7 +452,7 @@ export default function App() {
     setCurrentScreen('catalog');
 
     // 3. M3U listesi başarıyla yüklendiğinde katalog ekranında hemen listele ve ilk kanalı VideoPlayerModal'da otomatik oynat
-    if (items.length > 0) {
+    if (items.length > 0 && !isTvMode()) {
       const firstPlayable = items.find((i) => i.type === 'live') || items[0];
       setActivePlayerMedia(firstPlayable);
       showToast(
@@ -567,6 +569,7 @@ export default function App() {
         setActivePlaylist(verified);
         setIsCatalogLoading(false);
       }
+      if(isTvMode() && tvRecovery.current){setCurrentScreen(tvRecovery.current);tvRecovery.current=null;}
       showToast(`Yeni sunucuya geçildi: ${counts.live} canlı, ${counts.movie} film, ${counts.series} dizi.`);
       return true;
     } catch (error) {
@@ -699,6 +702,7 @@ export default function App() {
         } : prev);
         setCatalogItems(items);setIsCatalogLoading(false);
       }
+      if(isTvMode() && isSelected() && tvRecovery.current){setCurrentScreen(tvRecovery.current);tvRecovery.current=null;}
       showToast(`"${target.name}" kataloğu yüklendi: ${counts.live} canlı, ${counts.movie} film, ${counts.series} dizi.`);
     }catch(e:any){
       const message=e?.message||'Katalog indirme hatası';
@@ -1351,6 +1355,35 @@ export default function App() {
     window.addEventListener('xiptv-tv-back', back);
     return () => window.removeEventListener('xiptv-tv-back', back);
   });
+  useEffect(()=>{
+    if(!isTvMode() || !isAdminProfile || !activePlaylist || (familyConfiguration && currentProfileId===null))return;
+    const p=activePlaylist;
+    if(tvStartupChecked.current.has(p.id))return;
+    tvStartupChecked.current.add(p.id);
+    if(p.type!=='xtream')return;
+    if(!p.serverUrl||!p.username||!p.password){
+      tvRecovery.current='catalog';setCurrentScreen('playlists');return;
+    }
+    let cancelled=false;
+    const check=async()=>{
+      if(!navigator.onLine){showToast('İnternet bağlantısını kontrol edin.');return;}
+      for(let attempt=0;attempt<2;attempt++){
+        try{
+          const result=await XtreamClientService.verifyConnection(p.serverUrl!,p.username!,p.password!);
+          if(cancelled||activePlaylistRef.current?.id!==p.id)return;
+          if(result.success)return;
+        }catch{}
+        if(attempt===0)await new Promise(resolve=>setTimeout(resolve,2000));
+        if(cancelled)return;
+      }
+      if(!cancelled&&activePlaylistRef.current?.id===p.id){
+        tvRecovery.current='catalog';setCurrentScreen('playlists');
+        showToast('Sunucu doğrulanamadı. Bilgileri kontrol edin veya tekrar deneyin.');
+      }
+    };
+    void check();
+    return()=>{cancelled=true;};
+  },[activePlaylist?.id,isAdminProfile,currentProfileId]);
   if (familyConfiguration && currentProfileId === null) {
     return <FamilyProfilesModal
       mode="choose"
@@ -1411,6 +1444,8 @@ export default function App() {
             )}
 
             {!isChildProfile && currentScreen === 'playlists' && (
+              <>
+              {isTvMode() && <div className="flex gap-3 px-4 py-2"><button className="rounded-xl bg-[#29292c] px-4 py-2" onClick={()=>setCurrentScreen('settings')}>Ayarlar’a dön</button>{playlists.length>0&&<button className="rounded-xl bg-[#0566d9] px-4 py-2" onClick={handleNavigateToCatalog}>Kataloğa dön</button>}</div>}
               <PlaylistsScreen
                 playlists={playlists}
                 stats={stats}
@@ -1420,6 +1455,7 @@ export default function App() {
                 onDeletePlaylist={handleDeletePlaylist}
                 onUpdatePlaylist={handleUpdatePlaylist}
               />
+              </>
             )}
 
             {currentScreen === 'catalog' && (
@@ -1499,6 +1535,7 @@ export default function App() {
             )}
             {isAdminProfile && currentScreen === 'settings' && (
               <SettingsScreen
+                onOpenPlaylists={isTvMode()?()=>setCurrentScreen('playlists'):undefined}
                 catalog={catalogItems}
                 stats={stats}
                 onClearCache={handleClearCache}
