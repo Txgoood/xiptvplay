@@ -270,3 +270,8 @@ input[type="range"] {
 .xiptv-tv .tv-simple-menu{width:min(520px,90vw);padding:20px;display:flex;flex-direction:column;gap:8px;background:#20242d;border:1px solid #ffffff25;border-radius:16px}
 .xiptv-tv .tv-simple-menu button{padding:12px;background:#ffffff0c;border-radius:8px;text-align:left}
 .xiptv-tv .tv-catalog-hint{font-size:12px;color:#b9cacb;text-align:right}
+
+.xiptv-tv [data-catalog-tab="all"] .tv-simple-card:not(.tv-simple-card--list):not(.tv-simple-card--details) .tv-simple-art{aspect-ratio:2/3}
+.xiptv-tv [data-catalog-tab="all"] .tv-simple-live .tv-simple-art img{object-fit:contain}
+.xiptv-tv [data-catalog-tab] .tv-simple-card--details .tv-simple-meta{height:140px;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.xiptv-tv [data-catalog-tab] .tv-simple-card--list .tv-simple-meta{height:80px;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
