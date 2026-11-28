@@ -318,3 +318,5 @@ input[type="range"] {
 .xiptv-tv .tv-disk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .xiptv-tv .tv-disk-grid>div{display:flex;flex-direction:column;gap:8px;padding:15px;background:#1c232c;border-radius:12px}
 .xiptv-tv .tv-disk-grid span{color:#b9cacb}
+
+.xiptv-tv .tv-settings-screen{max-width:1200px;padding:16px 24px 32px}.xiptv-tv .tv-settings-screen [hidden]{display:none!important}.xiptv-tv .tv-settings-screen select,.xiptv-tv .tv-settings-screen button:not([role=switch]){min-height:40px}.xiptv-tv .tv-settings-screen label,.xiptv-tv .tv-settings-screen strong{font-size:16px}.xiptv-tv .tv-preference-panel{display:flex;flex-direction:column;gap:12px;background:#1c232c;padding:20px;border-radius:14px}.xiptv-tv .tv-preference-panel button{background:#303744;padding:12px;border-radius:9px;text-align:left}.xiptv-tv.xiptv-tv-reduced-motion *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;scroll-behavior:auto!important}
