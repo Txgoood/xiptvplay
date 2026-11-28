@@ -109,7 +109,7 @@ public class ScheduledDownloadService extends Service {
         if(cancelled(id))return;
         String url=job.getString("url");
         if(!url.startsWith("http://")&&!url.startsWith("https://"))throw new IOException("Yalnızca HTTP/HTTPS adresleri desteklenir.");
-        File base=new File(getFilesDir(),"downloads");if(!base.exists()&&!base.mkdirs())throw new IOException("İndirme klasörü oluşturulamadı");
+        File base=DownloadStorage.base(this);if(!base.exists()&&!base.mkdirs())throw new IOException("İndirme klasörü oluşturulamadı");
         String name=id.replaceAll("[^a-zA-Z0-9_-]","_");
         String ext="mp4";
         String clean=url.split("\\?")[0].toLowerCase(java.util.Locale.ROOT);
@@ -165,7 +165,7 @@ public class ScheduledDownloadService extends Service {
                     && ScheduledDownloadStore.inWindow(job,System.currentTimeMillis())
                     && ScheduledDownloadStore.conditions(this,job)
                     && (total<=0||read>=total) && find(id)!=null){
-                    job.put("status","completed");job.put("retryCount",0);job.put("path","downloads/"+target.getName());
+                    job.put("status","completed");job.put("retryCount",0);job.put("path",DownloadStorage.path(this,target));
                 }else{
                     job.put("status","paused");
                     job.put("retryAt",System.currentTimeMillis()+15*60000L);
