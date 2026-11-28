@@ -27,7 +27,7 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
   const list = view === 'list' || view === 'details';
   const open = () => live ? onPlay(item) : onInfo(item);
   const rating = catalogRating(item.rating);
-  return <article className={`catalog-card catalog-card--${view} group min-w-0 rounded-2xl bg-[#1c1b1d] border border-white/5 overflow-hidden hover:border-[#00f0ff]/30`}>
+  return <article className={`catalog-card catalog-card--${view} ${live?"catalog-card--live":""} group min-w-0 rounded-2xl bg-[#1c1b1d] border border-white/5 overflow-hidden hover:border-[#00f0ff]/30`}>
     <div className="catalog-card-poster relative bg-[#2a2a2c] overflow-hidden">
       <button type="button" onClick={open} className="block w-full h-full" aria-label={`${item.title} ${live ? 'izle' : 'bilgileri'}`}>
         <CatalogPoster media={item} className={`w-full h-full ${live ? 'object-contain p-3' : 'object-cover'}`} />
@@ -45,8 +45,8 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
     </div>
     {actions && <div role="dialog" aria-modal="true" className="fixed inset-0 z-[130] bg-black/75 flex items-center justify-center"><div className="w-full max-w-sm rounded-2xl bg-[#202022] p-4 flex flex-col gap-2"><div className="flex justify-between gap-2"><strong>{item.title}</strong><button onClick={()=>setActions(false)} aria-label="Kapat"><X size={20}/></button></div>{!isChildMode&&<button className="p-3 rounded-xl bg-white/10 text-left" onClick={()=>{setActions(false);series?onSeries(item):onDownload(item);}}>İndir</button>}{!isChildMode&&<button className="p-3 rounded-xl bg-white/10 text-left" onClick={()=>{setActions(false);series?onSeries(item):onSchedule(item);}}>İndirmeyi zamanla</button>}</div></div>}
     <div className="catalog-card-body flex flex-col min-w-0 p-2.5 gap-2">
-      <button type="button" className="text-left min-w-0" onClick={open}>
-        <h3 className="font-bold text-[13px] leading-snug line-clamp-2 text-[#e5e1e4]" title={item.title}>{item.title}</h3>
+      <button type="button" className="catalog-card-heading text-left min-w-0" onClick={open}>
+        <h3 className="catalog-card-title font-bold text-[13px] leading-snug line-clamp-2 text-[#e5e1e4]" title={item.title}>{item.title}</h3>
         <p className="catalog-card-category text-[11px] text-[#b9cacb] truncate mt-1">{item.category}</p>
       </button>
       {view === 'details' && <div className="text-xs text-[#b9cacb] flex flex-wrap gap-x-3 gap-y-1">
@@ -55,7 +55,7 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
         {item.addedAt && <span>Eklendi: {new Date(item.addedAt).toLocaleDateString('tr-TR')}</span>}
         {item.releaseDate && <span>İlk yayın: {item.releaseDate}</span>}
       </div>}
-      {live && item.epgCurrent && <p className="text-[11px] text-[#4edea3] truncate">{item.epgCurrent}</p>}
+      {live && item.epgCurrent && <p className="catalog-card-epg text-[11px] text-[#4edea3] truncate" title={item.epgCurrent}>{item.epgCurrent}</p>}
       <div className={`catalog-card-actions flex flex-wrap items-center gap-1.5 ${list || tv ? '' : 'mt-auto'}`}>
         <button type="button" className="catalog-primary min-h-10 px-2 rounded-xl bg-[#00f0ff] text-[#00363a] font-bold text-xs flex items-center justify-center gap-1 flex-1 min-w-0"
           onClick={() => series ? onSeries(item) : onPlay(item)} aria-label={series ? `${item.title} sezonlar ve bölümler` : `${item.title} oynat`}>
