@@ -141,3 +141,7 @@ input[type="range"] {
 .discovery-select { display: block; width: 100%; min-height: 44px; margin-top: 5px; padding: 8px; border-radius: 12px; background: #28282b; color: white; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 @media (max-width: 479px) { .catalog-type-tabs { gap: 2px; } .catalog-type-tabs button { font-size: 10px; padding-inline: 2px; min-height: 40px; } }
+
+.xiptv-tv :focus-visible, .xiptv-tv input:focus, .xiptv-tv button:focus { outline: 3px solid #00f0ff !important; outline-offset: 2px; }
+.xiptv-tv { scroll-behavior: auto; }
+.xiptv-tv [class*="backdrop-blur"] { backdrop-filter: none; }
