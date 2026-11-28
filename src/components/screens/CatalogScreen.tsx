@@ -336,15 +336,15 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         <section key={shelf.title} className="catalog-shelf min-w-0" aria-label={shelf.title}>
           <div className="flex items-center gap-2 mb-1"><Sparkles size={17} className="text-[#00f0ff]"/><h2 className="font-bold text-base">{shelf.title}</h2></div>
           <p className="text-[11px] text-[#849495] mb-3">{shelf.subtitle}</p>
-          <div className="flex gap-3 overflow-x-auto pb-3 snap-x">
+          <div className="tv-aligned-shelf flex items-start gap-3 overflow-x-auto pb-3 snap-x">
             {shelf.items.map(item => <button type="button" key={item.id} onClick={() => item.type === 'series' ? onOpenSeriesDetail(item) : onOpenTmdbInfo(item)}
-              className="relative shrink-0 w-[32vw] sm:w-36 lg:w-44 snap-start text-left group" aria-label={`${item.title} keşfet`}>
+              className="tv-shelf-card relative shrink-0 w-[32vw] sm:w-36 lg:w-44 snap-start text-left group" aria-label={`${item.title} keşfet`}>
               <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-[#29292c]">
                 <CatalogPoster media={item} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                 {item.type === 'movie' && <MovieCollectionBadge media={item}/>}
                 {shelf.badge && <span className="absolute bottom-0 inset-x-0 px-2 py-1 bg-[#00f0ff] text-[#00363a] font-bold text-[10px] text-center">{shelf.badge}</span>}
               </div>
-              <span className="block text-xs font-bold mt-1.5 line-clamp-2">{item.title}</span>
+              <span className="tv-shelf-title block text-xs font-bold mt-1.5 line-clamp-2">{item.title}</span>
             </button>)}
           </div>
         </section>
