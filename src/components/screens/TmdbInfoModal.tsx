@@ -1,3 +1,4 @@
+import { isTvMode } from '../../services/tvNavigation';
 import React, { useEffect, useState } from 'react';
 import { X, Play, Download, Star, Film, Loader2, ExternalLink, Layers3 } from 'lucide-react';
 import { MediaItem } from '../../types';
@@ -64,20 +65,24 @@ export const TmdbInfoModal: React.FC<Props> = ({ profileId = 'parent', media, ca
   };
 
   if (!media) return null;
+  const tv=isTvMode();
   return (
     <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/85 p-0 sm:p-4" onClick={onClose}>
-      <section role="dialog" aria-modal="true" aria-label={media.title + ' bilgileri'} onClick={event => event.stopPropagation()} className="relative w-full sm:max-w-xl max-h-[94dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[#171719] text-white border border-white/10">
+      <section role="dialog" aria-modal="true" aria-label={media.title + ' bilgileri'} onClick={event => event.stopPropagation()} className={`relative w-full sm:max-w-xl max-h-[94dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[#171719] text-white border border-white/10 ${tv?"tv-movie-detail":""}`}>
         <button onClick={onClose} className="absolute top-3 right-3 z-10 rounded-full p-2 bg-black/75" aria-label="Bilgi ekranını kapat"><X size={20}/></button>
-        <div className="relative h-48 sm:h-60 bg-[#242426]">
-          <img src={details?.backdrop || media.backdrop || details?.poster || media.poster} alt="" className="w-full h-full object-cover" />
+        {tv&&<div className="tv-movie-ambient" aria-hidden="true"><img src={details?.backdrop || media.backdrop || details?.poster || media.poster} alt=""/><div/></div>}
+        <div className={`relative h-48 sm:h-60 bg-[#242426] ${tv?"tv-movie-poster":""}`}>
+          <img src={tv?(details?.poster || media.poster):(details?.backdrop || media.backdrop || details?.poster || media.poster)} alt="" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#171719] to-transparent" />
         </div>
-        <div className="p-5 -mt-10 relative space-y-4">
+        <div className={`p-5 -mt-10 relative space-y-4 ${tv?"tv-movie-content":""}`}>
+          <div className={tv?"tv-movie-meta":"contents"}>
           <h2 className="text-xl font-bold">{details?.title || media.title}</h2>
           <div className="flex gap-3 items-center text-xs text-[#b9cacb]">
             {details && Number.isFinite(details.rating) && <span className="flex items-center gap-1 text-amber-300"><Star size={14}/> {details.rating.toFixed(1)} / 10 TMDB</span>}
             <span>{details?.releaseDate?.slice(0, 4) || media.year || ''}</span>
             <span>{details?.genres?.join(' • ')}</span>
+            {details?.runtimeMinutes && <span>{details.runtimeMinutes} dk</span>}
           </div>
           {loading && <div className="flex items-center gap-2 text-[#00f0ff] text-sm"><Loader2 size={18} className="animate-spin"/> TMDB bilgileri yükleniyor...</div>}
           {error && <div role="alert" className="text-sm text-amber-200 bg-amber-500/10 rounded-xl p-3 space-y-2"><p>{error}</p><button type="button" onClick={() => setRetry(value => value + 1)} className="min-h-10 px-3 rounded-xl bg-white/10 font-semibold">Yeniden dene</button></div>}
@@ -102,12 +107,13 @@ export const TmdbInfoModal: React.FC<Props> = ({ profileId = 'parent', media, ca
             <button onClick={() => { onClose(); media.type === 'series' ? onOpenSeries(media) : onDownload(media); }} className="flex items-center gap-2 rounded-full px-5 py-2.5 bg-[#28282b] text-sm font-semibold"><Download size={17}/>{media.type === 'series' ? 'Bölüm İndir' : 'İndir'}</button>
             {details?.trailerKey && <a className="flex items-center gap-2 rounded-full px-4 py-2.5 bg-[#28282b] text-sm" href={'https://www.youtube.com/watch?v=' + encodeURIComponent(details.trailerKey)} target="_blank" rel="noopener noreferrer"><Film size={17}/> Fragman <ExternalLink size={12}/></a>}
           </div>
+          </div>
           {media.type === 'movie' && details?.collection && <MovieCollectionSection key={details.collection.id} collection={details.collection} media={media} tmdbId={details.id} catalog={catalog} isChildMode={isChildMode}
             onInfo={item => onSelectRelated?.(item)} onPlay={item => { onClose(); onPlay(item); }}/>}
           <SimilarMediaSection media={media} catalog={catalog} genres={details?.genres} onInfo={item => onSelectRelated?.(item)}/>
           {details?.cast && details.cast.length > 0 && <div>
             <h3 className="font-bold text-sm mb-2">Oyuncular</h3>
-            <div className="flex gap-3 overflow-x-auto pb-3">
+            <div className="flex items-start gap-3 overflow-x-auto pb-3">
               {details.cast.map((actor, index) => <div key={index} className="w-24 shrink-0">
                 <div className="h-28 rounded-lg overflow-hidden bg-[#28282b]">{actor.photo ? <img src={actor.photo} className="w-full h-full object-cover" alt={actor.name}/> : <div className="h-full flex items-center justify-center text-[#849495]">👤</div>}</div>
                 <p className="mt-1 text-xs font-semibold">{actor.name}</p>
