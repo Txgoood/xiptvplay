@@ -213,3 +213,22 @@ input[type="range"] {
 .xiptv-tv .tv-movie-meta>div:first-of-type{flex-wrap:wrap;font-size:14px}
 .xiptv-tv .tv-movie-detail .tv-shelf-card{width:clamp(90px,11vw,160px)}
 .xiptv-tv .tv-movie-detail .tv-aligned-shelf{gap:12px}
+
+/* Build 52: fixed compact metadata tracks keep every watch action aligned.
+   EPG is a non-sizing overlay on live posters, so mixed catalog rows also
+   retain exactly the same height. Phone layout remains unchanged. */
+.xiptv-tv .catalog-card:not(.catalog-card--list):not(.catalog-card--details){position:relative;--tv-title-line:17px;--tv-category-line:15px;--tv-watch-height:32px;--tv-body-padding:6px}
+.xiptv-tv .catalog-card--six,.xiptv-tv .catalog-card--eight{--tv-watch-height:30px}
+.xiptv-tv .catalog-card:not(.catalog-card--list):not(.catalog-card--details) .catalog-card-body{box-sizing:border-box;flex:none;height:calc(2 * var(--tv-title-line) + var(--tv-category-line) + var(--tv-watch-height) + 2 * var(--tv-body-padding) + 8px);padding:var(--tv-body-padding);gap:4px;min-height:0}
+.xiptv-tv .catalog-card:not(.catalog-card--list):not(.catalog-card--details) .catalog-card-heading{display:flex;flex-direction:column;justify-content:flex-start;gap:0;min-height:0;flex:0 0 calc(2 * var(--tv-title-line) + var(--tv-category-line));height:calc(2 * var(--tv-title-line) + var(--tv-category-line));overflow:hidden}
+.xiptv-tv .catalog-card-title{font-size:13px;line-height:var(--tv-title-line,17px);height:calc(2 * var(--tv-title-line,17px));min-height:calc(2 * var(--tv-title-line,17px));max-height:calc(2 * var(--tv-title-line,17px));margin:0;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere;flex-shrink:0}
+.xiptv-tv .catalog-card-category{display:block;margin:0;line-height:var(--tv-category-line,15px);height:var(--tv-category-line,15px);min-height:var(--tv-category-line,15px);flex-shrink:0}
+.xiptv-tv .catalog-card:not(.catalog-card--list):not(.catalog-card--details) .catalog-card-actions{flex:none;margin:0;gap:0;height:var(--tv-watch-height)}
+.xiptv-tv .catalog-card:not(.catalog-card--list):not(.catalog-card--details) .catalog-primary{height:var(--tv-watch-height);min-height:var(--tv-watch-height);max-height:var(--tv-watch-height);font-weight:700;line-height:1.1;white-space:nowrap}
+.xiptv-tv .catalog-card:not(.catalog-card--list):not(.catalog-card--details) .catalog-card-epg{position:absolute;left:8px;right:8px;bottom:calc(2 * var(--tv-title-line) + var(--tv-category-line) + var(--tv-watch-height) + 2 * var(--tv-body-padding) + 28px);padding:2px 4px;border-radius:4px;background:rgba(0,0,0,.85);pointer-events:none}
+.xiptv-tv .catalog-card:not(.catalog-card--list):not(.catalog-card--details).catalog-favorite-card .catalog-card-body{height:calc(2 * var(--tv-title-line) + var(--tv-category-line) + var(--tv-watch-height) + 32px + 2 * var(--tv-body-padding) + 12px)}
+.xiptv-tv .catalog-favorite-card .catalog-card-body>button:not(.catalog-favorite-play){height:32px;min-height:32px;flex:none}
+.xiptv-tv .catalog-favorite-play{height:32px;min-height:32px;margin:0;flex:none;font-size:14px}
+.xiptv-tv .catalog-card--list .catalog-card-body,.xiptv-tv .catalog-card--details .catalog-card-body{height:auto;flex:1;min-width:0;gap:4px}
+.xiptv-tv .catalog-card--list .catalog-card-actions .catalog-primary,.xiptv-tv .catalog-card--details .catalog-card-actions .catalog-primary{flex:0 1 140px}
+.xiptv-tv .catalog-card--list .catalog-card-actions,.xiptv-tv .catalog-card--details .catalog-card-actions{margin-top:auto}
