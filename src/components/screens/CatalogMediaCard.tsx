@@ -36,7 +36,7 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
     const choose=(fn:()=>void)=>{setActions(false);fn();};
     return <article className={`tv-simple-card tv-simple-card--${view} ${live?'tv-simple-live':''}`} data-media-id={item.id}>
       <button type="button" className="tv-simple-target" aria-label={item.title+' · OK: aç, uzun OK: seçenekler'} data-tv-poster="true"
-        onKeyDown={e=>{if(e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();if(e.repeat||press.current!==null)return;longPress.current=false;press.current=setTimeout(()=>{press.current=null;longPress.current=true;setActions(true);},650);}}
+        onKeyDown={e=>{if(e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();if(e.repeat||press.current!==null)return;longPress.current=false;press.current=setTimeout(()=>{press.current=null;longPress.current=true;window.dispatchEvent(new Event('xiptv-long-confirm'));setActions(true);},650);}}
         onKeyUp={e=>{if(e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();cancelPress();if(!longPress.current)activate();longPress.current=false;}}
         onBlur={cancelPress} onClick={activate} onContextMenu={e=>{e.preventDefault();setActions(true);}}>
         <div className="tv-simple-art"><CatalogPoster media={item} className={`w-full h-full ${live?'object-contain p-3':'object-cover'}`}/>
