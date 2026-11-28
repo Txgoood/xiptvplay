@@ -1,5 +1,5 @@
 name: Build Android APK
-run-name: XIPTV Play Android TV EXPERIENCE 2.0 SETTINGS v1.5.6 (59) • ${{ github.event_name }} • ${{ github.sha }}
+run-name: XIPTV Play Android TV EXPERIENCE 2.0 PERFORMANCE v1.5.7 (60) • ${{ github.event_name }} • ${{ github.sha }}
 # Stable signing verification after GitHub repository secret registration.
 
 on:
@@ -126,7 +126,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: XIPTV-Play-v1.5.6-Build59-TV-EXPERIENCE-2.0
+          name: XIPTV-Play-v1.5.7-Build60-TV-EXPERIENCE-2.0
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
@@ -157,7 +157,7 @@ jobs:
       - name: Download APK produced by build job
         uses: actions/download-artifact@v4
         with:
-          name: XIPTV-Play-v1.5.6-Build59-TV-EXPERIENCE-2.0
+          name: XIPTV-Play-v1.5.7-Build60-TV-EXPERIENCE-2.0
           path: emulator-apk
 
       - name: Download player controls test APK
