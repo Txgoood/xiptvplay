@@ -1,8 +1,9 @@
+import {getInterfaceMode,detectInterfaceMode} from './interfaceMode';
 const selector = 'button:not(:disabled),a[href],input:not(:disabled):not([type=hidden]):not([type=file]),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])';
-export const isTvMode = () => /XIPTV-TV|Android TV|Google TV/i.test(navigator.userAgent);
+export const isTvMode = () => getInterfaceMode()==='tv';
 export function installTvNavigation() {
-  if (!isTvMode()) return;
-  document.documentElement.classList.add('xiptv-tv');
+  document.documentElement.classList.toggle('xiptv-tv',isTvMode());
+  if (!isTvMode() && detectInterfaceMode()!=='tv') return;
   const visible = (e: HTMLElement) => {
     const r=e.getBoundingClientRect(), s=getComputedStyle(e);
     return r.width>0 && r.height>0 && s.visibility!=='hidden' && s.display!=='none' && !e.closest('[inert],[aria-hidden="true"]');
