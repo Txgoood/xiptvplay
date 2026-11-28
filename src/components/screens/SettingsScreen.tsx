@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
-import { SystemStats } from '../../types';
+import { categoryKey, classifyTr, createContentFilter } from '../../services/smartTrFilter';
+import { SystemStats, MediaItem } from '../../types';
 import { StorageService } from '../../services/storage';
 import { Settings, Tv, Sliders, Trash2, Volume2, HardDrive, ShieldCheck } from 'lucide-react';
 
 interface SettingsScreenProps {
   stats: SystemStats;
+  catalog: MediaItem[];
   onClearCache: () => void;
   onResetApp: () => void;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   stats,
+  catalog,
   onClearCache,
   onResetApp,
 }) => {
@@ -27,6 +30,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [hideAdultCategories, setHideAdultCategories] = useState(() => Boolean(StorageService.getSettings().hideAdultCategories));
   const [showOnlyTurkishCategories, setShowOnlyTurkishCategories] = useState(() => Boolean(StorageService.getSettings().showOnlyTurkishCategories));
 
+  const [trSettings, setTrSettings] = useState(() => StorageService.getSettings());
+  const [manageTr, setManageTr] = useState(false);
+  const [trSearch, setTrSearch] = useState('');
+  const [trType, setTrType] = useState('live');
+  const saveTr = (patch: Record<string, any>) => {
+    const next = {...StorageService.getSettings(), ...patch};
+    StorageService.saveSettings(next); setTrSettings(next);
+  };
+  const categories = React.useMemo(() => {
+    const map = new Map<string, {name:string; type:string; count:number; shown:number}>();
+    const filter = createContentFilter(trSettings);
+    for(const item of catalog){
+      const name=item.category||'Genel', key=categoryKey(item.type,name);
+      const row=map.get(key)||{name,type:item.type,count:0,shown:0};
+      row.count++; if(filter(item))row.shown++; map.set(key,row);
+    }
+    return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+  },[catalog,trSettings]);
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
@@ -46,6 +67,23 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <div className="flex items-center gap-2">
         <Settings className="w-5 h-5 text-[#00f0ff]" />
         <h2 className="font-headline text-lg font-bold text-[#e5e1e4]">Uygulama &amp; Motor Ayarları</h2>
+        {showOnlyTurkishCategories && <div className="flex flex-col gap-3 border-t border-white/10 pt-3">
+          {([['trLive','Canlı TV Türkiye filtresi'],['trMovie','Film Türkçe filtresi'],['trSeries','Dizi Türkçe filtresi'],['trUnknown','Tanımlanamayan içerikleri göster']] as const).map(([key,label])=>{
+            const enabled=key==='trUnknown'?trSettings[key]===true:trSettings[key]!==false;
+            return <button key={key} type="button" role="switch" aria-checked={enabled} onClick={()=>saveTr({[key]:!enabled})} className="flex justify-between items-center rounded-xl bg-[#201f21] p-3 text-sm"><span>{label}</span><span className={enabled?'text-[#00f0ff]':'text-[#849495]'}>{enabled?'Açık':'Kapalı'}</span></button>;
+          })}
+          <button type="button" onClick={()=>setManageTr(!manageTr)} className="rounded-xl bg-[#0566d9] p-3 text-sm font-bold">Kategori yönetimi ve filtre raporu ({categories.length})</button>
+          {manageTr && <div className="flex flex-col gap-2">
+            <select value={trType} onChange={e=>setTrType(e.target.value)} className="discovery-select"><option value="live">Canlı TV</option><option value="movie">Film</option><option value="series">Dizi</option></select>
+            <input value={trSearch} onChange={e=>setTrSearch(e.target.value)} placeholder="Kategori ara..." className="discovery-select"/>
+            <div className="max-h-80 overflow-y-auto flex flex-col gap-2">
+            {categories.filter(row=>row.type===trType&&row.name.toLocaleLowerCase('tr').includes(trSearch.toLocaleLowerCase('tr'))).map(row=>{
+              const key=categoryKey(row.type,row.name);
+              return <div key={key} className="rounded-xl bg-[#201f21] p-2 flex flex-col gap-1"><span>{row.name} · {row.shown}/{row.count} görünür · {classifyTr({type:row.type,category:row.name})==='tr'?'Türkiye':classifyTr({type:row.type,category:row.name})==='foreign'?'Yabancı':'Belirsiz'}</span><select aria-label={row.name} className="discovery-select" value={trSettings.trOverrides?.[key]||'auto'} onChange={e=>{const overrides={...trSettings.trOverrides};if(e.target.value==='auto')delete overrides[key];else overrides[key]=e.target.value;saveTr({trOverrides:overrides});}}><option value="auto">Otomatik</option><option value="show">Göster</option><option value="hide">Gizle</option></select></div>;
+            })}
+            </div>
+          </div>}
+        </div>}
       </div>
 
       {/* Content privacy settings */}
@@ -57,8 +95,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
         <p className="text-[10px] text-[#849495]">Bu ayar uygulama arayüzünde gizleme yapar; tek başına ebeveyn kilidi veya içerik erişim koruması değildir.</p>
         <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/5">
-          <div className="flex flex-col pr-2 gap-1"><span className="text-xs font-semibold text-[#e5e1e4]">Yalnızca Türkiye (TR) listelerini göster</span><span className="text-[11px] text-[#b9cacb]">Canlı, film ve dizide kategori adı TR ile başlamayan içerikleri katalogdan ve aramadan gizler.</span></div>
-          <button type="button" role="switch" aria-checked={showOnlyTurkishCategories} onClick={() => { const next = !showOnlyTurkishCategories; setShowOnlyTurkishCategories(next); StorageService.saveSettings({ ...StorageService.getSettings(), showOnlyTurkishCategories: next }); showToast(next ? 'Yalnızca TR kategorileri gösteriliyor' : 'Tüm ülke kategorileri gösteriliyor'); }} className={`w-11 h-6 rounded-full transition-colors duration-200 p-0.5 flex items-center shrink-0 ${showOnlyTurkishCategories ? 'bg-[#0566d9]' : 'bg-[#2a2a2c]'}`}><span className={`w-5 h-5 rounded-full transition-transform duration-200 shadow-md ${showOnlyTurkishCategories ? 'translate-x-5 bg-[#00f0ff]' : 'translate-x-0 bg-[#849495]'}`}></span></button>
+          <div className="flex flex-col pr-2 gap-1"><span className="text-xs font-semibold text-[#e5e1e4]">Akıllı Türkiye filtresi</span><span className="text-[11px] text-[#b9cacb]">TR, [TR], Türkçe kategorileri ve Türk kanallarını tanır. Yabancı ülke kategorilerini gizler.</span></div>
+          <button type="button" role="switch" aria-checked={showOnlyTurkishCategories} onClick={() => { const next = !showOnlyTurkishCategories; setShowOnlyTurkishCategories(next); saveTr({showOnlyTurkishCategories: next}); showToast(next ? 'Yalnızca TR kategorileri gösteriliyor' : 'Tüm ülke kategorileri gösteriliyor'); }} className={`w-11 h-6 rounded-full transition-colors duration-200 p-0.5 flex items-center shrink-0 ${showOnlyTurkishCategories ? 'bg-[#0566d9]' : 'bg-[#2a2a2c]'}`}><span className={`w-5 h-5 rounded-full transition-transform duration-200 shadow-md ${showOnlyTurkishCategories ? 'translate-x-5 bg-[#00f0ff]' : 'translate-x-0 bg-[#849495]'}`}></span></button>
         </div>
 
       </div>
