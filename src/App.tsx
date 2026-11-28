@@ -1,3 +1,4 @@
+import {detectInterfaceMode} from './services/interfaceMode';
 import { createContentFilter } from './services/smartTrFilter';
 import { isTvMode } from './services/tvNavigation';
 import { CastModal } from './components/screens/CastModal';
@@ -60,7 +61,7 @@ export default function App() {
   const tvPrevious = useRef(currentScreen);
   const tvReturning = useRef(false);
   useEffect(() => {
-    if (!isTvMode() || tvPrevious.current === currentScreen) return;
+    if ((!isTvMode() && detectInterfaceMode()!=='tv') || tvPrevious.current === currentScreen) return;
     if (!tvReturning.current) tvHistory.current.push(tvPrevious.current);
     tvReturning.current = false;
     tvPrevious.current = currentScreen;
@@ -1333,7 +1334,7 @@ export default function App() {
   ).length;
 
   useEffect(() => {
-    if (!isTvMode()) return;
+    if (!isTvMode() && detectInterfaceMode()!=='tv') return;
     const back = () => {
       if (activePlayerMedia) { setActivePlayerMedia(null); return; }
       if (isSearchOpen) { setIsSearchOpen(false); return; }
