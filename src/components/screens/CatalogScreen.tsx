@@ -82,9 +82,9 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [categorySort, setCategorySort] = useState<'az' | 'za' | 'oldest' | 'newest'>('az');
-  const [preferences, setPreferences] = useState(() => readCatalogPreferences(profileId));
+  const [preferences, setPreferences] = useState(() => readCatalogPreferences(profileId, activeTab));
   const [openTools, setOpenTools] = useState<'sort' | 'view' | null>(null);
-  useEffect(() => { setPreferences(readCatalogPreferences(profileId)); setOpenTools(null); }, [profileId]);
+  useEffect(() => { setPreferences(readCatalogPreferences(profileId, activeTab)); setOpenTools(null); }, [profileId, activeTab]);
   useEffect(() => { setVisibleCount(PAGE_CHUNK); }, [catalog, preferences.sort, preferences.view]);
   useEffect(() => {
     if (!openTools) return;
@@ -94,7 +94,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   }, [openTools]);
   const updatePreferences = (patch: Partial<CatalogPreferences>) => {
     const next = { ...preferences, ...patch };
-    setPreferences(next); saveCatalogPreferences(profileId, next); setOpenTools(null);
+    setPreferences(next); saveCatalogPreferences(profileId, next, activeTab); setOpenTools(null);
     if (patch.sort && patch.sort !== preferences.sort) requestAnimationFrame(() => gridStart.current?.scrollIntoView({block:'start'}));
   };
   const sortable = activeTab === 'movie' || activeTab === 'series';
@@ -371,7 +371,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
       {openTools && <div className="fixed inset-0 z-[110] bg-black/70 flex items-end sm:items-center justify-center sm:p-4" onClick={() => setOpenTools(null)}>
         <section role="dialog" aria-modal="true" aria-label={openTools === 'sort' ? 'İçerik sıralaması' : 'Katalog görünümü'} onClick={event => event.stopPropagation()} className="w-full sm:max-w-md max-h-[88dvh] overflow-auto rounded-t-3xl sm:rounded-3xl bg-[#171719] border border-white/10 p-4 pb-8">
           <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-base">{openTools === 'sort' ? 'İçerikleri sırala' : 'Katalog görünümü'}</h2><button autoFocus type="button" onClick={() => setOpenTools(null)} aria-label="Seçenekleri kapat" className="min-h-10 min-w-10 flex items-center justify-center"><X size={20}/></button></div>
-          <p className="text-xs text-[#b9cacb] mb-3">Seçimin bu profil için hatırlanır.{openTools === 'sort' ? ' Film ve Dizi sekmelerinde, tüm alt kategorilerde uygulanır. Tarihi veya puanı olmayanlar sonda gösterilir.' : ''}</p>
+          <p className="text-xs text-[#b9cacb] mb-3">Seçimin bu profil ve içerik türü için ayrı hatırlanır.{openTools === 'sort' ? ' Film ve Dizi sekmelerinde, tüm alt kategorilerde uygulanır. Tarihi veya puanı olmayanlar sonda gösterilir.' : ''}</p>
           {(openTools === 'sort' ? sortOptions : VIEW_OPTIONS).map(([key, label]) => <button type="button" key={key} aria-pressed={key === (openTools === 'sort' ? (sortPresentation.usesUpdatedAt ? preferences.sort : sortPresentation.sort) : preferences.view)}
             onClick={() => openTools === 'sort' ? updatePreferences({ sort: key as CatalogSort }) : updatePreferences({ view: key as CatalogView })}
             className="w-full min-h-12 flex items-center justify-between gap-3 px-3 py-3 mb-1 rounded-xl bg-white/5 text-left text-sm">
