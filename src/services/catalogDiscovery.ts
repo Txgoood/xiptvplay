@@ -9,23 +9,24 @@ export const SORT_OPTIONS = [
   ['title-asc', 'İsim: A → Z'], ['title-desc', 'İsim: Z → A'],
 ] as const;
 export type CatalogSort = typeof SORT_OPTIONS[number][0];
-export type CatalogView = 'large' | 'medium' | 'small' | 'list' | 'details';
+export type CatalogView = 'large' | 'medium' | 'small' | 'six' | 'eight' | 'list' | 'details';
 export const VIEW_OPTIONS: [CatalogView, string][] = [
   ['large', 'Büyük kartlar · 2 sütun'], ['medium', 'Orta kartlar · 3 sütun'],
-  ['small', 'Küçük kartlar · 4 sütun'], ['list', 'Liste'], ['details', 'Ayrıntılı liste'],
+  ['small', 'Küçük kartlar · 4 sütun'], ['six', '6 sütun'], ['eight', '8 sütun'], ['list', 'Liste'], ['details', 'Ayrıntılı liste'],
 ];
 export interface CatalogPreferences { sort: CatalogSort; view: CatalogView }
 const preferenceKey = (profileId: string) => 'xiptvplay_catalog_preferences_v1_' + profileId;
-export function readCatalogPreferences(profileId: string): CatalogPreferences {
+export function readCatalogPreferences(profileId: string, tab?: string): CatalogPreferences {
   let saved: Partial<CatalogPreferences> = {};
   try { saved = JSON.parse(localStorage.getItem(preferenceKey(profileId)) || '{}') || {}; } catch {}
+  if(tab) { try { saved = {...saved,...JSON.parse(localStorage.getItem(preferenceKey(profileId)+'_'+tab)||'{}')}; } catch {} }
   return {
     sort: SORT_OPTIONS.some(([key]) => key === saved.sort) ? saved.sort! : 'added-desc',
     view: VIEW_OPTIONS.some(([key]) => key === saved.view) ? saved.view! : 'medium',
   };
 }
-export function saveCatalogPreferences(profileId: string, preferences: CatalogPreferences) {
-  try { localStorage.setItem(preferenceKey(profileId), JSON.stringify(preferences)); } catch { /* Dolu depoda oturum tercihi korunur. */ }
+export function saveCatalogPreferences(profileId: string, preferences: CatalogPreferences, tab?: string) {
+  try { localStorage.setItem(preferenceKey(profileId)+(tab?'_'+tab:''), JSON.stringify(preferences)); } catch { /* Dolu depoda oturum tercihi korunur. */ }
 }
 
 // Sunucu zamanları saniye veya milisaniye olabilir. Eksik tarih uydurulmaz.
