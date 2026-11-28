@@ -40,9 +40,10 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
         className={`absolute top-1 right-1 ${tv ? "w-7 h-7" : "min-w-10 min-h-10"} rounded-full bg-black/65 text-[#ffb4ab] flex items-center justify-center`}>
         <Heart className={`w-4 h-4 ${item.isFavorite ? 'fill-current' : ''}`} />
       </button>
-      {tv && !live && <button type="button" aria-label="İçerik seçenekleri" onClick={()=>setActions(true)} className="absolute top-1 right-9 w-7 h-7 rounded-full bg-black/65 flex items-center justify-center text-white"><MoreHorizontal size={16}/></button>}
+      {tv && !live && <button type="button" aria-label="Bilgiler" onClick={()=>onInfo(item)} className="absolute top-1 right-9 w-7 h-7 rounded-full bg-black/65 flex items-center justify-center text-white"><Info size={16}/></button>}
+      {tv && !live && !isChildMode && <button type="button" aria-label="İçerik seçenekleri" onClick={()=>setActions(true)} className="absolute top-1 right-[4.25rem] w-7 h-7 rounded-full bg-black/65 flex items-center justify-center text-white"><MoreHorizontal size={16}/></button>}
     </div>
-    {actions && <div role="dialog" aria-modal="true" className="fixed inset-0 z-[130] bg-black/75 flex items-center justify-center"><div className="w-full max-w-sm rounded-2xl bg-[#202022] p-4 flex flex-col gap-2"><div className="flex justify-between gap-2"><strong>{item.title}</strong><button onClick={()=>setActions(false)} aria-label="Kapat"><X size={20}/></button></div><button className="p-3 rounded-xl bg-white/10 text-left" onClick={()=>{setActions(false);onInfo(item);}}>Bilgiler</button>{!isChildMode&&<button className="p-3 rounded-xl bg-white/10 text-left" onClick={()=>{setActions(false);series?onSeries(item):onDownload(item);}}>İndir</button>}{!isChildMode&&<button className="p-3 rounded-xl bg-white/10 text-left" onClick={()=>{setActions(false);series?onSeries(item):onSchedule(item);}}>İndirmeyi zamanla</button>}</div></div>}
+    {actions && <div role="dialog" aria-modal="true" className="fixed inset-0 z-[130] bg-black/75 flex items-center justify-center"><div className="w-full max-w-sm rounded-2xl bg-[#202022] p-4 flex flex-col gap-2"><div className="flex justify-between gap-2"><strong>{item.title}</strong><button onClick={()=>setActions(false)} aria-label="Kapat"><X size={20}/></button></div>{!isChildMode&&<button className="p-3 rounded-xl bg-white/10 text-left" onClick={()=>{setActions(false);series?onSeries(item):onDownload(item);}}>İndir</button>}{!isChildMode&&<button className="p-3 rounded-xl bg-white/10 text-left" onClick={()=>{setActions(false);series?onSeries(item):onSchedule(item);}}>İndirmeyi zamanla</button>}</div></div>}
     <div className="catalog-card-body flex flex-col min-w-0 p-2.5 gap-2">
       <button type="button" className="text-left min-w-0" onClick={open}>
         <h3 className="font-bold text-[13px] leading-snug line-clamp-2 text-[#e5e1e4]" title={item.title}>{item.title}</h3>
@@ -55,7 +56,7 @@ export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, on
         {item.releaseDate && <span>İlk yayın: {item.releaseDate}</span>}
       </div>}
       {live && item.epgCurrent && <p className="text-[11px] text-[#4edea3] truncate">{item.epgCurrent}</p>}
-      <div className={`catalog-card-actions flex flex-wrap items-center gap-1.5 ${list ? '' : 'mt-auto'}`}>
+      <div className={`catalog-card-actions flex flex-wrap items-center gap-1.5 ${list || tv ? '' : 'mt-auto'}`}>
         <button type="button" className="catalog-primary min-h-10 px-2 rounded-xl bg-[#00f0ff] text-[#00363a] font-bold text-xs flex items-center justify-center gap-1 flex-1 min-w-0"
           onClick={() => series ? onSeries(item) : onPlay(item)} aria-label={series ? `${item.title} sezonlar ve bölümler` : `${item.title} oynat`}>
           {series ? <Layers size={15} className="shrink-0" /> : <Play size={15} className="shrink-0" />}<span>{series ? 'Bölümler' : 'İzle'}</span>
