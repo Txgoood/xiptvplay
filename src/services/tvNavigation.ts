@@ -18,6 +18,10 @@ export function installTvNavigation() {
   let remembered:{scope:string;id:string;index:number}|null=null;
   let pending:{grid:HTMLElement;index:number;attempts:number}|null=null;
   let lastRepeat=0;
+  let suppressConfirmRelease=false;
+  window.addEventListener('xiptv-long-confirm',()=>{suppressConfirmRelease=true;},true);
+  window.addEventListener('keydown',e=>{if(suppressConfirmRelease&&(e.key==='Enter'||e.key===' ')){if(!e.repeat){suppressConfirmRelease=false;return;}e.preventDefault();e.stopImmediatePropagation();}},true);
+  window.addEventListener('keyup',e=>{if(suppressConfirmRelease&&(e.key==='Enter'||e.key===' ')){suppressConfirmRelease=false;e.preventDefault();e.stopImmediatePropagation();}},true);
   const gridScope=(grid:HTMLElement)=>grid.closest('[data-catalog-tab]')?.getAttribute('data-catalog-tab')||'';
   const findTile=(grid:HTMLElement,index:number)=>grid.querySelector<HTMLElement>('[data-grid-index="'+index+'"] [data-tv-poster]');
   const restoreTile=()=>{
@@ -86,7 +90,7 @@ export function installTvNavigation() {
         if(next!==index&&next>=0&&next<total){e.preventDefault();e.stopImmediatePropagation();requestTile(grid,next);return;}
         if(e.key!=='ArrowUp'||index>=columns){e.preventDefault();e.stopImmediatePropagation();return;}
       }
-      if(active===document.body&&restoreTile()){e.preventDefault();e.stopImmediatePropagation();return;}
+      if(!pending&&active===document.body&&restoreTile()){e.preventDefault();e.stopImmediatePropagation();return;}
     }
     const root=last||document;
     const list=targets(root), active=document.activeElement as HTMLElement;
