@@ -41,7 +41,7 @@ interface VideoPlayerModalProps {
 const PLAYBACK_SPEEDS = [0.5, 1.0, 1.25, 1.5, 2.0];
 
 const NativeMediaPlayer = registerPlugin<{
-  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string; offlineEpisodeQueue?: Array<{uri: string; title: string}> }): Promise<{ started: boolean; returnedToInline?: boolean; positionMs?: number; durationMs?: number; sameMedia?: boolean; history?: { index: number; positionMs: number; durationMs: number; completed: boolean }[] }>;
+  play(options: { url: string; title: string; isLocalFile?: boolean; bufferSeconds?: number; isLive?: boolean; liveQueue?: Array<{id:string; title:string; streamUrl:string}>; liveIndex?: number; nextUrl?: string; nextTitle?: string; nextNextUrl?: string; nextNextTitle?: string; offlineEpisodeQueue?: Array<{uri: string; title: string}> }): Promise<{ started: boolean; returnedToInline?: boolean; positionMs?: number; durationMs?: number; sameMedia?: boolean; history?: { index: number; positionMs: number; durationMs: number; completed: boolean }[] }>;
   stop(): Promise<void>;
 }>('NativeMediaPlayer');
 
@@ -351,6 +351,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
     const mediaData = media as typeof media & Pick<MediaItem, 'nativeEpisodeQueue' | 'nextEpisodeUrl' | 'nextEpisodeTitle' | 'nextNextEpisodeUrl' | 'nextNextEpisodeTitle'> & Pick<DownloadItem, 'fileUri'>;
     const episodeQueue = mediaData.nativeEpisodeQueue || [];
+    const liveData = media as typeof media & { nativeLiveQueue?: Array<{id:string;title:string;streamUrl:string}>; nativeLiveIndex?: number };
     const { nativeEpisodeQueue: _queue, ...initialMedia } = mediaData;
     const nextEpisode = episodeQueue[0]?.media;
     const nextEpisodeUrl = mediaData.nextEpisodeUrl || nextEpisode?.streamUrl || null;
@@ -368,6 +369,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     NativeMediaPlayer.play({
       url: playbackUrl,
       isLocalFile: !!localFileUri,
+      isLive: media.type === 'live',
+      ...(media.type === 'live' && liveData.nativeLiveQueue ? {liveQueue:liveData.nativeLiveQueue,liveIndex:liveData.nativeLiveIndex} : {}),
       title: media.title || 'XIPTV Play',
       bufferSeconds: Math.max(3, Math.min(45, Number(StorageService.getSettings().bufferSeconds) || 15)),
       ...(media.type === 'series' && nextEpisodeUrl ? { nextUrl: nextEpisodeUrl } : {}),
