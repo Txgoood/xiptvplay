@@ -1,3 +1,5 @@
+import {isTvMode} from '../../services/tvNavigation';
+import {Capacitor,registerPlugin} from '@capacitor/core';
 import React, { useEffect, useRef, useState } from 'react';
 import { DownloadItem, SystemStats } from '../../types';
 import type { ScheduledDownload } from '../../services/downloadSchedule';
@@ -61,6 +63,10 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
   onDeleteItem,
   onPromoteItem,
 }) => {
+  const tv=isTvMode();
+  const [downloadTab,setDownloadTab]=useState('all');
+  const [disk,setDisk]=useState<{target:string;internalFree:number;internalTotal:number;usbAvailable:boolean;usbFree:number;usbTotal:number}|null>(null);
+  useEffect(()=>{if(!tv||Capacitor.getPlatform()!=='android')return;let active=true;const plugin=registerPlugin<{getDownloadTarget():Promise<NonNullable<typeof disk>>}>('DownloadFiles');const refresh=()=>{void plugin.getDownloadTarget().then(value=>{if(active)setDisk(value);}).catch(()=>{});};refresh();const timer=window.setInterval(refresh,15000);return()=>{active=false;window.clearInterval(timer);};},[tv]);
   const hasManualDownload = downloads.some(d => d.status === 'downloading');
   const scheduledActive = scheduledDownloads.filter(j => j.status === 'downloading');
   const isAnyDownloading = hasManualDownload || scheduledActive.length > 0;
@@ -112,7 +118,8 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
     return sizeMb < 1000 ? `${sizeMb} MB` : `${(sizeMb / 1000).toFixed(2)} GB`;
   };
 
-  const activeDownload = downloads.find((item) => item.status === 'downloading');
+  const activeDownloads = downloads.filter(item=>item.status==='downloading');
+  const activeDownload = activeDownloads[0];
   const queuedDownloads = downloads
     .filter((item) => item.status === 'queued')
     .sort((a, b) => (a.queueOrder ?? Number.MAX_SAFE_INTEGER) - (b.queueOrder ?? Number.MAX_SAFE_INTEGER));
@@ -144,6 +151,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
     const other: DownloadItem[] = [];
     downloads.forEach((item) => {
       if (item.status === 'queued' || item.status === 'downloading') return;
+      if(tv&&downloadTab!=='all'&&item.status!==downloadTab)return;
       if (item.type === 'movie') { movies.push(item); return; }
       const episode = item.type === 'series' ? getEpisodeGrouping(item) : null;
       if (!episode?.seriesTitle) { other.push(item); return; }
@@ -434,7 +442,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-2 pb-28 gap-4 select-none">
+    <div className="tv-download-screen flex flex-col w-full max-w-xl mx-auto px-4 pt-2 pb-28 gap-4 select-none">
       {/* Toast Notification Container */}
       {shareSuccess && (
         <div className="fixed top-20 inset-x-0 flex justify-center z-50 pointer-events-none px-4">
@@ -575,6 +583,8 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
         </div>
       </div>
 
+      {tv&&disk&&<div className="tv-disk-grid"><div><strong>Dahili hafıza</strong><span>{displayGb(disk.internalFree/1e9)} boş / {displayGb(disk.internalTotal/1e9)}</span></div><div><strong>USB depolama</strong><span>{disk.usbAvailable?displayGb(disk.usbFree/1e9)+' boş / '+displayGb(disk.usbTotal/1e9):'USB bağlı değil veya erişilemiyor'}</span></div><div><strong>Yeni indirme hedefi</strong><span>{disk.target==='usb'?'USB':'Dahili hafıza'}</span></div></div>}
+      {tv&&<div className="tv-management-tabs">{[['all','Tümü',downloads.length+pendingScheduled.length],['downloading','İniyor',activeDownloads.length],['queued','Bekleyen',queuedDownloads.length],['completed','Tamamlanan',downloads.filter(d=>d.status==='completed').length],['paused','Duraklatılan',downloads.filter(d=>d.status==='paused').length],['error','Hatalar',downloads.filter(d=>d.status==='error').length],['scheduled','Planlanan',pendingScheduled.length]].map(([id,label,count])=><button key={id} aria-pressed={downloadTab===id} onClick={()=>setDownloadTab(String(id))}>{label} ({count})</button>)}</div>}
       {/* Global Action Toolbar */}
       <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-2">
@@ -606,7 +616,7 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
       </div>
 
       {/* Native Android scheduled queue (separate from immediate download manager). */}
-      <section className="bg-[#1d2329] rounded-2xl border border-[#00f0ff]/20 p-3 space-y-3">
+      <section hidden={tv&&downloadTab!=='all'&&downloadTab!=='scheduled'} className="bg-[#1d2329] rounded-2xl border border-[#00f0ff]/20 p-3 space-y-3">
         <div className="flex justify-between items-center gap-2">
           <div><h3 className="text-sm font-bold flex items-center gap-2"><Clock className="h-4 w-4 text-[#00f0ff]"/> ⏰ Planlananlar</h3>
             <p className="text-[11px] text-[#b9cacb]">{pendingScheduled.length} aktif/bekleyen görev · Tamamlananlar aşağıdaki indirilenlere taşınır</p>
@@ -671,8 +681,9 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
         </div>
       </div>
 
+      {tv&&downloadTab!=='all'&&downloadTab!=='scheduled'&&!downloads.some(d=>d.status===downloadTab)&&<p className="p-4 text-[#b9cacb]">Bu durumda indirme bulunmuyor.</p>}
       {/* Download List Container */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3" hidden={tv&&downloadTab==='scheduled'}>
         {downloads.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 bg-[#1c1b1d] rounded-2xl border border-white/5 text-center my-2 gap-3">
             <div className="w-14 h-14 rounded-full bg-[#201f21] flex items-center justify-center text-[#849495] shadow-inner border border-white/5">
@@ -689,13 +700,13 @@ export const DownloadsScreen: React.FC<DownloadsScreenProps> = ({
           </div>
         ) : (
           <>
-            {activeDownload && (
+            {activeDownload && (!tv||downloadTab==='all'||downloadTab==='downloading') && (
               <div className="flex flex-col gap-2">
                 <div className="px-3 py-2 rounded-xl bg-[#00f0ff]/10 border border-[#00f0ff]/20 text-xs font-semibold text-[#7df4ff]">Şu an indiriliyor</div>
-                {renderDownloadItem(activeDownload)}
+                {tv?activeDownloads.map(renderDownloadItem):renderDownloadItem(activeDownload)}
               </div>
             )}
-            {queuedDownloads.length > 0 && (
+            {queuedDownloads.length > 0 && (!tv||downloadTab==='all'||downloadTab==='queued') && (
               <div className="flex flex-col gap-2">
                 <div className="px-3 py-2 rounded-xl bg-[#0566d9]/15 border border-[#0566d9]/25 text-xs font-semibold text-[#adc6ff]">Sıradaki indirmeler</div>
                 {queuedDownloads.map(renderDownloadItem)}
