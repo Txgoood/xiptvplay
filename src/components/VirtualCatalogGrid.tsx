@@ -24,11 +24,24 @@ export function VirtualCatalogGrid<T>({items,view,render,getKey}:Props<T>) {
   window.addEventListener('scroll',schedule,{passive:true});window.addEventListener('resize',schedule);measure();
   return()=>{observer.disconnect();window.removeEventListener('scroll',schedule);window.removeEventListener('resize',schedule);cancelAnimationFrame(frame);};
  },[items,view]);
+ useLayoutEffect(()=>{
+  const root=container.current;if(!root)return;
+  const jump=(event:Event)=>{
+   const index=(event as CustomEvent<number>).detail;
+   if(!Number.isInteger(index)||index<0||index>=items.length)return;
+   const row=Math.floor(index/layout.columns);
+   const top=window.scrollY+root.getBoundingClientRect().top+row*layout.rowHeight;
+   window.scrollTo({top:Math.max(0,top-160),behavior:'instant'});
+   setLayout(old=>({...old,start:Math.max(0,row-3),end:Math.min(Math.ceil(items.length/old.columns),row+Math.ceil(window.innerHeight/old.rowHeight)+4)}));
+  };
+  root.addEventListener('xiptv-grid-jump',jump);
+  return()=>root.removeEventListener('xiptv-grid-jump',jump);
+ },[items.length,layout.columns,layout.rowHeight]);
  const first=layout.start*layout.columns,last=layout.end*layout.columns;
  const totalRows=Math.ceil(items.length/layout.columns);
- return <div ref={container} className={`catalog-grid catalog-grid--${view}`} data-testid="catalog-grid" data-total={items.length}>
+ return <div ref={container} className={`catalog-grid catalog-grid--${view}`} data-testid="catalog-grid" data-total={items.length} data-tv-columns={layout.columns}>
   {layout.start>0&&<div aria-hidden="true" style={{gridColumn:'1 / -1',height:Math.max(0,layout.start*layout.rowHeight-layout.gap)}}/>}
-  {items.slice(first,last).map((item,index)=><div key={getKey(item)} ref={index===0?probe:undefined} className="virtual-catalog-cell">{render(item)}</div>)}
+  {items.slice(first,last).map((item,index)=><div key={getKey(item)} ref={index===0?probe:undefined} className="virtual-catalog-cell" data-grid-index={first+index}>{render(item)}</div>)}
   {layout.end<totalRows&&<div aria-hidden="true" style={{gridColumn:'1 / -1',height:Math.max(0,(totalRows-layout.end)*layout.rowHeight-layout.gap)}}/>}
  </div>;
 }
