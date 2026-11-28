@@ -1,6 +1,8 @@
 package com.xiptvplay.app;
 
 import android.app.Activity;
+import android.app.UiModeManager;
+import android.view.KeyEvent;
 import android.app.PictureInPictureParams;
 import android.app.RemoteAction;
 import android.app.PendingIntent;
@@ -76,11 +78,16 @@ public class NativePlayerActivity extends Activity {
         }
     }
 
+    private boolean isTvDevice() {
+        UiModeManager manager = (UiModeManager) getSystemService(UI_MODE_SERVICE);
+        return manager != null && manager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION;
+    }
+
     private void closePlayerAndFinish() {
         savePlaybackPosition();
         releasePlayer();
         if (!isFinishing()) {
-            finishAndRemoveTask();
+            if (isTvDevice()) finish(); else finishAndRemoveTask();
         }
     }
 
@@ -196,7 +203,7 @@ public class NativePlayerActivity extends Activity {
         getWindow().setNavigationBarColor(Color.BLACK);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        setRequestedOrientation(isTvDevice() ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
@@ -738,7 +745,32 @@ public class NativePlayerActivity extends Activity {
     }
 
     @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (!isTvDevice()) return super.dispatchKeyEvent(event);
+        int key = event.getKeyCode();
+        if (key == KeyEvent.KEYCODE_BACK) {
+            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
+                if (event.getEventTime() - event.getDownTime() >= 2000) {
+                    savePlaybackPosition(); releasePlayer(); moveTaskToBack(true); finish();
+                } else if (controlsVisible) setControlsVisible(false);
+                else closePlayerAndFinish();
+            }
+            return true;
+        }
+        if (!controlsVisible && (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if (key == KeyEvent.KEYCODE_DPAD_UP) showControlsTemporarily();
+                else if (key == KeyEvent.KEYCODE_DPAD_CENTER) togglePlayback();
+                else seekByTenSeconds(key == KeyEvent.KEYCODE_DPAD_RIGHT);
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
     public void onBackPressed() {
+        if (isTvDevice()) { if (controlsVisible) setControlsVisible(false); else closePlayerAndFinish(); return; }
         if (fullscreen) {
             setFullscreen(false);
         } else {
