@@ -19,8 +19,9 @@ const countryNameList = [...countryNames].sort((a,b)=>b.length-a.length);
 export function classifyTr(item: FilterItem): 'tr'|'foreign'|'unknown' {
   const category=normalizeCategory(item.category), title=normalizeCategory(item.title);
   if(trPrefix.test(category))return 'tr';
+  if(item.type==='live'&&liveCategory.test(category))return 'tr';
   const code=category.match(/^\s*(?:[\[({]\s*)?([a-z]{2,3})(?=$|[\s\])}:|_–—-])/);
-  if(code && codes.has(code[1]))return 'foreign';
+  if(code && codes.has(code[1]) && (code[1]!=='tv' || /^\s*tv\s*[-:|]/.test(category)))return 'foreign';
   if(countryNameList.some(n=>category===n||category.startsWith(n+' ')||category.startsWith(n+'-')||category.startsWith(n+':')))return 'foreign';
   if(item.type==='live'){
     if(liveCategory.test(category)||trPrefix.test(title)||localChannel.test(title))return 'tr';
