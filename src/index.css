@@ -320,3 +320,6 @@ input[type="range"] {
 .xiptv-tv .tv-disk-grid span{color:#b9cacb}
 
 .xiptv-tv .tv-settings-screen{max-width:1200px;padding:16px 24px 32px}.xiptv-tv .tv-settings-screen [hidden]{display:none!important}.xiptv-tv .tv-settings-screen select,.xiptv-tv .tv-settings-screen button:not([role=switch]){min-height:40px}.xiptv-tv .tv-settings-screen label,.xiptv-tv .tv-settings-screen strong{font-size:16px}.xiptv-tv .tv-preference-panel{display:flex;flex-direction:column;gap:12px;background:#1c232c;padding:20px;border-radius:14px}.xiptv-tv .tv-preference-panel button{background:#303744;padding:12px;border-radius:9px;text-align:left}.xiptv-tv.xiptv-tv-reduced-motion *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;scroll-behavior:auto!important}
+
+/* Avoid expensive continuous effects on low-memory TV devices. */
+.xiptv-tv .tv-simple-target{transition:none}.xiptv-tv .tv-simple-art img{display:block}.xiptv-tv .xiptv-header{backdrop-filter:none;background:#101319}.xiptv-tv .tv-simple-menu{box-shadow:0 8px 24px #0008}.xiptv-tv .tv-movie-ambient img,.xiptv-tv .tv-series-ambient img{filter:blur(4px)}
