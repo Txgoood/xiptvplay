@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { isTvMode } from '../../services/tvNavigation';
 import { CatalogPoster } from '../CatalogPoster';
 import { CalendarDays, Download, Heart, Info, Layers, Play, MoreHorizontal, X } from 'lucide-react';
@@ -22,11 +22,40 @@ interface Props {
 export function CatalogMediaCard({ item, view, isChildMode, onPlay, onSeries, onInfo, onEpg, onDownload, onSchedule, onFavorite }: Props) {
   const [actions,setActions]=useState(false);
   useEffect(()=>{if(!actions)return;const back=(e:Event)=>{e.stopImmediatePropagation();setActions(false);};window.addEventListener('xiptv-tv-back',back,true);return()=>window.removeEventListener('xiptv-tv-back',back,true);},[actions]);
+  const press=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const longPress=useRef(false);
+  const cancelPress=()=>{if(press.current!==null){clearTimeout(press.current);press.current=null;}};
+  useEffect(()=>()=>{if(press.current!==null)clearTimeout(press.current);},[]);
   const tv=isTvMode();
   const live = item.type === 'live', series = item.type === 'series';
   const list = view === 'list' || view === 'details';
   const open = () => live ? onPlay(item) : onInfo(item);
   const rating = catalogRating(item.rating);
+  if(tv){
+    const activate=()=>live?onPlay(item):series?onSeries(item):onInfo(item);
+    const choose=(fn:()=>void)=>{setActions(false);fn();};
+    return <article className={`tv-simple-card tv-simple-card--${view} ${live?'tv-simple-live':''}`} data-media-id={item.id}>
+      <button type="button" className="tv-simple-target" aria-label={item.title+' · OK: aç, uzun OK: seçenekler'} data-tv-poster="true"
+        onKeyDown={e=>{if(e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();if(e.repeat||press.current!==null)return;longPress.current=false;press.current=setTimeout(()=>{press.current=null;longPress.current=true;setActions(true);},650);}}
+        onKeyUp={e=>{if(e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();cancelPress();if(!longPress.current)activate();longPress.current=false;}}
+        onBlur={cancelPress} onClick={activate} onContextMenu={e=>{e.preventDefault();setActions(true);}}>
+        <div className="tv-simple-art"><CatalogPoster media={item} className={`w-full h-full ${live?'object-contain p-3':'object-cover'}`}/>
+          {item.isFavorite&&<Heart size={15} className="tv-simple-heart" fill="currentColor"/>}
+          {rating&&!live&&<span className="tv-simple-rating">★ {rating}</span>}
+          {live&&<span className="tv-simple-live-badge">{item.resolution||'CANLI'}</span>}
+        </div>
+        <div className="tv-simple-meta"><span className="tv-simple-title">{item.title}</span>{view==='details'&&<span className="tv-simple-category">{item.category}</span>}
+        {view==='details'&&live&&item.epgCurrent&&<span className="tv-simple-category">{item.epgCurrent}</span>}</div>
+      </button>
+      {actions&&<div role="dialog" aria-modal="true" aria-label={item.title+' seçenekleri'} className="fixed inset-0 z-[130] bg-black/75 flex items-center justify-center"><div className="tv-simple-menu"><strong>{item.title}</strong>
+        <button onClick={()=>choose(()=>series?onSeries(item):onPlay(item))}>{series?'Bölümler':'İzle'}</button>
+        <button onClick={()=>choose(()=>live?onEpg(item):onInfo(item))}>{live?'Yayın bilgisi':'Bilgiler'}</button>
+        <button onClick={()=>choose(()=>onFavorite(item.id))}>{item.isFavorite?'Favorilerden çıkar':'Favorilere ekle'}</button>
+        {!isChildMode&&!live&&<button onClick={()=>choose(()=>series?onSeries(item):onDownload(item))}>İndir</button>}
+        {!isChildMode&&!live&&<button onClick={()=>choose(()=>series?onSeries(item):onSchedule(item))}>İndirmeyi zamanla</button>}
+        <button onClick={()=>setActions(false)}>Kapat</button></div></div>}
+    </article>;
+  }
   return <article className={`catalog-card catalog-card--${view} ${live?"catalog-card--live":""} group min-w-0 rounded-2xl bg-[#1c1b1d] border border-white/5 overflow-hidden hover:border-[#00f0ff]/30`}>
     <div className="catalog-card-poster relative bg-[#2a2a2c] overflow-hidden">
       <button type="button" onClick={open} className="block w-full h-full" aria-label={`${item.title} ${live ? 'izle' : 'bilgileri'}`}>
