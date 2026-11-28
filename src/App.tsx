@@ -1596,6 +1596,8 @@ export default function App() {
         onClose={() => setTmdbInfoItem(null)}
         onPlay={safePlay}
         onDownload={handleDownloadMedia}
+        onFavorite={id=>{handleToggleFavorite(id);setTmdbInfoItem(prev=>prev?.id===id?{...prev,isFavorite:!prev.isFavorite}:prev);}}
+        onSchedule={item=>{if(!isChildProfile)setScheduleSelection([item]);}}
         onOpenSeries={(item) => { setCatalogTargetSeason(undefined); setFollowEpisode(undefined); setSelectedSeriesItem(item); }}
       />
 
