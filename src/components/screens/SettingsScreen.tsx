@@ -1,3 +1,4 @@
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import React, { useState } from 'react';
 import { categoryKey, classifyTr, createContentFilter } from '../../services/smartTrFilter';
 import { SystemStats, MediaItem } from '../../types';
@@ -19,6 +20,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onClearCache,
   onResetApp,
 }) => {
+  const disk=React.useMemo(()=>registerPlugin<{getDownloadTarget():Promise<any>;setDownloadTarget(options:{target:string}):Promise<any>}>('DownloadFiles'),[]);
+  const [target,setTarget]=useState<any>(null);
+  const refreshTarget=()=>disk.getDownloadTarget().then(setTarget).catch(()=>{});
+  React.useEffect(()=>{if(Capacitor.getPlatform()==='android')void refreshTarget();},[]);
   const [hardwareDecoder, setHardwareDecoder] = useState(() => {
     const settings = StorageService.getSettings();
     return settings.hardwareDecoder || 'HEVC/H.265 Donanım Hızlandırıcı (MediaCodec)';
@@ -73,6 +78,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       </div>
 
       {onOpenPlaylists && <button type="button" onClick={onOpenPlaylists} className="w-full flex items-center justify-between rounded-2xl bg-[#1c1b1d] border border-white/10 p-4 text-left"><span><strong>Playlist ve Sunucu Yönetimi</strong><br/><span className="text-xs text-[#b9cacb]">Sunucu ekle, düzenle, doğrula ve senkronize et</span></span><span>›</span></button>}
+      {target&&<section className="flex flex-col gap-2 rounded-2xl bg-[#1c1b1d] p-4"><strong>İndirme ve Depolama Konumu</strong><label>Varsayılan hedef <select className="bg-[#29292c] rounded-lg p-2" value={target.target} onChange={e=>disk.setDownloadTarget({target:e.target.value}).then(setTarget).catch(err=>showToast(String(err.message||err)))}><option value="internal">Dahili hafıza</option><option value="usb">Harici USB bellek</option></select></label><span>Dahili boş/toplam: {(target.internalFree/1e9).toFixed(1)} / {(target.internalTotal/1e9).toFixed(1)} GB</span><span>{target.usbAvailable?'USB boş/toplam: '+(target.usbFree/1e9).toFixed(1)+' / '+(target.usbTotal/1e9).toFixed(1)+' GB':'USB bağlı değil veya erişilemiyor'}</span><button className="p-2 rounded-lg bg-white/10" onClick={refreshTarget}>Depolamayı yenile</button><p className="text-xs">Yeni indirmeler seçili konuma kaydedilir. Eski dosyalar taşınmaz.</p></section>}
       {/* Content privacy settings */}
       <div className="flex flex-col gap-3 p-4 rounded-2xl bg-[#1c1b1d] border border-white/5">
         <div className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#ffb4ab]" /><span className="font-headline text-xs text-[#ffb4ab] uppercase tracking-wider font-bold">İçerik Gizliliği</span></div>
