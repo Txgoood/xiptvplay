@@ -77,7 +77,7 @@ public class NativeDownloadPlugin extends Plugin {
             InputStream input = null;
             File target = null;
             try {
-                File base = new File(getContext().getFilesDir(), "downloads");
+                File base = DownloadStorage.base(getContext());
                 if (!base.exists() && !base.mkdirs()) throw new Exception("İndirme klasörü oluşturulamadı.");
                 String safeName = new File(relativePath).getName();
                 target = new File(base, safeName);
@@ -235,7 +235,7 @@ public class NativeDownloadPlugin extends Plugin {
                 finalEvent.put("contentLength", total > 0 ? total : target.length());
                 mainHandler.post(() -> notifyListeners("downloadProgress", finalEvent));
                 JSObject result = new JSObject();
-                result.put("path", "downloads/" + target.getName());
+                result.put("path", DownloadStorage.path(getContext(),target));
                 result.put("fileUri", "file://" + target.getAbsolutePath());
                 result.put("bytes", target.length());
                 call.resolve(result);
