@@ -356,6 +356,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
         </section>
       ))}
 
+      {isTvMode()&&<p className="tv-catalog-hint">OK: Aç · Uzun OK: Seçenekler</p>}
       {/* Kategori çipleri ve tüm alt kategorileri açan menü */}
       {categoriesForTab.length > 0 && (
         <div className="flex items-center gap-2 min-w-0">
