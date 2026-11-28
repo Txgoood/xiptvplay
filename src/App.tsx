@@ -42,6 +42,8 @@ import { DownloadNotifications } from './services/downloadNotifications';
 if (Capacitor.getPlatform() === 'android') StorageService.prepareEmptyPlaylistInstall();
 
 export default function App() {
+  const [tvTabRequest,setTvTabRequest]=useState<{tab:'all'|'live'|'movie'|'series';seq:number}|null>(null);
+  const [tvActiveTab,setTvActiveTab]=useState<'all'|'live'|'movie'|'series'>('live');
   useEffect(()=>{
     const resume=()=>{if(document.visibilityState==='visible')void CloudSyncController.restore();};
     void CloudSyncController.restore();
@@ -1425,6 +1427,7 @@ export default function App() {
         onOpenProfile={() => setIsProfileOpen(true)}
       />}
 
+      {isTvMode() && appMode==='app' && !isChildProfile && currentScreen!=='onboarding' && <nav className="tv-experience-nav" aria-label="TV ana menü">{([['all','Tümü'],['live','Canlı TV'],['movie','Filmler'],['series','Diziler'],['favorites','Favoriler'],['downloads','İndirmeler'],['history','Geçmiş'],['settings','Ayarlar']] as const).map(([id,label])=>{const catalogTab=id==='all'||id==='live'||id==='movie'||id==='series';const active=catalogTab?currentScreen==='catalog'&&tvActiveTab===id:currentScreen===id||(id==='settings'&&currentScreen==='playlists');return <button key={id} aria-current={active?'page':undefined} onClick={()=>{if(catalogTab){setTvTabRequest(prev=>({tab:id,seq:(prev?.seq||0)+1}));setTvActiveTab(id);handleNavigateToCatalog();}else{setTvTabRequest(null);setCurrentScreen(id);}}}>{label}</button>;})}</nav>}
       {/* Main View Port */}
       <main className="flex-1 w-full pt-16 flex flex-col">
         {appMode === 'prd' && !isChildProfile ? (
@@ -1463,6 +1466,8 @@ export default function App() {
             {currentScreen === 'catalog' && (
               <CatalogScreen
                 key={historyProfileId+'_'+(activePlaylist?.id||'all')}
+                tvTabRequest={isTvMode()?tvTabRequest:null}
+                onTvTabChange={setTvActiveTab}
                 profileId={historyProfileId}
                 watchHistory={watchHistory}
                 catalog={decoratedCatalog}
@@ -1550,7 +1555,7 @@ export default function App() {
       </main>
 
       {/* Bottom Nav: Only visible when in 'app' mode and not in onboarding */}
-      {appMode === 'app' && !isChildProfile && currentScreen !== 'onboarding' && (
+      {appMode === 'app' && !isTvMode() && !isChildProfile && currentScreen !== 'onboarding' && (
         <BottomNav
           currentScreen={currentScreen}
           onSelectScreen={(s) => {
