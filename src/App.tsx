@@ -1518,7 +1518,8 @@ export default function App() {
                   }
                 }}
                 onRemoveFavorite={handleToggleFavorite}
-                onOpenCatalog={() => setCurrentScreen('catalog')}
+                onOpenCategory={row=>{const target=playlists.find(p=>p.id===row.playlistId);if(!target){showToast('Playlist bulunamadı.');return;}try{sessionStorage.setItem('xiptv_catalog_session_'+historyProfileId+'_'+target.id,JSON.stringify({tab:row.tab,category:row.name,search:''}));sessionStorage.removeItem('xiptv_catalog_session_'+historyProfileId+'_'+target.id+'_scroll');}catch{}handleSelectPlaylist(target);}}
+                 onOpenCatalog={() => setCurrentScreen('catalog')}
               />
             )}
 
