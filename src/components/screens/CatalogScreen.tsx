@@ -1,3 +1,4 @@
+import { isTvMode } from '../../services/tvNavigation';
 import { createContentFilter } from '../../services/smartTrFilter';
 import { CatalogPoster } from '../CatalogPoster';
 import React, { useState, useMemo, useEffect, useDeferredValue } from 'react';
@@ -71,9 +72,11 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   const [decisionOpen, setDecisionOpen] = useState(false);
   const sessionKey = 'xiptv_catalog_session_' + profileId + '_' + (activePlaylist?.id || 'all');
   const [session] = useState(() => { try { return JSON.parse(sessionStorage.getItem(sessionKey) || '{}'); } catch { return {}; } });
-  const [activeTab, setActiveTab] = useState<'all' | 'live' | 'movie' | 'series'>(session.tab || 'all');
+  const [activeTab, setActiveTab] = useState<'all' | 'live' | 'movie' | 'series'>(session.tab || (isTvMode() ? 'live' : 'all'));
   const [selectedCategory, setSelectedCategory] = useState<string>(session.category || 'Tümü');
   const [searchQuery, setSearchQuery] = useState(session.search || '');
+  const [tvSearchEditing,setTvSearchEditing]=useState(false);
+  useEffect(()=>{if(!tvSearchEditing)return;const close=(e:Event)=>{e.stopImmediatePropagation();setTvSearchEditing(false);};window.addEventListener('xiptv-tv-back',close,true);return()=>window.removeEventListener('xiptv-tv-back',close,true);},[tvSearchEditing]);
   const deferredQuery = useDeferredValue(searchQuery);
   const searchIndex = useMemo(() => new Map(catalog.map(item => [item.id, normalizeSearch(item.title + ' ' + item.category)])), [catalog]);
   useEffect(() => { try { sessionStorage.setItem(sessionKey,JSON.stringify({tab:activeTab,category:selectedCategory,search:searchQuery})); } catch {} },[sessionKey,activeTab,selectedCategory,searchQuery]);
@@ -228,11 +231,11 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   return (
     <div className="flex flex-col w-full max-w-none mx-auto px-3 sm:px-4 lg:px-6 pt-2 pb-28 gap-3.5 select-none">
       {/* Search Input Bar */}
-      <div className="relative flex items-center rounded-2xl bg-[#1c1b1d] border border-white/5 focus-within:border-[#00f0ff]/40 shadow-md">
+      <div className="xiptv-catalog-search relative flex items-center rounded-2xl bg-[#1c1b1d] border border-white/5 focus-within:border-[#00f0ff]/40 shadow-md">
         <div className="absolute left-3.5 flex items-center pointer-events-none text-[#b9cacb]">
           <Search className="w-4 h-4 text-[#b9cacb]" />
         </div>
-        <input
+        {isTvMode() ? <button type="button" onClick={() => setTvSearchEditing(true)} className="w-full text-left pl-11 pr-10 py-3 text-sm text-[#e5e1e4]">{searchQuery || "Kanal, film veya dizi ara · OK"}</button> : <input
           className="w-full bg-transparent pl-11 pr-10 py-3 text-[14px] text-[#e5e1e4] placeholder:text-[#849495] focus:outline-none"
           placeholder="Gerçek Kanal, Film veya Dizi Ara..."
           type="text"
@@ -241,7 +244,8 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
             setSearchQuery(e.target.value);
             setVisibleCount(PAGE_CHUNK);
           }}
-        />
+        />}
+        {isTvMode() && tvSearchEditing && <div role="dialog" className="fixed inset-0 z-[120] bg-black/80 flex items-start justify-center p-4"><div className="mt-2 w-full max-w-xl rounded-xl bg-[#201f21] p-4 flex flex-col gap-3"><label htmlFor="tv-catalog-query">Kanal, film veya dizi ara</label><input id="tv-catalog-query" autoFocus value={searchQuery} onChange={e=>{setSearchQuery(e.target.value);setVisibleCount(PAGE_CHUNK);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();setTvSearchEditing(false);}}} className="w-full p-3 rounded-lg bg-[#131315] text-white"/><button onClick={()=>setTvSearchEditing(false)} className="rounded-lg bg-[#0566d9] p-3">Sonuçları göster</button></div></div>}
         {searchQuery && (
           <button
             onClick={() => {
