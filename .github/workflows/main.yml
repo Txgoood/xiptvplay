@@ -1,5 +1,5 @@
 name: Build Android APK
-run-name: XIPTV Play Android TV BOX CINEMATIC MOVIES v1.4.43 (51) • ${{ github.event_name }} • ${{ github.sha }}
+run-name: XIPTV Play Android TV BOX PERFECT ALIGNMENT v1.4.44 (52) • ${{ github.event_name }} • ${{ github.sha }}
 # Stable signing verification after GitHub repository secret registration.
 
 on:
@@ -16,6 +16,7 @@ on:
       - feat/android-tv-box-smart-interface-build49
       - feat/android-tv-box-cinematic-series-build50
       - feat/android-tv-box-cinematic-movies-build51
+      - feat/android-tv-box-perfect-alignment-build52
     paths:
       - '.github/workflows/main.yml'
       - 'scripts/android-emulator-smoke.sh'
@@ -124,7 +125,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: XIPTV-Play-v1.4.43-Build51-TV-BOX-CINEMATIC-MOVIES
+          name: XIPTV-Play-v1.4.44-Build52-TV-BOX-PERFECT-ALIGNMENT
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
@@ -155,7 +156,7 @@ jobs:
       - name: Download APK produced by build job
         uses: actions/download-artifact@v4
         with:
-          name: XIPTV-Play-v1.4.43-Build51-TV-BOX-CINEMATIC-MOVIES
+          name: XIPTV-Play-v1.4.44-Build52-TV-BOX-PERFECT-ALIGNMENT
           path: emulator-apk
 
       - name: Download player controls test APK
