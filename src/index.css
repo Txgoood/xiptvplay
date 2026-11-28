@@ -162,3 +162,27 @@ input[type="range"] {
 .xiptv-tv .xiptv-header + main { padding-top:8px; }
 .xiptv-tv .xiptv-catalog-search { scroll-margin-top:60px; scroll-margin-bottom:85px; }
 .xiptv-tv main button, .xiptv-tv main input { scroll-margin-top:60px; scroll-margin-bottom:85px; }
+
+/* TV-only cinematic series detail; a single blurred artwork behind both panes. */
+.xiptv-tv .tv-series-overlay{padding:12px;overflow:hidden}
+.xiptv-tv .tv-series-shell{width:100%;max-width:1600px;height:95dvh;max-height:95dvh;isolation:isolate;background:#15151d}
+.xiptv-tv .tv-series-ambient{position:absolute;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.xiptv-tv .tv-series-ambient img{width:100%;height:100%;object-fit:cover;filter:blur(25px);transform:scale(1.09);opacity:.68}
+.xiptv-tv .tv-series-ambient>div{position:absolute;inset:0;background:linear-gradient(110deg,rgba(19,19,27,.16),rgba(19,19,27,.72) 50%,rgba(19,19,27,.86)),linear-gradient(0deg,rgba(14,14,20,.9),transparent 90%)}
+.xiptv-tv .tv-series-hero{width:37%;min-width:0;max-width:none;height:100%;background:transparent;border-right:1px solid rgba(255,255,255,.1)}
+.xiptv-tv .tv-series-hero-image{position:absolute;inset:0;width:100%;height:52%;object-fit:cover;object-position:center top;filter:blur(1.5px);transform:none;opacity:.84;mask-image:linear-gradient(#000 40%,transparent 100%)}
+.xiptv-tv .tv-series-hero-shade{background:linear-gradient(0deg,rgba(14,14,20,.85),rgba(14,14,20,.28) 65%,transparent)}
+.xiptv-tv .tv-series-meta{top:56px;bottom:64px;left:16px;right:16px;align-items:flex-start;overflow-y:auto;overscroll-behavior:contain;padding:6px;display:flex;gap:12px}
+.xiptv-tv .tv-series-poster{width:clamp(76px,10vw,154px);border-radius:12px}
+.xiptv-tv .tv-series-title{font-size:clamp(18px,2.1vw,34px);overflow-wrap:anywhere;white-space:normal}
+.xiptv-tv .tv-series-plot{font-size:clamp(12px,1.2vw,17px);line-height:1.55;color:#f3eeee;text-shadow:0 1px 3px #000}
+.xiptv-tv .tv-series-extra{font-size:12px;line-height:1.55;margin-top:10px;display:grid;gap:8px;color:#e1dce2}
+.xiptv-tv .tv-series-extra strong{color:#86ecf4}
+.xiptv-tv .tv-series-left-actions{position:absolute;z-index:12;bottom:14px;left:22px;right:16px}
+.xiptv-tv .tv-series-episodes{position:relative;padding:18px;gap:14px;background:transparent}
+.xiptv-tv .tv-series-toolbar{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.xiptv-tv .tv-series-batch{display:flex;gap:10px;flex:none}
+.xiptv-tv .tv-series-batch button{width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(30,29,39,.55);color:#e7f7fa;display:grid;place-items:center}
+.xiptv-tv .tv-series-episode-row{flex-direction:row;align-items:center;background:rgba(28,27,39,.52);border:1px solid rgba(255,255,255,.12);padding:9px;min-height:70px}
+.xiptv-tv .tv-series-episode-row:focus-within{border-color:#00eaff;box-shadow:0 0 0 1px #00eaff}
+.xiptv-tv .tv-series-toast{position:absolute;z-index:30;left:38%;right:3%;bottom:16px;background:#174236}
