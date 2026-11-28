@@ -250,3 +250,23 @@ input[type="range"] {
 .xiptv-tv .tv-catalog-tabs-replaced{display:none}
 .xiptv-tv .tv-experience-nav+main{padding-top:10px}
 .xiptv-tv .tv-experience-nav~main button,.xiptv-tv .tv-experience-nav~main input{scroll-margin-top:110px}
+
+/* TV EXPERIENCE 2.0: one focusable tile per item; no permanent action buttons. */
+.xiptv-tv .tv-simple-card{min-width:0;position:relative}
+.xiptv-tv .tv-simple-target{display:flex;flex-direction:column;width:100%;text-align:left;min-width:0;padding:0;border:1px solid #ffffff16;border-radius:10px;background:#181b22;color:#f0f4f5;overflow:hidden}
+.xiptv-tv .tv-simple-target:focus{outline:3px solid #00e6ef!important;outline-offset:2px;border-color:#00e6ef}
+.xiptv-tv .tv-simple-art{position:relative;aspect-ratio:2/3;width:100%;overflow:hidden;background:#222630;flex:none}
+.xiptv-tv .tv-simple-live .tv-simple-art{aspect-ratio:16/9}
+.xiptv-tv .tv-simple-meta{padding:6px 8px;width:100%;min-width:0}
+.xiptv-tv .tv-simple-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;line-height:1.3;height:2.6em;font-weight:650;font-size:clamp(12px,1.15vw,18px)}
+.xiptv-tv .tv-simple-rating,.xiptv-tv .tv-simple-live-badge,.xiptv-tv .tv-simple-heart{position:absolute;top:5px;right:5px;padding:3px 5px;background:#101319dc;border-radius:5px;font-size:11px;color:#ffe098}
+.xiptv-tv .tv-simple-heart{left:5px;right:auto;color:#ff9aaa;box-sizing:content-box}
+.xiptv-tv .tv-simple-live-badge{color:#00e6ef}
+.xiptv-tv .tv-simple-card--list .tv-simple-target,.xiptv-tv .tv-simple-card--details .tv-simple-target{flex-direction:row;align-items:center}
+.xiptv-tv .tv-simple-card--list .tv-simple-art{width:60px;height:80px}
+.xiptv-tv .tv-simple-card--details .tv-simple-art{width:104px;height:140px}
+.xiptv-tv .tv-simple-card--list.tv-simple-live .tv-simple-art,.xiptv-tv .tv-simple-card--details.tv-simple-live .tv-simple-art{aspect-ratio:auto}
+.xiptv-tv .tv-simple-category{display:block;font-size:12px;color:#b9cacb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xiptv-tv .tv-simple-menu{width:min(520px,90vw);padding:20px;display:flex;flex-direction:column;gap:8px;background:#20242d;border:1px solid #ffffff25;border-radius:16px}
+.xiptv-tv .tv-simple-menu button{padding:12px;background:#ffffff0c;border-radius:8px;text-align:left}
+.xiptv-tv .tv-catalog-hint{font-size:12px;color:#b9cacb;text-align:right}
